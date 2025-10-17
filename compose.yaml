@@ -1,27 +1,55 @@
 services:
 
-  # Resets persistent volumes (cache and local state) to build-time defaults.
-  # Run after initial build, or anytime you want to discard accumulated
-  # data and start fresh.
-  reset-volumes:
+  # Reset cache directory shared between all volumes
+  reset-cache:
     image: paul-containers:latest
     pull_policy: never
     user: root
     command: >
       sh -c "cp -a /home/${USERNAME}/.container-cache/. /mnt/cache/ &&
-             cp -a /home/${USERNAME}/.container-local/. /mnt/local/ &&
-             chown -R ${HOST_UID}:${HOST_GID} /mnt/cache /mnt/local"
+             chown -R ${HOST_UID}:${HOST_GID} /mnt/cache"
     volumes:
-      - container-cache:/mnt/cache
-      - container-local:/mnt/local
+      - shared-cache:/mnt/cache
     environment:
       - USERNAME=${USERNAME:-dev}
       - HOST_UID=${HOST_UID:-1000}
       - HOST_GID=${HOST_GID:-1000}
-    # Allows to avoid running it by default
-    profiles: ["init"]
+    profiles: ["reset-all", "reset-cache"]
 
-  devenv:
+  # Reset local state/data for Project A
+  reset-local-a:
+    image: paul-containers:latest
+    pull_policy: never
+    user: root
+    command: >
+      sh -c "cp -a /home/${USERNAME}/.container-local/. /mnt/local/ &&
+             chown -R ${HOST_UID}:${HOST_GID} /mnt/local"
+    volumes:
+      - project-a-local:/mnt/local
+    environment:
+      - USERNAME=${USERNAME:-dev}
+      - HOST_UID=${HOST_UID:-1000}
+      - HOST_GID=${HOST_GID:-1000}
+    profiles: ["reset-all", "reset-a"]
+
+  # Reset local state/data for Project B
+  reset-local-b:
+    image: paul-containers:latest
+    pull_policy: never
+    user: root
+    command: >
+      sh -c "cp -a /home/${USERNAME}/.container-local/. /mnt/local/ &&
+             chown -R ${HOST_UID}:${HOST_GID} /mnt/local"
+    volumes:
+      - project-b-local:/mnt/local
+    environment:
+      - USERNAME=${USERNAME:-dev}
+      - HOST_UID=${HOST_UID:-1000}
+      - HOST_GID=${HOST_GID:-1000}
+    profiles: ["reset-all", "reset-project-b"]
+
+  # Development environment for project A
+  devenv-a:
     image: paul-containers:latest
     pull_policy: never
     stdin_open: true
@@ -44,10 +72,39 @@ services:
         GIT_AUTHOR_EMAIL: ${GIT_AUTHOR_EMAIL}
     volumes:
       - ${GIT_CREDS_HOST:-/dev/null}:/home/${USERNAME:-dev}/.git-credentials:ro
-      - ${PROJECT_PATH}:/home/${USERNAME:-dev}/projects/app
-      - container-cache:/home/${USERNAME:-dev}/.container-cache
-      - container-local:/home/${USERNAME:-dev}/.container-local
+      - ${PROJECT_A_PATH}:/home/${USERNAME:-dev}/projects/app
+      - shared-cache:/home/${USERNAME:-dev}/.container-cache
+      - project-a-local:/home/${USERNAME:-dev}/.container-local
+
+  # Development environment for project B
+  devenv-b:
+    image: paul-containers:latest
+    pull_policy: never
+    stdin_open: true
+    tty: true
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        HOST_UID: ${HOST_UID:-1000}
+        HOST_GID: ${HOST_GID:-1000}
+        USERNAME: ${USERNAME:-dev}
+        USER_SHELL: ${USER_SHELL:-bash}
+        SUPPLEMENTARY_PACKAGES: ${SUPPLEMENTARY_PACKAGES:-}
+        INSTALL_NEOVIM: ${INSTALL_NEOVIM:-true}
+        INSTALL_STARSHIP: ${INSTALL_STARSHIP:-true}
+        INSTALL_ATUIN: ${INSTALL_ATUIN:-true}
+        INSTALL_MISE: ${INSTALL_MISE:-true}
+        NODE_VERSION: ${NODE_VERSION:-22.11.0}
+        GIT_AUTHOR_NAME: ${GIT_AUTHOR_NAME}
+        GIT_AUTHOR_EMAIL: ${GIT_AUTHOR_EMAIL}
+    volumes:
+      - ${GIT_CREDS_HOST:-/dev/null}:/home/${USERNAME:-dev}/.git-credentials:ro
+      - ${PROJECT_B_PATH}:/home/${USERNAME:-dev}/projects/app
+      - shared-cache:/home/${USERNAME:-dev}/.container-cache
+      - project-b-local:/home/${USERNAME:-dev}/.container-local
 
 volumes:
-  container-cache:
-  container-local:
+  shared-cache:       # Shared cache across all containers (safe)
+  project-a-local:    # Separate local state/data for project A
+  project-b-local:    # Separate local state/data for project B
