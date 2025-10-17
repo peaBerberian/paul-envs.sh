@@ -135,7 +135,7 @@ read-only and kept as-is).
 
 - **Preserved**: the mounted project directory (`~/projects/app`), the
   "cache" directory (mounted as `~/.container-cache`) and the "local" directory
-  (mounted as `~/.container-cache`) - see the "persisted volumes" chapter for
+  (mounted as `~/.container-local`) - see the "persisted volumes" chapter for
   those last two.
 
 - **Persistent**: Git credentials if `GIT_CREDS_HOST` is set in `.env`
