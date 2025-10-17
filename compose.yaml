@@ -131,6 +131,7 @@ services:
 volumes:
   shared-cache:
     name: devenv-shared-cache
+    external: true
 
   local-state:
     # Create project-specific volume with clean name

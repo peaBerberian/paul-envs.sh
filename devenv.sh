@@ -448,10 +448,13 @@ cmd_build() {
         error "Project '$name' not found at $config_file\nHint: Use 'devenv.sh list' to see available projects or 'devenv.sh create' to make a new one"
     fi
 
+    # Ensure shared cache volume exists
+    docker volume create devenv-shared-cache 2>/dev/null || true
+
     export COMPOSE_PROJECT_NAME="$name"
     docker compose -f "$BASE_COMPOSE" -f "$config_file" build
     success "Built project '$name'"
-
+    
     echo ""
     warn "Resetting persistent volumes..."
     docker compose -f "$BASE_COMPOSE" -f "$config_file" --profile reset up reset-cache reset-local
