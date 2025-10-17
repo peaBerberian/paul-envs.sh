@@ -118,7 +118,11 @@ RUN if [ "$INSTALL_MISE" = "true" ]; then \
              mise exec -- npm config set cache /home/${USERNAME}/.container-cache/.npm && \
              mise exec -- npm install -g yarn && \
              mise exec -- yarn config set cacheFolder /home/${USERNAME}/.container-cache/.yarn'; \
-  else \
+  fi
+
+USER root
+
+RUN if [ "$INSTALL_MISE" != "true" ]; then \
     # Just install nodejs and npm from Ubuntu's repositories
     apt-get update && apt-get install -y \
       nodejs \
@@ -129,6 +133,8 @@ RUN if [ "$INSTALL_MISE" = "true" ]; then \
       && yarn config set cacheFolder /home/${USERNAME}/.container-cache/.yarn \
       && rm -rf /var/lib/apt/lists/*; \
   fi
+
+USER ${USERNAME}
 
 # Pre-install nvim plugins if neovim is installed and config exists
 RUN if [ "$INSTALL_NEOVIM" = "true" ] && [ -d /home/${USERNAME}/.config/nvim ]; then \

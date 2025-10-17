@@ -1,5 +1,25 @@
 services:
+
+  # Resets persistent volumes (cache and local state) to build-time defaults.
+  # Run after initial build, or anytime you want to discard accumulated
+  # data and start fresh.
+  reset-volumes:
+    image: paul-containers:latest
+    pull_policy: never
+    user: root
+    command: >
+      sh -c "cp -a /home/${USERNAME:-dev}/.container-cache/. /mnt/cache/ &&
+             cp -a /home/${USERNAME:-dev}/.container-local/. /mnt/local/ &&
+             chown -R ${HOST_UID:-1000}:${HOST_GID:-1000} /mnt/cache /mnt/local"
+    volumes:
+      - container-cache:/mnt/cache
+      - container-local:/mnt/local
+    # Allows to avoid running it by default
+    profiles: ["init"]
+
   devenv:
+    image: paul-containers:latest
+    pull_policy: never
     build:
       context: .
       dockerfile: Dockerfile
@@ -19,8 +39,8 @@ services:
     volumes:
       - ${GIT_CREDS_HOST:-/dev/null}:/home/${USERNAME:-dev}/.git-credentials:ro
       - ${PROJECT_PATH}:/home/${USERNAME:-dev}/projects/app
-      - container-cache:/home/${USERNAME}/.container-cache
-      - container-local:/home/${USERNAME}/.container-local
+      - container-cache:/home/${USERNAME:-dev}/.container-cache
+      - container-local:/home/${USERNAME:-dev}/.container-local
 volumes:
   container-cache:
   container-local:

@@ -4,8 +4,11 @@
 
 1. Copy `.env.example` to `.env` and configure it
 2. Populate the `configs/` directory with your dotfiles (merged with `$HOME`)
-3. Build: `docker compose build`
-4. Run: `docker compose run --rm devenv`
+3. Build the container: `docker compose build`
+4. First initialize the persistent "volumes" (needed after a build):
+   `docker compose --profile init run --rm reset-volumes`
+5. Run the container each time you want to work on the project:
+   `docker compose run --rm devenv`
 
 ## What's this
 
@@ -88,12 +91,10 @@ _I made use both of the XDG spec and of tool-specific configuration for this._
 
 Along the mounted project, those are the only directories which are persisted.
 If an instability arises at some point, the "volumes" corresponding to those
-directories cache can be reset. For example with docker-compose:
+directories cache can be reset very easily through the `reset-volumes` service.
+For example with docker-compose:
 ```sh
-# Nuclear option: clear all caches
-docker compose down -v  # stops and removes volumes
-docker compose build    # rebuild container
-docker compose run --rm devenv
+docker compose --profile init run --rm reset-volumes
 ```
 
 ## How to run it
@@ -101,10 +102,13 @@ docker compose run --rm devenv
 Once setup is done (configs and env files), the container needs first to be
 "built".
 
-With docker-compose, this can be done just by `cd`-ing in this directory, then
+With docker-compose, this can be done by `cd`-ing in this directory, then
 calling:
 ```sh
 docker compose build
+
+# Initialize the persistent "volumes" with the build-time data
+docker compose --profile init run --rm reset-volumes
 ```
 
 This can be re-done later to refresh the installed build tools, if needed
