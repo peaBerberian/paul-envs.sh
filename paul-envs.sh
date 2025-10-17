@@ -247,13 +247,13 @@ prompt_for_credentials() {
     for choice in $choices; do
         case $choice in
             1)
-                result_volumes+=("~/.ssh:/home/\${USERNAME}/.ssh:ro")
+                result_volumes+=("$HOME/.ssh:/home/\${USERNAME}/.ssh:ro")
                 ;;
             2)
-                result_volumes+=("~/.git-credentials:/home/\${USERNAME}/.git-credentials:ro")
+                result_volumes+=("$HOME/.git-credentials:/home/\${USERNAME}/.git-credentials:ro")
                 ;;
             3)
-                result_volumes+=("~/.aws:/home/\${USERNAME}/.aws:ro")
+                result_volumes+=("$HOME/.aws:/home/\${USERNAME}/.aws:ro")
                 ;;
             4)
                 result_volumes+=("/etc/ssl/certs/custom-ca.crt:/usr/local/share/ca-certificates/custom-ca.crt:ro")
