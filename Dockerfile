@@ -19,7 +19,10 @@ RUN apt-get update && apt-get install -y \
 RUN if [ "$USER_SHELL" = "fish" ]; then \
   apt-get update && apt-get install -y fish && rm -rf /var/lib/apt/lists/*; \
   elif [ "$USER_SHELL" = "zsh" ]; then \
-  apt-get update && apt-get install -y zsh && rm -rf /var/lib/apt/lists/*; \
+    apt-get update && apt-get install -y zsh && rm -rf /var/lib/apt/lists/*; \
+    echo -e "\nexport HISTFILE=/home/${USERNAME}/.container-local/.zsh_history" >> /home/${USERNAME}/.zshrc; \
+  elif [ "$USER_SHELL" = "bash" ]; then \
+    echo -e "\nexport HISTFILE=/home/${USERNAME}/.container-local/.bash_history" >> /home/${USERNAME}/.bashrc; \
   fi
 
 # Create user
@@ -30,6 +33,11 @@ RUN if id -u ubuntu >/dev/null 2>&1; then userdel -r ubuntu; fi && \
 USER ${USERNAME}
 
 ENV SHELL=/usr/bin/${USER_SHELL}
+
+# Set various persistent caches locations through env
+ENV XDG_CACHE_HOME=/home/${USERNAME}/.container-cache/cache \
+    XDG_STATE_HOME=/home/${USERNAME}/.container-local/state \
+    XDG_DATA_HOME=/home/${USERNAME}/.container-local/data
 
 #############################################
 FROM ubuntu-base AS ubuntu-tools
@@ -48,6 +56,10 @@ ARG GIT_AUTHOR_NAME
 ARG GIT_AUTHOR_EMAIL
 
 USER root
+
+ENV _ZO_DATA_DIR=/home/${USERNAME}/.container-local/zoxide \
+    STARSHIP_CACHE=/home/${USERNAME}/.container-local/starship \
+    ATUIN_DB_PATH=/home/${USERNAME}/.container-local/atuin/history.db
 
 RUN apt-get update && apt-get install -y \
   $SUPPLEMENTARY_PACKAGES \
@@ -103,12 +115,18 @@ RUN if [ "$INSTALL_MISE" = "true" ]; then \
     bash -c 'export PATH="$HOME/.local/bin:$PATH" && \
              mise use -g node@${NODE_VERSION} && \
              mise exec -- npm config set prefix "$HOME/.local" && \
-             mise exec -- npm install -g yarn'; \
+             mise exec -- npm config set cache /home/${USERNAME}/.container-cache/.npm && \
+             mise exec -- npm install -g yarn && \
+             mise exec -- yarn config set cacheFolder /home/${USERNAME}/.container-cache/.yarn'; \
   else \
     # Just install nodejs and npm from Ubuntu's repositories
     apt-get update && apt-get install -y \
       nodejs \
       npm \
+      && npm config set prefix "$HOME/.local" \
+      && npm config set cache /home/${USERNAME}/.container-cache/.npm \
+      && npm install -g yarn \
+      && yarn config set cacheFolder /home/${USERNAME}/.container-cache/.yarn \
       && rm -rf /var/lib/apt/lists/*; \
   fi
 
@@ -124,31 +142,6 @@ USER ${USERNAME}
 
 # Set-up projects directory
 RUN mkdir -p /home/${USERNAME}/projects
-RUN mkdir -p /home/${USERNAME}/.container-cache
-
-# Set various caches locations through env
-ENV XDG_CACHE_HOME=/home/${USERNAME}/.container-cache/cache \
-    _ZO_DATA_DIR=/home/${USERNAME}/.container-cache/zoxide \
-    STARSHIP_CACHE=/home/${USERNAME}/.container-cache/starship \
-    ATUIN_DB_PATH=/home/${USERNAME}/.container-cache/atuin/history.db
-
-# Configure npm/yarn cache locations
-RUN if [ "$INSTALL_MISE" = "true" ]; then \
-    bash -c 'export PATH="$HOME/.local/bin:$PATH" && \
-             mise exec -- npm config set cache /home/${USERNAME}/.container-cache/.npm && \
-             mise exec -- yarn config set cacheFolder /home/${USERNAME}/.container-cache/.yarn'; \
-  else \
-    npm config set cache /home/${USERNAME}/.container-cache/.npm && \
-    yarn config set cacheFolder /home/${USERNAME}/.container-cache/.yarn; \
-  fi
-
-# Relocate shell history locations cache to be persistent
-# NOTE: fish is already handled with `XDG_CACHE_HOME`
-RUN if [ "$USER_SHELL" = "zsh" ]; then \
-    echo -e "\nexport HISTFILE=/home/${USERNAME}/.container-cache/.zsh_history" >> /home/${USERNAME}/.zshrc; \
-  elif [ "$USER_SHELL" = "bash" ]; then \
-    echo -e "\nexport HISTFILE=/home/${USERNAME}/.container-cache/.bash_history" >> /home/${USERNAME}/.bashrc; \
-  fi
 
 WORKDIR /home/${USERNAME}/projects
 

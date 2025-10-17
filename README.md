@@ -12,25 +12,26 @@
 I often have to switch between projects at work.
 
 Some of those projects are very fast-moving JS projects with a lot of
-dependencies churning, moving at a pace where I cannot guarantee my
-trust in everything that's going on (that their updates or dependencies work
-well on my system, that they have a limited impact on it and not break anything
-else etc.).
+dependencies churning, and new tools being added very frequently. Some of those
+update system files (e.g. the `mkcert` tool) without my explicit agreement.
 
-Most of those developers also have very similar environments between each
-other, which is sadly not close to mine, so I encounter a lot of issues
-(mostly linked to their bash scripts and such) that they never encounter.
+Moreover, most of those developers also have very similar environments between
+each other, which is sadly not close to mine, so I encounter a lot of issues
+that they never encounter. As those are huge projects and not my main focus, the
+right action which would be to just fix those issues is very time-consuming.
 
-I thus decided to rely on a simple minimal container, adding my current
-developing tools to it, and do development and scripting on it when working on
-their project.
+I thus decided to rely on a container for developing on those projects to
+protect my own system from unwanted changes and to provide a more "barebone"
+and popular environment (ubuntu LTS, adding only my current developing tools to
+it).
 As my setup is only terminal-based (neovim, CLI tools), this can be done
-relatively easily.
+easily.
 
 At first I was just relying on `systemd-nspawn`, as this is a tool that I knew.
 But by using it for this, I thought that having a base with an ephemeral
-"overlay" and a mounted "volume" from the host for the source code was the most
-flexible solution for my setup, so I ended up with a more complex `Dockerfile`
+"overlay" and a few mounted "volumes" from the host (for the source code, caches
+and some minimal controlled state such as shell history) was the most flexible
+solution for my setup, so I ended up with a more complex `Dockerfile`
 and `compose.yaml` file instead and I now rely on a software compatible to
 those.
 
@@ -66,17 +67,34 @@ configs/
         └── ... (your neovim config)
 ```
 
-### cache directory
+### persisted volumes
 
-The `cache` directory found here will be used by the container as a persistent
-cache (e.g. `npm` / `yarn` cache)/history (e.g. shell history, `nvim` history,
-`zoxide`/`atuin` databases if enabled) for tools running inside it.
-It shouldn't be updated on the host but can be emptied to ensure that you
-start fresh - you probably want to keep some kind of peristent cache to speed
-up recurrent tasks though.
+Two container "volumes", a `~/.container-cache` and a `~/.container-local`
+directory, will be present in the container.
+Their main specificity is that unlike almost anything else, their contents are
+persisted through multiple containers run.
 
-Tools installed on the container are already configured to create entries in
-this directory.
+The former (`.container-cache`) is configured to store the various "caches"
+(e.g. `npm` and `yarn` loaded package cache, or any other similar cache), to
+prevent re-doing the same avoidable requests/operations each time a container is
+spawned.
+
+The latter (`.container-local`) is intended for persistent tool data instead,
+such as shell history, neovim undo history, tool databases etc.
+
+The dockerfile is configured so that the installed tools know they have to use
+those directories for the aforementioned purposes.
+_I made use both of the XDG spec and of tool-specific configuration for this._
+
+Along the mounted project, those are the only directories which are persisted.
+If an instability arises at some point, the "volumes" corresponding to those
+directories cache can be reset. For example with docker-compose:
+```sh
+# Nuclear option: clear all caches
+docker compose down -v  # stops and removes volumes
+docker compose build    # rebuild container
+docker compose run --rm devenv
+```
 
 ## How to run it
 
@@ -108,16 +126,18 @@ start fresh from a known stable config.
 
 When working inside the container, here's what you can expect to be either
 "preserved" (changes will stay from container to container), "ephemeral" (it will
-be removed when the container is exited) or "persistent" (host files as read-only
-and kept as-is).
+be removed when the container is exited) or "persistent" (host files mounted as
+read-only and kept as-is).
 
-- **Preserved**: the mounted project directory (`~/projects/app`) and the
-  "cache" directory (mounted as `~/.container-cache`).
+- **Preserved**: the mounted project directory (`~/projects/app`), the
+  "cache" directory (mounted as `~/.container-cache`) and the "local" directory
+  (mounted as `~/.container-cache`) - see the "persisted volumes" chapter for
+  those last two.
 
 - **Persistent**: Git credentials if `GIT_CREDS_HOST` is set in `.env`
 
-- **Ephemeral**: All other changes (further installed packages, tool
-  configuration etc.)
+- **Ephemeral**: All other changes (further installed global packages, global
+  system configurations etc.)
 
 If a new element needs to be added to the container outside the mounted project
 directory, the dockerfile will need to be updated and re-built.

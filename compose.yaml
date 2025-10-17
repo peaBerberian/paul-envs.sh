@@ -19,4 +19,8 @@ services:
     volumes:
       - ${GIT_CREDS_HOST:-/dev/null}:/home/${USERNAME:-dev}/.git-credentials:ro
       - ${PROJECT_PATH}:/home/${USERNAME:-dev}/projects/app
-      - ./cache:/home/${USERNAME}/.container-cache
+      - container-cache:/home/${USERNAME}/.container-cache
+      - container-local:/home/${USERNAME}/.container-local
+volumes:
+  container-cache:
+  container-local:
