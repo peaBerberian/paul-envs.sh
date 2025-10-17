@@ -5,9 +5,9 @@
 1. Copy `.env.example` to `.env` and configure it
 2. Populate the `configs/` directory with your dotfiles (merged with `$HOME`)
 3. Build the container: `docker compose build`
-4. First initialize the persistent "volumes" (needed after a build):
-   `docker compose --profile init run --rm reset-volumes`
-5. Run the container each time you want to work on the project:
+4. First initialize all persistent "volumes" (needed after a build):
+   `docker compose --profile reset up reset-cache reset-local`
+5. Then run the container each time you want to work on the project:
    `docker compose run --rm devenv`
 
 ## What's this
@@ -90,11 +90,18 @@ those directories for the aforementioned purposes.
 _I made use both of the XDG spec and of tool-specific configuration for this._
 
 Along the mounted project, those are the only directories which are persisted.
-If an instability arises at some point, the "volumes" corresponding to those
-directories cache can be reset very easily through the `reset-volumes` service.
-For example with docker-compose:
+If an instability arises at some point, the "volumes" corresponding to
+`.container-cache` and `.container-local` can be reset very easily through
+respectively the `reset-cache` and `reset-local` under the `reset` profile:
 ```sh
-docker compose --profile init run --rm reset-volumes
+# Reset both
+docker compose --profile reset up reset-cache reset-local
+
+# Reset only the .container-cache directory
+docker compose --profile reset up reset-cache
+
+# Reset only the .container-local directory
+docker compose --profile reset up reset-local
 ```
 
 ## How to run it
@@ -108,7 +115,7 @@ calling:
 docker compose build
 
 # Initialize the persistent "volumes" with the build-time data
-docker compose --profile init run --rm reset-volumes
+docker compose --profile reset up reset-cache reset-local
 ```
 
 This can be re-done later to refresh the installed build tools, if needed
@@ -145,3 +152,25 @@ read-only and kept as-is).
 
 If a new element needs to be added to the container outside the mounted project
 directory, the dockerfile will need to be updated and re-built.
+
+## Multi-projects set-up
+
+The `compose.yaml` file is compatible and even optimized for an optional
+multi-project configuration, each project having its own container with a shared
+`.container-cache` persisted volume yet a distinct `.container-local` volume,
+to guard against data race issues if multiple containers write simultaneously
+(which is less of a problem with a cache directory).
+
+To make it work with multiple projects, just:
+
+1.  Create multiple `.env` files by following the same `.env.example` template.
+
+    E.g. for two projects, `project-a` and  `project-b`, you could have both
+    a `.env.project-a` and a `.env.project-b` file.
+
+2.  Then tell your compose-compatible software (e.g. `docker-compose`) to rely
+    on that file when doing container operations. For example for
+    `.env.project-a` with `docker-compose`:
+    ```
+    docker compose --env-file .env.project-a build
+    ```
