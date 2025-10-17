@@ -22,7 +22,6 @@ services:
         GIT_AUTHOR_NAME: ${GIT_AUTHOR_NAME}
         GIT_AUTHOR_EMAIL: ${GIT_AUTHOR_EMAIL}
     volumes:
-      - ${GIT_CREDS_HOST:-/dev/null}:/home/${USERNAME:-dev}/.git-credentials:ro
       - ${PROJECT_PATH}:/home/${USERNAME:-dev}/projects/app
       - shared-cache:/home/${USERNAME:-dev}/.container-cache
       - local-state:/home/${USERNAME:-dev}/.container-local
