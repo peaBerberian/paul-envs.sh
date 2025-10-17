@@ -1,5 +1,12 @@
 # Containers
 
+## Quick Start
+
+1. Copy `.env.example` to `.env` and configure it
+2. Create a `configs/` directory with your dotfiles (merged with `$HOME`)
+3. Build: `docker compose build`
+4. Run: `docker compose run --rm devenv`
+
 ## What's this
 
 I often have to switch between projects at work.
@@ -11,7 +18,7 @@ well on my system, that they have a limited impact on it and not break anything
 else etc.).
 
 Most of those developers also have very similar environments between each
-others, which is sadly not close to mine, so I encounter a lot of issues
+other, which is sadly not close to mine, so I encounter a lot of issues
 (mostly linked to their bash scripts and such) that they never encounter.
 
 I thus decided to rely on a simple minimal container, adding my current
@@ -48,16 +55,16 @@ enabled, the user name, the preferred node.js version, the basic git config
 A configs directory also has to be created locally. It will contain the config
 files for tools that I currently set-up in the `Dockerfile`.
 
-For now files and directories that can be put inside (all optional) are:
-
-- `.bashrc`
-- `.zshrc`
-- `fish`: for the fish terminal config (e.g. the content of the `.config/fish`
-  directory)
-- `nvim`: for the neovim config (e.g. the content of the `.config/nvim`
-  directory)
-- `starship.toml`: for a [starship](https://starship.rs/) (the prompt) config
-  (e.g. the `.config/starship.toml` file).
+Its content will be merged with the home directory of the container. As such you
+can put a `.bashrc` directly in there at its root, or directories in it such as
+`.config/nvim` for a neovim config:
+```
+configs/
+├── .bashrc
+└── .config/
+    └── nvim/
+        └── ... (your neovim config)
+```
 
 ## How to run it
 
@@ -74,7 +81,7 @@ This can be re-done later to refresh the installed build tools, if needed
 (hopefully not a lot).
 
 Then anytime there's need to develop on the project, that container can be
-"run" by just running in any directory:
+"run" by just running:
 ```sh
 docker compose run --rm devenv
 ```
@@ -84,3 +91,20 @@ is that all modifications done in the base container which are not part of the
 mounted project's directory will disappear when that container is not
 relied on anymore - this is actually one of the point of this setup to always
 start fresh from a known stable config.
+
+## What gets preserved vs. ephemeral
+
+When working inside the container, here's what you can expect to be either
+"preserved" (changes will stay from container to container), "ephemeral" (it will
+be removed when the container is exited) or "persistent" (host files as read-only
+and kept as-is).
+
+- **Preserved**: the mounted project directory (`~/projects/app`)
+
+- **Persistent**: Git credentials if `GIT_CREDS_HOST` is set in `.env`
+
+- **Ephemeral**: All other changes (further installed packages, shell history,
+  etc.)
+
+If a new element needs to be added to the container outside the mounted project
+directory, the dockerfile will need to be updated and re-built.
