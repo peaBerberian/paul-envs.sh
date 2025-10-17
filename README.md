@@ -281,16 +281,6 @@ In simple single-projects scenarios, it can also be relied on directly.
 Just set the right env variables listed in there (.e.g in an `env` file) and
 rely on `docker compose` directly (e.g. `docker compose build`). It works!
 
-If (and only if) going that route do not forget to reset the persistent volumes
-after a `build` (even the first one), so that it contains what has been cached
-at build-time:
-```sh
-docker compose --profile reset up reset-cache reset-local
-```
-
-Failing to do that will not break anything, but will needlessly repeat some work
-that has already been done at build-time (e.g. neovim plugin installation).
-
 ### The devenv.sh script
 
 Managing very dynamic configurations for multiple projects just with
