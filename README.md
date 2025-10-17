@@ -3,7 +3,7 @@
 ## Quick Start
 
 1. Copy `.env.example` to `.env` and configure it
-2. Create a `configs/` directory with your dotfiles (merged with `$HOME`)
+2. Populate the `configs/` directory with your dotfiles (merged with `$HOME`)
 3. Build: `docker compose build`
 4. Run: `docker compose run --rm devenv`
 
@@ -52,8 +52,8 @@ enabled, the user name, the preferred node.js version, the basic git config
 
 ### configs directory
 
-A configs directory also has to be created locally. It will contain the config
-files for tools that I currently set-up in the `Dockerfile`.
+A `configs` directory is also present and can be updated on the host. It should
+contain the config files for tools that I currently set-up in the `Dockerfile`.
 
 Its content will be merged with the home directory of the container. As such you
 can put a `.bashrc` directly in there at its root, or directories in it such as
@@ -65,6 +65,18 @@ configs/
     └── nvim/
         └── ... (your neovim config)
 ```
+
+### cache directory
+
+The `cache` directory found here will be used by the container as a persistent
+cache (e.g. `npm` / `yarn` cache)/history (e.g. shell history, `nvim` history,
+`zoxide`/`atuin` databases if enabled) for tools running inside it.
+It shouldn't be updated on the host but can be emptied to ensure that you
+start fresh - you probably want to keep some kind of peristent cache to speed
+up recurrent tasks though.
+
+Tools installed on the container are already configured to create entries in
+this directory.
 
 ## How to run it
 
@@ -99,12 +111,13 @@ When working inside the container, here's what you can expect to be either
 be removed when the container is exited) or "persistent" (host files as read-only
 and kept as-is).
 
-- **Preserved**: the mounted project directory (`~/projects/app`)
+- **Preserved**: the mounted project directory (`~/projects/app`) and the
+  "cache" directory (mounted as `~/.container-cache`).
 
 - **Persistent**: Git credentials if `GIT_CREDS_HOST` is set in `.env`
 
-- **Ephemeral**: All other changes (further installed packages, shell history,
-  etc.)
+- **Ephemeral**: All other changes (further installed packages, tool
+  configuration etc.)
 
 If a new element needs to be added to the container outside the mounted project
 directory, the dockerfile will need to be updated and re-built.

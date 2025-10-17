@@ -1,3 +1,6 @@
-.env
 old/
+.env
 configs/*
+!configs/placeholder
+cache/*
+!cache/placeholder

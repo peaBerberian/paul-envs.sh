@@ -124,6 +124,31 @@ USER ${USERNAME}
 
 # Set-up projects directory
 RUN mkdir -p /home/${USERNAME}/projects
+RUN mkdir -p /home/${USERNAME}/.container-cache
+
+# Set various caches locations through env
+ENV XDG_CACHE_HOME=/home/${USERNAME}/.container-cache/cache \
+    _ZO_DATA_DIR=/home/${USERNAME}/.container-cache/zoxide \
+    STARSHIP_CACHE=/home/${USERNAME}/.container-cache/starship \
+    ATUIN_DB_PATH=/home/${USERNAME}/.container-cache/atuin/history.db
+
+# Configure npm/yarn cache locations
+RUN if [ "$INSTALL_MISE" = "true" ]; then \
+    bash -c 'export PATH="$HOME/.local/bin:$PATH" && \
+             mise exec -- npm config set cache /home/${USERNAME}/.container-cache/.npm && \
+             mise exec -- yarn config set cacheFolder /home/${USERNAME}/.container-cache/.yarn'; \
+  else \
+    npm config set cache /home/${USERNAME}/.container-cache/.npm && \
+    yarn config set cacheFolder /home/${USERNAME}/.container-cache/.yarn; \
+  fi
+
+# Relocate shell history locations cache to be persistent
+# NOTE: fish is already handled with `XDG_CACHE_HOME`
+RUN if [ "$USER_SHELL" = "zsh" ]; then \
+    echo -e "\nexport HISTFILE=/home/${USERNAME}/.container-cache/.zsh_history" >> /home/${USERNAME}/.zshrc; \
+  elif [ "$USER_SHELL" = "bash" ]; then \
+    echo -e "\nexport HISTFILE=/home/${USERNAME}/.container-cache/.bash_history" >> /home/${USERNAME}/.bashrc; \
+  fi
 
 WORKDIR /home/${USERNAME}/projects
 
