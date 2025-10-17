@@ -1,6 +1,6 @@
-#compdef devenv.sh
+#compdef paul-envs.sh
 
-_devenv() {
+_paulenvs() {
     local -a commands
     commands=(
         'create:Create a new development container'
@@ -21,4 +21,4 @@ _devenv() {
     esac
 }
 
-_devenv "$@"
+_paulenvs "$@"

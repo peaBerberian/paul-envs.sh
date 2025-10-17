@@ -35,7 +35,7 @@ validate_project_name() {
     fi
 }
 
-# Check that the choosen shell is one supported by devenv.sh
+# Check that the choosen shell is one supported by paul-envs.sh
 # TODO: support nushell and others?
 validate_shell() {
     local shell=$1
@@ -167,7 +167,7 @@ generate_project_compose() {
     local env_file=$(get_project_env "$name")
 
     if [[ -f "$compose_file" || -f "$env_file" ]]; then
-        error "Project '$name' already exists\nHint: Use 'devenv.sh list' to see all projects or 'devenv.sh remove $name' to delete it"
+        error "Project '$name' already exists\nHint: Use 'paul-envs.sh list' to see all projects or 'paul-envs.sh remove $name' to delete it"
     fi
 
     # Sanitize all user inputs
@@ -203,7 +203,7 @@ EOF
     # Generate YAML
     cat >> "$compose_file" <<EOF
 services:
-  devenv:
+  paulenv:
     build:
 EOF
 
@@ -289,7 +289,7 @@ cmd_create() {
 
     # First two positional args
     if [[ $# -lt 2 ]]; then
-        error "Usage: devenv.sh create <name> <project-path> [options]"
+        error "Usage: paul-envs.sh create <name> <project-path> [options]"
     fi
 
     name=$1
@@ -427,7 +427,7 @@ cmd_list() {
     check_base_compose
     if [[ ! -d "$PROJECTS_DIR" ]]; then
         echo "No project created yet"
-        echo "Hint: Create one with 'devenv.sh create <name> <path>'"
+        echo "Hint: Create one with 'paul-envs.sh create <name> <path>'"
         exit 0
     fi
 
@@ -445,7 +445,7 @@ cmd_list() {
 
     if [[ $found -eq 0 ]]; then
         echo "  (no project found)"
-        echo "Hint: Create one with 'devenv.sh create <name> <path>'"
+        echo "Hint: Create one with 'paul-envs.sh create <name> <path>'"
     fi
 }
 
@@ -454,7 +454,7 @@ cmd_build() {
     local name=$1
 
     if [[ -z "$name" ]]; then
-        error "Usage: devenv.sh build <name>\nHint: Use 'devenv.sh list' to see available projects"
+        error "Usage: paul-envs.sh build <name>\nHint: Use 'paul-envs.sh list' to see available projects"
     fi
 
     validate_project_name "$name"
@@ -462,11 +462,11 @@ cmd_build() {
     local compose_file=$(get_project_compose "$name")
     local env_file=$(get_project_env "$name")
     if [[ ! -f "$compose_file" || ! -f "$env_file" ]]; then
-        error "Project '$name' not found\nHint: Use 'devenv.sh list' to see available projects or 'devenv.sh create' to make a new one"
+        error "Project '$name' not found\nHint: Use 'paul-envs.sh list' to see available projects or 'paul-envs.sh create' to make a new one"
     fi
 
     # Ensure shared cache volume exists
-    docker volume create devenv-shared-cache 2>/dev/null || true
+    docker volume create paulenv-shared-cache 2>/dev/null || true
 
     export COMPOSE_PROJECT_NAME="$name"
     docker compose -f "$BASE_COMPOSE" -f "$compose_file" --env-file "$env_file" build
@@ -484,7 +484,7 @@ cmd_run() {
     shift 1
 
     if [[ -z "$name" ]]; then
-        error "Usage: devenv.sh run <name> [command]\nHint: Use 'devenv.sh list' to see available projects"
+        error "Usage: paul-envs.sh run <name> [command]\nHint: Use 'paul-envs.sh list' to see available projects"
     fi
 
     validate_project_name "$name"
@@ -492,25 +492,25 @@ cmd_run() {
     local compose_file=$(get_project_compose "$name")
     local env_file=$(get_project_env "$name")
     if [[ ! -f "$compose_file" || ! -f "$env_file" ]]; then
-        error "Project '$name' not found\nHint: Use 'devenv.sh list' to see available projects"
+        error "Project '$name' not found\nHint: Use 'paul-envs.sh list' to see available projects"
     fi
 
     export COMPOSE_PROJECT_NAME="$name"
-    docker compose -f "$BASE_COMPOSE" -f "$compose_file" --env-file "$env_file" run --rm devenv "$@"
+    docker compose -f "$BASE_COMPOSE" -f "$compose_file" --env-file "$env_file" run --rm paulenv "$@"
 }
 
 cmd_remove() {
     local name=$1
 
     if [[ -z "$name" ]]; then
-        error "Usage: devenv.sh remove <name>\nHint: Use 'devenv.sh list' to see available projects"
+        error "Usage: paul-envs.sh remove <name>\nHint: Use 'paul-envs.sh list' to see available projects"
     fi
 
     validate_project_name "$name"
 
     local project_dir=$(get_project_dir "$name")
     if [[ ! -d "$project_dir" ]]; then
-        error "Project '$name' not found\nHint: Use 'devenv.sh list' to see available projects"
+        error "Project '$name' not found\nHint: Use 'paul-envs.sh list' to see available projects"
     fi
 
     read -p "Remove project '$name'? (y/N) " -n 1 -r
@@ -519,7 +519,7 @@ cmd_remove() {
         rm -rf "$project_dir"
         success "Removed project '$name'"
         echo "Note: Docker volumes are preserved. To remove them, run:"
-        echo "  docker volume rm devenv-$name-local"
+        echo "  docker volume rm paulenv-$name-local"
     fi
 }
 
@@ -547,14 +547,14 @@ case ${1:-} in
         ;;
     *)
         cat <<EOF
-devenv.sh - Development Environment Manager
+paul-envs.sh - Development Environment Manager
 
 Usage:
-  devenv.sh create <name> <path> [options]
-  devenv.sh list
-  devenv.sh build <name>
-  devenv.sh run <name> [command]
-  devenv.sh remove <name>
+  paul-envs.sh create <name> <path> [options]
+  paul-envs.sh list
+  paul-envs.sh build <name>
+  paul-envs.sh run <name> [command]
+  paul-envs.sh remove <name>
 
 Options for create:
   --uid UID                    Host UID (default: current user)
@@ -574,10 +574,10 @@ Options for create:
 
 Examples:
   # Create a project (will ask for shell and credentials)
-  devenv.sh create myapp ~/projects/myapp
+  paul-envs.sh create myapp ~/projects/myapp
 
   # Create with all options
-  devenv.sh create myapp ~/work/api \\
+  paul-envs.sh create myapp ~/work/api \\
     --shell zsh \\
     --node-version 20.10.0 \\
     --git-name "John Doe" \\
@@ -589,17 +589,17 @@ Examples:
     --volume ~/.git-credentials:/home/dev/.git-credentials:ro
 
   # Then build it
-  devenv.sh build myapp
+  paul-envs.sh build myapp
 
   # Then run it
-  devenv.sh run myapp
+  paul-envs.sh run myapp
 
   # Or run a specific command
-  devenv.sh run myapp cd app && npm run test
+  paul-envs.sh run myapp cd app && npm run test
 
   # Manage projects
-  devenv.sh list
-  devenv.sh remove myapp
+  paul-envs.sh list
+  paul-envs.sh remove myapp
 
 Configuration:
   Base compose: $BASE_COMPOSE

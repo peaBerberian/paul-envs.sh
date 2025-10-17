@@ -1,4 +1,4 @@
-_devenv()
+_paulenvs()
 {
     local cur prev opts
     COMPREPLY=()
@@ -7,10 +7,10 @@ _devenv()
     opts="create list build run remove"
 
     case "${prev}" in
-        devenv.sh)
+        paul-envs.sh)
             COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
             return 0
             ;;
     esac
 }
-complete -F _devenv devenv.sh
+complete -F _paulenvs paul_envs.sh

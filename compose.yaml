@@ -2,20 +2,21 @@
 # =================
 #
 # If you plan to just set-up a single container for a single project,
-# you can update this file directly instead of trusting my `devenv.sh` script.
+# you can update this file directly instead of trusting my `paul-envs.sh`
+# script.
 #
-# The "args" in the `devenv` service are probably the only things you want to
+# The "args" in the `paulenv` service are probably the only things you want to
 # update in that case. You can also add `volumes` and `ports` to it or anything
 # you want, the sky is the limit.
 #
-# If you don't mind running the `devenv.sh` script, none of this is necessary,
-# the `devenv.sh` script extends this compose.yaml file into other more refined
-# compose files and auto-fills the right parameters.
+# If you don't mind running the `paul-envs.sh` script, none of this is
+# necessary, the `paul-envs.sh` script extends this compose.yaml file into other
+# more refined compose files and auto-fills the right parameters.
 
 services:
 
-  devenv:
-    image: devenv:latest
+  paulenv:
+    image: paulenv:latest
     pull_policy: never
     stdin_open: true
     tty: true
@@ -93,7 +94,7 @@ services:
   # installed npm/yarn packages.
   # It can be shared through multiple containers simultaneously relatively safely.
   reset-cache:
-    image: devenv:latest
+    image: paulenv:latest
     pull_policy: never
     user: root
     command: >
@@ -114,7 +115,7 @@ services:
   # This volume is more concurrency-sensible and is thus mounted as separate
   # distinct volumes on multiple simultaneous containers (one per project).
   reset-local:
-    image: devenv:latest
+    image: paulenv:latest
     pull_policy: never
     user: root
     command: >
@@ -130,9 +131,9 @@ services:
 
 volumes:
   shared-cache:
-    name: devenv-shared-cache
+    name: paulenv-shared-cache
     external: true
 
   local-state:
     # Create project-specific volume with clean name
-    name: devenv-${COMPOSE_PROJECT_NAME}-local
+    name: paulenv-${COMPOSE_PROJECT_NAME}-local

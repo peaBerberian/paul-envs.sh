@@ -1,13 +1,43 @@
-# devenv.sh
+# paul-envs.sh
 
-Manage development containers to facilitate my work on multiple
-fast-moving and large projects.
+`paul-envs.sh` allows me to manage development containers so I can easily work
+on multiple large projects with rapidly changing dependencies in isolated and
+minimal containers.
+
+It is both a wrapper over the `docker compose` tool and a configuration
+generator for it.
+Each of the created containers is similar in a way to [dev
+containers](https://containers.dev/) in that they are targeted for development
+usages.
+
+However this tool is especially designed for a multiple projects setup where
+each project is linked to its own separate container. A container for another
+project can be created with only a few flags, with the following features:
+
+-  Only project files and key directories (e.g. terminal history, installed
+   tools' stored data) are persisted. All other paths reset when the container
+   exits.
+
+   This ensures the system stays minimal and clean over time.
+
+-  Caches (e.g., npm, yarn) are shared across containers via a common persistent
+   volume.
+
+-  The container is a minimal CLI-only environment: just an ubuntu LTS image
+   with a few optional binaries (including in my case, the `neovim` editor).
+
+   Minimizing installed packages reduces opportunies for issues (package
+   conflicts, poor support of unusual system configuration...), attack surface
+   and simplifies debugging.
+
+-  A shared `Dockerfile`, making new containers easy to set up and very fast to
+   build.
 
 ## Quick Start
 
 1. Ensure `docker compose` is installed locally and accessible in path.
 
-2. Run `./devenv.sh create <NAME> <path/to/your/project>`.
+2. Run `./paul-envs.sh create <NAME> <path/to/your/project>`.
 
    This will just create a compose and env file in a new `projects/` directory
    with the right preset properties.
@@ -20,15 +50,15 @@ fast-moving and large projects.
    `~/.aws`, `~/.git-credentials` etc.) as those could have issues being
    copied (due to restrictive permissions).
 
-   If you want to copy some of those, see `./devenv.sh create` flags.
+   If you want to copy some of those, see `./paul-envs.sh create` flags.
 
-4. Run `./devenv.sh build <NAME>`.
+4. Run `./paul-envs.sh build <NAME>`.
 
    It will build the container through the right `docker compose build`
    invokation and initialize persistent volumes.
 
 5. Then run the container each time you want to work on the project:
-   `./devenv.sh run <NAME>`.
+   `./paul-envs.sh run <NAME>`.
 
    The mounted project is available in that container at `~/projects/app`.
 
@@ -38,7 +68,7 @@ fast-moving and large projects.
 
    Each new run thus start from a relatively clean and simple state.
 
-## What's this
+## Why creating this
 
 I often have to switch between projects at work.
 
@@ -76,10 +106,10 @@ through persistent volumes.
 
 ## How to run it
 
-Running `devenv.sh` without any argument will list all available operations and
-corresponding flags:
+Running `paul-envs.sh` without any argument will list all available operations
+and corresponding flags:
 ```sh
-./devenv.sh
+./paul-envs.sh
 ```
 
 ### 1. Create a new container's config
@@ -89,11 +119,11 @@ same base container with variations).
 
 This container first need to be configured to point to your project and have the
 right arguments (e.g. the right tools and git configuration). This is done
-through the `devenv.sh create` "command".
+through the `paul-envs.sh create` "command".
 
 First ensure the target project is present locally in your host, then run:
 ```sh
-./devenv.sh create <NAME> <path/to/your/project>
+./paul-envs.sh create <NAME> <path/to/your/project>
 # With:
 # 1. `<NAME>` being a name of your choosing to refer to that container
 # 2. `<path/to/your/project>` the path in your host to that project.
@@ -104,7 +134,7 @@ Here's an example of a real-life usage:
 ```sh
 # Will create a container named `myapp` with a default `zsh` shell and many
 # configurations. Also mount your `.git-credentials` readonly to the container.
-./devenv.sh create myapp ~/work/api \
+./paul-envs.sh create myapp ~/work/api \
   --shell zsh \
   --node-version 22.11.0 \
   --git-name "John Doe" \
@@ -115,7 +145,7 @@ Here's an example of a real-life usage:
   --volume ~/.git-credentials:/home/dev/.git-credentials:ro
 ```
 
-Without the corresponding flags, prompts will be proposed by `devenv.sh` for
+Without the corresponding flags, prompts will be proposed by `paul-envs.sh` for
 important parameters (choosen shell, wanted pre-mounted volumes etc.).
 
 What this step does is just to create both a `yaml` and a `.env` file containing
@@ -132,10 +162,10 @@ configuration to define the container we want to build.
 
 This step relies on `docker compose`, which you should have locally installed.
 
-To build a container, just run the `devenv.sh build <NAME>` command.
+To build a container, just run the `paul-envs.sh build <NAME>` command.
 For example, with a container named `myapp`, you would just do:
 ```sh
-./devenv.sh build myapp
+./paul-envs.sh build myapp
 ```
 
 This will take some time as the initialization of the container is going on:
@@ -144,10 +174,10 @@ packages are loaded, tools are set-up etc.
 ### 3. Run the container
 
 Now that the container is built. It can be run at any time, with the
-`./devenv.sh run` command.
+`./paul-envs.sh run` command.
 For example, with a container named `myapp`, you would do:
 ```sh
-./devenv.sh build myapp
+./paul-envs.sh build myapp
 ```
 
 You will directly switch to that container's `$HOME/projects` directory.
@@ -165,16 +195,16 @@ rebuild just to update some base tools).
 
 ### Other commands
 
-`devenv.sh` also proposes the `list` and `remove` commands, respectively to list
-"created" configurations (what's in the `projects` directory basically) and
+`paul-envs.sh` also proposes the `list` and `remove` commands, respectively to
+list "created" configurations (what's in the `projects` directory basically) and
 to easily remove one of them (basically a `rm` command for that configuration)
 respectively:
 ```sh
 # List all created configurations, built or not
-./devenv.sh list
+./paul-envs.sh list
 
 # Remove the configuration file for the `myapp` container
-./devenv.sh remove myapp
+./paul-envs.sh remove myapp
 ```
 
 ## What gets preserved vs. ephemeral
@@ -194,14 +224,14 @@ will be removed when the container is exited).
 ## Deep dive on how it works
 
 Much like container applications, this repository is organized in separate
-layers: `Dockerfile`, `compose.yaml` and `devenv.sh` script, from the core
+layers: `Dockerfile`, `compose.yaml` and `paul-envs.sh` script, from the core
 layer to the most outer one, each inner layer being able to run independently
 of its outer layers (just losing some features in the process).
 
 The following chapters explain each layer and how to run them independently if
 wanted. If you just want to [run this without understanding every little
-details](https://www.youtube.com/watch?v=bJHPfpOnDzg) just run `devenv.sh` and
-performs the operations it advertises.
+details](https://www.youtube.com/watch?v=bJHPfpOnDzg) just run `paul-envs.sh`
+and performs the operations it advertises.
 
 ### Dockerfile
 
@@ -259,7 +289,7 @@ the dockerfile.
 
 The job of copying the `configs` directory's content is taken by the
 `Dockerfile`. Meaning that you'll profit from this even if you're not relying on
-`docker compose` or `devenv.sh`.
+`docker compose` or `paul-envs.sh`.
 
 #### Note about neovim
 
@@ -268,7 +298,7 @@ container is built if you rely on the `lazy.nvim` plugin manager.
 
 With other solutions, the installation will need to be done the first time the
 container is ran (it should be persisted thereafter if going the
-`compose.yaml` or `devenv.sh` route).
+`compose.yaml` or `paul-envs.sh` route).
 
 ### compose.yaml
 
@@ -281,7 +311,7 @@ In simple single-projects scenarios, it can also be relied on directly.
 Just set the right env variables listed in there (.e.g in an `env` file) and
 rely on `docker compose` directly (e.g. `docker compose build`). It works!
 
-### The devenv.sh script
+### The paul-envs.sh script
 
 Managing very dynamic configurations for multiple projects just with
 `docker compose` is not as straightforward as I would have liked: depending on
@@ -289,8 +319,9 @@ what you want to do, the idiomatic ways to configure it are through either
 environment variables or new compose files.
 
 Instead of doing both, which would have been difficult to maintain (and to
-remember what goes where and why), I thus decided to create a `devenv.sh` script
-whose job is to wrap both compose files creation and `docker compose` calls.
+remember what goes where and why), I thus decided to create a `paul-envs.sh`
+script whose job is to wrap both compose files creation and `docker compose`
+calls.
 
 Through a small list of commands and a high number of flags, it is now possible
 to easily create configurations, build containers, run them, list them etc.
