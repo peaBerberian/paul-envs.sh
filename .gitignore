@@ -1,3 +1,4 @@
-.env
-configs/*
-!configs/placeholder
+/.env
+/configs/*
+/!configs/placeholder
+/projects/

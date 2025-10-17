@@ -1,14 +1,42 @@
-# Containers
+# devenv.sh
+
+Manage development containers to facilitate my work on multiple
+fast-moving and large projects.
 
 ## Quick Start
 
-1. Copy `.env.example` to `.env` and configure it
-2. Populate the `configs/` directory with your dotfiles (merged with `$HOME`)
-3. Build the container: `docker compose build`
-4. First initialize all persistent "volumes" (needed after a build):
-   `docker compose --profile reset up reset-cache reset-local`
+1. Ensure `docker compose` is installed locally and accessible in path.
+
+2. Run `./devenv.sh create <NAME> <path/to/your/project>`.
+
+   This will just create a compose file in a new `projects/` directory with the
+   right preset properties (you can update that file how you want).
+
+3. Optionally, put the "dotfiles" that you want to retrieve in the container's
+   home directory in `configs`. They will be copied to the container when it is
+   build (next step).
+
+   Note that you shouldn't put your credentials/secrets in there (`~/.ssh`,
+   `~/.aws`, `~/.git-credentials` etc.) as those could have issues being
+   copied (due to restrictive permissions).
+
+   If you want to copy some of those, see `./devenv.sh create` flags.
+
+4. Run `./devenv.sh build <NAME>`.
+
+   It will build the container through the right `docker compose build`
+   invokation and initialize persistent volumes.
+
 5. Then run the container each time you want to work on the project:
-   `docker compose run --rm devenv`
+   `./devenv.sh run <NAME>`.
+
+   The mounted project is available in that container at `~/projects/app`.
+
+   The project, caches (npm/yarn caches etc.) and the pre-installed tools'
+   storage (shell history, `mise` data etc.) are persisted, everything else is
+   automically removed when that container is exited.
+
+   Each new run thus start from a relatively clean and simple state.
 
 ## What's this
 
@@ -38,44 +66,256 @@ solution for my setup, so I ended up with a more complex `Dockerfile`
 and `compose.yaml` file instead and I now rely on a software compatible to
 those.
 
-## How it works
+In the end I spent some efforts making sure those files are minimal, portable
+and optimized enough to efficienty be relied on for multi-projects setups, each
+with its own container. For example, the order of instruction in the
+`Dockerfile` have been carefully thought out to perform tasks from the
+less-likely to change to the most likely for efficient caching and some
+package-side caching (e.g. `yarn`, `npm` etc.) is shared between all containers
+through persistent volumes.
 
-The `Dockerfile` and `compose.yaml` are updated in function of tools I'm using.
-What they do is just set a minimal Ubuntu environment with those.
+## How to run it
 
-Note that including many other things, it relies on neovim with the Lazy plugin
-manager (note to self as I may not keep using that one long-term).
+Running `devenv.sh` without any argument will list all available operations and
+corresponding flags:
+```sh
+./devenv.sh
+```
 
-### .env file
+### 1. Create a new container's config
 
-An `.env` file should be created (based e.g. on `.env.example`) to setup
-environment variables, allowing to setup the default shell, which tool are
-enabled, the user name, the preferred node.js version, the basic git config
-(name + e-mail address) and even the projects to mount inside the container
-(path on the host to the source code to work on).
+The idea is to create a separate container for each project (that will rely on a
+same base container with variations).
 
-### configs directory
+This container first need to be configured to point to your project and have the
+right arguments (e.g. the right tools and git configuration). This is done
+through the `devenv.sh create` "command".
 
-A `configs` directory is also present and can be updated on the host. It should
-contain the config files for tools that I currently set-up in the `Dockerfile`.
+First ensure the target project is present locally in your host, then run:
+```sh
+./devenv.sh create <NAME> <path/to/your/project>
+# With:
+# 1. `<NAME>` being a name of your choosing to refer to that container
+# 2. `<path/to/your/project>` the path in your host to that project.
+```
+
+Optionally, you may add a lot of flags to better configure that container.
+Here's an example of a real-life usage:
+```sh
+# Will create a container named `myapp` with a default `zsh` shell and many
+# configurations. Also mount your `.git-credentials` readonly to the container.
+./devenv.sh create myapp ~/work/api \
+  --shell zsh \
+  --node-version 22.11.0 \
+  --git-name "John Doe" \
+  --git-email "john@example.com" \
+  --port 8000 \
+  --port 5432 \
+  --packages "fzf ripgrep" \
+  --volume ~/.git-credentials:/home/dev/.git-credentials:ro
+```
+
+Without the corresponding flags, prompts will be proposed by `devenv.sh` for
+important parameters (choosen shell, wanted pre-mounted volumes etc.).
+
+What this step does is just to create a `yaml` file containing your container's
+configuration. It doesn't build anything yet.
+
+The file will be saved as `./projects/<NAME>.yaml`, with `<NAME>` being the
+name you chose, and can be directly edited if you want (though it should
+already be complete).
+
+### 2. Build the container
+
+The previous file created a "compose" file - basically a configuration file to
+define the container we want - we now need to build that container.
+
+This step relies on `docker compose`, which you should have locally installed.
+
+To build a container, just run the `devenv.sh build <NAME>` command.
+For example, with a container named `myapp`, you would just do:
+```sh
+./devenv.sh build myapp
+```
+
+This will take some time as the initialization of the container is going on:
+packages are loaded, tools are set-up etc.
+
+### 3. Run the container
+
+Now that the container is built. It can be run at any time, with the
+`./devenv.sh run` command.
+For example, with a container named `myapp`, you would do:
+```sh
+./devenv.sh build myapp
+```
+
+You will directly switch to that container's `$HOME/projects` directory.
+In it the `app` directory is the project you linked to that container.
+
+You can go out of that container at any time (e.g. by calling `exit`), as you
+exit that container, everything that is not part of the "persisted volume" (see
+`What gets preserved vs. ephemeral` chapter) is reset to the state it was at
+build-time.
+
+As cache and tools' data directory are still persisted, you might also want to
+re-build the container if you feel that you need a completely fresh state. This
+should be needed extremely rarely hopefully (you more probably will want to
+rebuild just to update some base tools).
+
+### Other commands
+
+`devenv.sh` also proposes the `list` and `remove` commands, respectively to list
+"created" configurations (what's in the `projects` directory basically) and
+to easily remove one of them (basically a `rm` command for that configuration)
+respectively:
+```sh
+# List all created configurations, built or not
+./devenv.sh list
+
+# Remove the configuration file for the `myapp` container
+./devenv.sh remove myapp
+```
+
+## What gets preserved vs. ephemeral
+
+When working inside the container, here's what you can expect to be either
+"preserved" (changes will stay from container to container) or "ephemeral" (it
+will be removed when the container is exited).
+
+- **Preserved**: the mounted project directory (`~/projects/app`), the
+  "cache" directory (mounted as `~/.container-cache`) and the "local" directory
+  (mounted as `~/.container-local`) - see the "persisted volumes" chapter for
+  those last two.
+
+- **Ephemeral**: All other changes (further installed global packages, global
+  system configurations etc.)
+
+## Deep dive on how it works
+
+Much like container applications, this repository is organized in separate
+layers: `Dockerfile`, `compose.yaml` and `devenv.sh` script, from the core
+layer to the most outer one, each inner layer being able to run independently
+of its outer layers (just losing some features in the process).
+
+The following chapters explain each layer and how to run them independently if
+wanted. If you just want to [run this without understanding every little
+details](https://www.youtube.com/watch?v=bJHPfpOnDzg) just run `devenv.sh` and
+performs the operations it advertises.
+
+### Dockerfile
+
+The `Dockerfile` sets a simple Ubuntu LTS environment with a shell of your
+preference (either `bash` as default or `zsh` or `fish`) and optional popular
+CLI tools (`neovim`, `starship`, `atuin` and `mise`).
+
+It also copies the content of the `configs` directory inside of that container
+and sets-up `$HOME/.container-cache` and `$HOME/.container-local` directories
+for cache and tools' local data (including shell history, `atuin` database,
+`mise` environments) respectively.
+
+You can rely on this `Dockerfile` without anything else, as a standalone, e.g.
+via `docker`. Note that if you do that, you won't have persistent volumes for
+cache, tools data and the project code, which would have to be re-populated each
+time the container is run. Adding persistence is the main point of the
+`compose.yaml` file.
+
+### The configs directory
+
+The `configs` directory in this repository helps with the initialization of
+so-called "dotfiles" in the created containers.
 
 Its content will be merged with the home directory of the container. As such you
-can put a `.bashrc` directly in there at its root, or directories in it such as
-`.config/nvim` for a neovim config:
+can put a `.bashrc` directly in there at its root, and the config for the tools
+you planned to install (e.g. the `starship` configuration file: `starship.toml`,
+a `nvim` directory for `neovim` etc.):
 ```
 configs/
 ├── .bashrc
 └── .config/
+    ├── starship.toml (config for the starship tool)
     └── nvim/
         └── ... (your neovim config)
 ```
+
+All files in `configs` will be copied as is unmodified, with two exceptions:
+
+1.  shell files  (`.bashrc`, `.zshrc` and/or `.config/fish/config.fish` files)
+    may still be updated after being copied in the dockerfile to redirect their
+    history to `~/.container-local` (see next chapter) to ensure history
+    persistence.
+
+2.  The git config file (generally `~/.gitconfig`) may also be updated after
+    being copied in the container to set the name and e-mail information you
+    configured in your env file.
+
+Because those are the only exceptions, if you plan to overwrite one of those
+shell files, you will need to add the tool initialization commands in them
+yourself (e.g. `eval "$(starship init bash)"` for initializing `starship` in the
+bash shell in your `.bashrc`).
+If you're not overwriting those files however, the default provided one will
+already contain the initialization code for all the tools explicitely listed in
+the dockerfile.
+
+The job of copying the `configs` directory's content is taken by the
+`Dockerfile`. Meaning that you'll profit from this even if you're not relying on
+`docker compose` or `devenv.sh`.
+
+#### Note about neovim
+
+If you set a `neovim` config with plugins, they will be pre-installed as the
+container is built if you rely on the `lazy.nvim` plugin manager.
+
+With other solutions, the installation will need to be done the first time the
+container is ran (it should be persisted thereafter if going the
+`compose.yaml` or `devenv.sh` route).
+
+### compose.yaml
+
+The `compose.yaml` file allows `docker compose` to build a container with
+the right arguments for your project. More importantly, it also mount the
+right "volumes" so that some changes (project changes, cache, tools data,
+shell history etc.) are persisted.
+
+In simple single-projects scenarios, it can also be relied on directly.
+Just set the right env variables listed in there (.e.g in an `env` file) and
+rely on `docker compose` directly (e.g. `docker compose build`). It works!
+
+If (and only if) going that route do not forget to reset the persistent volumes
+after a `build` (even the first one), so that it contains what has been cached
+at build-time:
+```sh
+docker compose --profile reset up reset-cache reset-local
+```
+
+Failing to do that will not break anything, but will needlessly repeat some work
+that has already been done at build-time (e.g. neovim plugin installation).
+
+### The devenv.sh script
+
+Managing very dynamic configurations for multiple projects just with
+`docker compose` is not as straightforward as I would have liked: depending on
+what you want to do, the idiomatic ways to configure it are through either
+environment variables or new compose files.
+
+Instead of doing both, which would have been difficult to maintain (and to
+remember what goes where and why), I thus decided to create a `devenv.sh` script
+whose job is to wrap both compose files creation and `docker compose` calls.
+
+Through a small list of commands and a high number of flags, it is now possible
+to easily create configurations, build containers, run them, list them etc.
+
+That script actually just writes `compose.yaml` files and wraps `docker compose`
+calls, with also some input validation and the printing of helpful information
+on top.
 
 ### persisted volumes
 
 Two container "volumes", a `~/.container-cache` and a `~/.container-local`
 directory, will be present in the container.
 Their main specificity is that unlike almost anything else, their contents are
-persisted through multiple containers run.
+persisted through multiple containers run (unless you went directly the
+`Dockerfile` route).
 
 The former (`.container-cache`) is configured to store the various "caches"
 (e.g. `npm` and `yarn` loaded package cache, or any other similar cache), to
@@ -90,87 +330,3 @@ those directories for the aforementioned purposes.
 _I made use both of the XDG spec and of tool-specific configuration for this._
 
 Along the mounted project, those are the only directories which are persisted.
-If an instability arises at some point, the "volumes" corresponding to
-`.container-cache` and `.container-local` can be reset very easily through
-respectively the `reset-cache` and `reset-local` under the `reset` profile:
-```sh
-# Reset both
-docker compose --profile reset up reset-cache reset-local
-
-# Reset only the .container-cache directory
-docker compose --profile reset up reset-cache
-
-# Reset only the .container-local directory
-docker compose --profile reset up reset-local
-```
-
-## How to run it
-
-Once setup is done (configs and env files), the container needs first to be
-"built".
-
-With docker-compose, this can be done by `cd`-ing in this directory, then
-calling:
-```sh
-docker compose build
-
-# Initialize the persistent "volumes" with the build-time data
-docker compose --profile reset up reset-cache reset-local
-```
-
-This can be re-done later to refresh the installed build tools, if needed
-(hopefully not a lot).
-
-Then anytime there's need to develop on the project, that container can be
-"run" by just running:
-```sh
-docker compose run --rm devenv
-```
-
-With `--rm` meaning that the container will be removed on exit. What this imply
-is that all modifications done in the base container which are not part of the
-mounted project's directory will disappear when that container is not
-relied on anymore - this is actually one of the point of this setup to always
-start fresh from a known stable config.
-
-## What gets preserved vs. ephemeral
-
-When working inside the container, here's what you can expect to be either
-"preserved" (changes will stay from container to container), "ephemeral" (it will
-be removed when the container is exited) or "persistent" (host files mounted as
-read-only and kept as-is).
-
-- **Preserved**: the mounted project directory (`~/projects/app`), the
-  "cache" directory (mounted as `~/.container-cache`) and the "local" directory
-  (mounted as `~/.container-local`) - see the "persisted volumes" chapter for
-  those last two.
-
-- **Persistent**: Git credentials if `GIT_CREDS_HOST` is set in `.env`
-
-- **Ephemeral**: All other changes (further installed global packages, global
-  system configurations etc.)
-
-If a new element needs to be added to the container outside the mounted project
-directory, the dockerfile will need to be updated and re-built.
-
-## Multi-projects set-up
-
-The `compose.yaml` file is compatible and even optimized for an optional
-multi-project configuration, each project having its own container with a shared
-`.container-cache` persisted volume yet a distinct `.container-local` volume,
-to guard against data race issues if multiple containers write simultaneously
-(which is less of a problem with a cache directory).
-
-To make it work with multiple projects, just:
-
-1.  Create multiple `.env` files by following the same `.env.example` template.
-
-    E.g. for two projects, `project-a` and  `project-b`, you could have both
-    a `.env.project-a` and a `.env.project-b` file.
-
-2.  Then tell your compose-compatible software (e.g. `docker-compose`) to rely
-    on that file when doing container operations. For example for
-    `.env.project-a` with `docker-compose`:
-    ```
-    docker compose --env-file .env.project-a build
-    ```

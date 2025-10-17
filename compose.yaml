@@ -1,37 +1,99 @@
+# compose.yaml file
+# =================
+#
+# If you plan to just set-up a single container for a single project,
+# you can update this file directly instead of trusting my `devenv.sh` script.
+#
+# The "args" in the `devenv` service are probably the only things you want to
+# update in that case. You can also add `volumes` and `ports` to it or anything
+# you want, the sky is the limit.
+#
+# If you don't mind running the `devenv.sh` script, none of this is necessary,
+# the `devenv.sh` script extends this compose.yaml file into other more refined
+# compose files and auto-fills the right parameters.
+
 services:
 
   devenv:
-    image: paul-containers:latest
+    image: devenv:latest
     pull_policy: never
     stdin_open: true
     tty: true
     build:
       context: .
       dockerfile: Dockerfile
+
       args:
+        # To align with your current uid.
+        # This is to ensure the mounted volume from your host has compatible
+        # permissions.
+        # On POSIX-like systems, just run `id -u` with the wanted user to know it.
         HOST_UID: ${HOST_UID:-1000}
+
+        # To align with your current gid (same reason than for `uid`).
+        # On POSIX-like systems, just run `id -g` with the wanted user to know it.
         HOST_GID: ${HOST_GID:-1000}
+
+        # Username created in the container.
+        # Not really important, just set it if you want something other than `dev`.
         USERNAME: ${USERNAME:-dev}
+
+        # The default shell wanted.
+        # Only `bash`, `zsh` or `fish` are supported for now.
         USER_SHELL: ${USER_SHELL:-bash}
-        SUPPLEMENTARY_PACKAGES: ${SUPPLEMENTARY_PACKAGES:-}
+
+        # Tools toggle.
+        # `true` == install it, anything else == don't.
         INSTALL_NEOVIM: ${INSTALL_NEOVIM:-true}
         INSTALL_STARSHIP: ${INSTALL_STARSHIP:-true}
         INSTALL_ATUIN: ${INSTALL_ATUIN:-true}
         INSTALL_MISE: ${INSTALL_MISE:-true}
-        NODE_VERSION: ${NODE_VERSION:-22.11.0}
+
+        # Default Node.js version wanted.
+        # (e.g. "22.11.0", also with "latest" being the latest one).
+        NODE_VERSION: ${NODE_VERSION:-latest}
+
+        # Git basic information.
+        # Can also be empty to not set that in the container.
         GIT_AUTHOR_NAME: ${GIT_AUTHOR_NAME}
         GIT_AUTHOR_EMAIL: ${GIT_AUTHOR_EMAIL}
+
+        # Additional packages outside the core base, separated by a space.
+        # Have to be in Ubuntu's default repository
+        # (e.g. "ripgrep fzf". Can be left empty for no supplementary packages)
+        SUPPLEMENTARY_PACKAGES: ${SUPPLEMENTARY_PACKAGES:-}
+
+        # Path to the project you want to mount in this container
+        # Will be mounted in `$HOME/projects/app` inside that container.
+        PROJECT_PATH: ${PROJECT_PATH}
+
+    # Persistent volumes mounted. Those three are necessary, but you can add
+    # supplementary ones with different access rules if you want.
     volumes:
       - ${PROJECT_PATH}:/home/${USERNAME:-dev}/projects/app
       - shared-cache:/home/${USERNAME:-dev}/.container-cache
       - local-state:/home/${USERNAME:-dev}/.container-local
+      # Git credentials for HTTPS auth
+      # - ~/.git-credentials:/home/${USERNAME:-dev}/.git-credentials:ro
+
+      # SSH keys for Git over SSH
+      # - ~/.ssh:/home/${USERNAME:-dev}/.ssh:ro
+
+      # AWS credentials
+      # - ~/.aws:/home/${USERNAME:-dev}/.aws:ro
+
+      # Custom CA certificates
+      # - /etc/ssl/certs/custom-ca.crt:/usr/local/share/ca-certificates/custom-ca.crt:ro
+
+      # Add your own:
+      # - /host/path:/container/path:ro
 
   # Reset cache directory to its state at build-time.
   # The "cache directory" corresponds to cached data such as the one for
   # installed npm/yarn packages.
   # It can be shared through multiple containers simultaneously relatively safely.
   reset-cache:
-    image: paul-containers:latest
+    image: devenv:latest
     pull_policy: never
     user: root
     command: >
@@ -52,7 +114,7 @@ services:
   # This volume is more concurrency-sensible and is thus mounted as separate
   # distinct volumes on multiple simultaneous containers (one per project).
   reset-local:
-    image: paul-containers:latest
+    image: devenv:latest
     pull_policy: never
     user: root
     command: >
@@ -68,8 +130,8 @@ services:
 
 volumes:
   shared-cache:
-    name: paul-containers-shared-cache
-  
+    name: devenv-shared-cache
+
   local-state:
     # Create project-specific volume with clean name
-    name: paul-containers-${COMPOSE_PROJECT_NAME}-local
+    name: devenv-${COMPOSE_PROJECT_NAME}-local
