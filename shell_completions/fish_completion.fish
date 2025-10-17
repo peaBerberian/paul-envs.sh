@@ -1,0 +1,5 @@
+complete -c devenv.sh -f -n __fish_use_subcommand -a create -d 'Create a new development container'
+complete -c devenv.sh -f -n __fish_use_subcommand -a list -d 'List all containers'
+complete -c devenv.sh -f -n __fish_use_subcommand -a build -d 'Build an container'
+complete -c devenv.sh -f -n __fish_use_subcommand -a run -d 'Run commands in an container'
+complete -c devenv.sh -f -n __fish_use_subcommand -a remove -d 'Remove an container'
