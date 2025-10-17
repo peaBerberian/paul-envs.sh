@@ -8,18 +8,24 @@ services:
     pull_policy: never
     user: root
     command: >
-      sh -c "cp -a /home/${USERNAME:-dev}/.container-cache/. /mnt/cache/ &&
-             cp -a /home/${USERNAME:-dev}/.container-local/. /mnt/local/ &&
-             chown -R ${HOST_UID:-1000}:${HOST_GID:-1000} /mnt/cache /mnt/local"
+      sh -c "cp -a /home/${USERNAME}/.container-cache/. /mnt/cache/ &&
+             cp -a /home/${USERNAME}/.container-local/. /mnt/local/ &&
+             chown -R ${HOST_UID}:${HOST_GID} /mnt/cache /mnt/local"
     volumes:
       - container-cache:/mnt/cache
       - container-local:/mnt/local
+    environment:
+      - USERNAME=${USERNAME:-dev}
+      - HOST_UID=${HOST_UID:-1000}
+      - HOST_GID=${HOST_GID:-1000}
     # Allows to avoid running it by default
     profiles: ["init"]
 
   devenv:
     image: paul-containers:latest
     pull_policy: never
+    stdin_open: true
+    tty: true
     build:
       context: .
       dockerfile: Dockerfile
@@ -28,7 +34,7 @@ services:
         HOST_GID: ${HOST_GID:-1000}
         USERNAME: ${USERNAME:-dev}
         USER_SHELL: ${USER_SHELL:-bash}
-        SUPPLEMENTARY_PACKAGES: ${SUPPLEMENTARY_PACKAGES}
+        SUPPLEMENTARY_PACKAGES: ${SUPPLEMENTARY_PACKAGES:-}
         INSTALL_NEOVIM: ${INSTALL_NEOVIM:-true}
         INSTALL_STARSHIP: ${INSTALL_STARSHIP:-true}
         INSTALL_ATUIN: ${INSTALL_ATUIN:-true}
@@ -41,6 +47,7 @@ services:
       - ${PROJECT_PATH}:/home/${USERNAME:-dev}/projects/app
       - container-cache:/home/${USERNAME:-dev}/.container-cache
       - container-local:/home/${USERNAME:-dev}/.container-local
+
 volumes:
   container-cache:
   container-local:

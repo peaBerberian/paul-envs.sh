@@ -1,4 +1,3 @@
-old/
 .env
 configs/*
 !configs/placeholder

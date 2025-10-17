@@ -34,6 +34,10 @@ USER ${USERNAME}
 
 ENV SHELL=/usr/bin/${USER_SHELL}
 
+# Set-up cache directories
+RUN mkdir -p /home/${USERNAME}/.container-cache && \
+    mkdir -p /home/${USERNAME}/.container-local
+
 # Set various persistent caches locations through env
 ENV XDG_CACHE_HOME=/home/${USERNAME}/.container-cache/cache \
     XDG_STATE_HOME=/home/${USERNAME}/.container-local/state \
@@ -93,8 +97,7 @@ RUN echo "INSTALL_ATUIN value: '$INSTALL_ATUIN'" && \
 
 # Copy config files
 RUN --mount=type=bind,source=configs,target=/tmp/configs \
-  cp -r /tmp/configs/. /home/${USERNAME}/ && \
-  chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}
+  cp -r /tmp/configs/. /home/${USERNAME}/
 
 # Install mise (optional)
 # `nvm` is mainly maintained by ljharb, enough said. Also, it doesn't
@@ -112,9 +115,9 @@ RUN if [ "$INSTALL_MISE" = "true" ]; then \
       echo 'eval "$(mise activate zsh)"' >> /home/${USERNAME}/.zshrc; \
     fi && \
     # 3. Install Node, set global default, install yarn (non-interactive)
-    bash -c 'export PATH="$HOME/.local/bin:$PATH" && \
+    bash -c 'export PATH="/home/${USERNAME}/.local/bin:$PATH" && \
              mise use -g node@${NODE_VERSION} && \
-             mise exec -- npm config set prefix "$HOME/.local" && \
+             mise exec -- npm config set prefix "/home/${USERNAME}/.local" && \
              mise exec -- npm config set cache /home/${USERNAME}/.container-cache/.npm && \
              mise exec -- npm install -g yarn && \
              mise exec -- yarn config set cacheFolder /home/${USERNAME}/.container-cache/.yarn'; \
@@ -127,7 +130,7 @@ RUN if [ "$INSTALL_MISE" != "true" ]; then \
     apt-get update && apt-get install -y \
       nodejs \
       npm \
-      && npm config set prefix "$HOME/.local" \
+      && npm config set prefix "/home/${USERNAME}/.local" \
       && npm config set cache /home/${USERNAME}/.container-cache/.npm \
       && npm install -g yarn \
       && yarn config set cacheFolder /home/${USERNAME}/.container-cache/.yarn \
