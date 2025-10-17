@@ -9,8 +9,8 @@ fast-moving and large projects.
 
 2. Run `./devenv.sh create <NAME> <path/to/your/project>`.
 
-   This will just create a compose file in a new `projects/` directory with the
-   right preset properties (you can update that file how you want).
+   This will just create a compose and env file in a new `projects/` directory
+   with the right preset properties.
 
 3. Optionally, put the "dotfiles" that you want to retrieve in the container's
    home directory in `configs`. They will be copied to the container when it is
@@ -118,17 +118,17 @@ Here's an example of a real-life usage:
 Without the corresponding flags, prompts will be proposed by `devenv.sh` for
 important parameters (choosen shell, wanted pre-mounted volumes etc.).
 
-What this step does is just to create a `yaml` file containing your container's
-configuration. It doesn't build anything yet.
+What this step does is just to create both a `yaml` and a `.env` file containing
+your container's configuration. It doesn't build anything yet.
 
-The file will be saved as `./projects/<NAME>.yaml`, with `<NAME>` being the
-name you chose, and can be directly edited if you want (though it should
-already be complete).
+Those files will be written in a new `./projects/<NAME>` directory, with
+`<NAME>` being the name you chose, and can be directly edited if you want
+(though it should already be complete).
 
 ### 2. Build the container
 
-The previous file created a "compose" file - basically a configuration file to
-define the container we want - we now need to build that container.
+The previous file created both a "compose" and "env" file - basically
+configuration to define the container we want to build.
 
 This step relies on `docker compose`, which you should have locally installed.
 

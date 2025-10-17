@@ -5,7 +5,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE_COMPOSE="$SCRIPT_DIR/compose.yaml"
 
-# Directory where projects' yaml will be created
+# Directory where projects' yaml and env files will be created
 PROJECTS_DIR="$SCRIPT_DIR/projects"
 
 # Colors for output
@@ -70,8 +70,8 @@ validate_apt_package_names() {
     done
 }
 
-# Sanitize string for YAML - escape quotes and remove newlines
-sanitize_yaml_string() {
+# Sanitize string for YAML/env - escape quotes and remove newlines/CR
+light_sanitize() {
     local str=$1
     # Remove newlines and carriage returns
     str="${str//$'\n'/}"
@@ -137,72 +137,94 @@ check_base_compose() {
     fi
 }
 
-# Get project config path
-get_project_config() {
+# Get project directory path
+get_project_dir() {
     local name=$1
-    echo "$PROJECTS_DIR/$name.yaml"
+    echo "$PROJECTS_DIR/$name"
+}
+
+# Get project config path
+get_project_compose() {
+    local name=$1
+    echo "$PROJECTS_DIR/$name/compose.yaml"
+}
+
+# Get project env path
+get_project_env() {
+    local name=$1
+    echo "$PROJECTS_DIR/$name/.env"
 }
 
 # Generate project compose file
-# Usage: generate_project_compose output_file config_array ports_array volumes_array
+# Usage: generate_project_compose name config_array ports_array volumes_array
 generate_project_compose() {
-    local output_file=$1
+    local name=$1
     local -n gen_cfg=$2
     local -n gen_ports=$3
     local -n gen_volumes=$4
 
+    local compose_file=$(get_project_compose "$name")
+    local env_file=$(get_project_env "$name")
+
+    if [[ -f "$compose_file" || -f "$env_file" ]]; then
+        error "Project '$name' already exists\nHint: Use 'devenv.sh list' to see all projects or 'devenv.sh remove $name' to delete it"
+    fi
+
     # Sanitize all user inputs
-    local safe_git_name=$(sanitize_yaml_string "${gen_cfg[git_name]}")
-    local safe_git_email=$(sanitize_yaml_string "${gen_cfg[git_email]}")
-    local safe_packages=$(sanitize_yaml_string "${gen_cfg[packages]}")
+    local safe_git_name=$(light_sanitize "${gen_cfg[git_name]}")
+    local safe_git_email=$(light_sanitize "${gen_cfg[git_email]}")
+    local safe_packages=$(light_sanitize "${gen_cfg[packages]}")
+
+    mkdir -p "$(dirname "$compose_file")"
+
+		# Generate .env file
+    cat >> "$env_file" <<EOF
+HOST_UID="${gen_cfg[host_uid]}"
+HOST_GID="${gen_cfg[host_gid]}"
+USERNAME="${gen_cfg[username]}"
+USER_SHELL="${gen_cfg[shell]}"
+NODE_VERSION="${gen_cfg[node_version]}"
+PROJECT_PATH="${gen_cfg[project_path]}"
+SUPPLEMENTARY_PACKAGES="$safe_packages"
+INSTALL_NEOVIM="${gen_cfg[install_neovim]}"
+INSTALL_STARSHIP="${gen_cfg[install_starship]}"
+INSTALL_ATUIN="${gen_cfg[install_atuin]}"
+INSTALL_MISE="${gen_cfg[install_mise]}"
+EOF
+
+    # Add git args if provided
+    if [[ -n "$safe_git_name" ]]; then
+        echo "GIT_AUTHOR_NAME=\"$safe_git_name\"" >> "$env_file"
+    fi
+    if [[ -n "$safe_git_email" ]]; then
+        echo "GIT_AUTHOR_EMAIL=\"$safe_git_email\"" >> "$env_file"
+    fi
 
     # Generate YAML
-    cat >> "$output_file" <<EOF
+    cat >> "$compose_file" <<EOF
 services:
   devenv:
     build:
-      args:
-        HOST_UID: "${gen_cfg[host_uid]}"
-        HOST_GID: "${gen_cfg[host_gid]}"
-        USERNAME: "${gen_cfg[username]}"
-        USER_SHELL: "${gen_cfg[shell]}"
-        NODE_VERSION: "${gen_cfg[node_version]}"
-        PROJECT_PATH: "${gen_cfg[project_path]}"
-        SUPPLEMENTARY_PACKAGES: "$safe_packages"
-        INSTALL_NEOVIM: "${gen_cfg[install_neovim]}"
-        INSTALL_STARSHIP: "${gen_cfg[install_starship]}"
-        INSTALL_ATUIN: "${gen_cfg[install_atuin]}"
-        INSTALL_MISE: "${gen_cfg[install_mise]}"
 EOF
-    # Add git args if provided
-    if [[ -n "$safe_git_name" ]]; then
-        echo "        GIT_AUTHOR_NAME: \"$safe_git_name\"" >> "$output_file"
-    fi
-    if [[ -n "$safe_git_email" ]]; then
-        echo "        GIT_AUTHOR_EMAIL: \"$safe_git_email\"" >> "$output_file"
-    fi
 
     # Add ports if specified
     if [[ ${#gen_ports[@]} -gt 0 ]]; then
-        echo "    ports:" >> "$output_file"
+        echo "    ports:" >> "$compose_file"
         for port in "${gen_ports[@]}"; do
-            echo "      - \"$port:$port\"" >> "$output_file"
+            echo "      - \"$port:$port\"" >> "$compose_file"
         done
     fi
 
-    # Add volumes
-    cat >> "$output_file" <<EOF
+    # Add volumes if wanted
+    cat >> "$compose_file" <<EOF
     volumes:
-      - \${PROJECT_PATH}:/home/\${USERNAME}/projects/app
 EOF
-
-    # Add optional volumes
     # TODO: some kind of pre-validation?
     for vol in "${gen_volumes[@]}"; do
-        echo "      - $vol" >> "$output_file"
+        echo "      - $vol" >> "$compose_file"
     done
 
-    echo "" >> "$output_file"
+    echo "" >> "$compose_file"
 }
 
 # Prompt for common credential mounts
@@ -388,11 +410,6 @@ cmd_create() {
 
     config[project_path]=$project_path
 
-    local config_file=$(get_project_config "$name")
-    if [[ -f "$config_file" ]]; then
-        error "Project '$name' already exists at $config_file\nHint: Use 'devenv.sh list' to see all projects or 'devenv.sh remove $name' to delete it"
-    fi
-
     if [[ ! -d "$project_path" ]]; then
         warn "Warning: Path $project_path does not exist"
         read -p "Create config anyway? (y/N) " -n 1 -r
@@ -401,10 +418,9 @@ cmd_create() {
     fi
 
     # Generate config
-    generate_project_compose "$config_file" config ports volumes
+    generate_project_compose "$name" config ports volumes
 
-    success "Created project '$name' at $config_file"
-    echo "Build with: devenv.sh build $name"
+    success "Created project '$name'"
 }
 
 cmd_list() {
@@ -417,11 +433,11 @@ cmd_list() {
 
     echo "Projects created:"
     local found=0
-    for file in "$PROJECTS_DIR"/*.yaml; do
-        if [[ -f "$file" ]]; then
+    for dir in "$PROJECTS_DIR"/*; do
+        if [[ -d "$dir" && -f "$dir/compose.yaml" ]]; then
             found=1
-            name=$(basename "$file" .yaml)
-            path=$(grep "PROJECT_PATH:" "$file" | head -1 | sed 's/ *PROJECT_PATH: *//' | tr -d '"')
+            name=$(basename "$dir")
+            path=$(grep "PROJECT_PATH=" "$dir"/.env | head -1 | sed 's/PROJECT_PATH=//' | tr -d '"')
             echo "  - $name"
             echo "      Path: $path"
         fi
@@ -443,21 +459,22 @@ cmd_build() {
 
     validate_project_name "$name"
 
-    local config_file=$(get_project_config "$name")
-    if [[ ! -f "$config_file" ]]; then
-        error "Project '$name' not found at $config_file\nHint: Use 'devenv.sh list' to see available projects or 'devenv.sh create' to make a new one"
+    local compose_file=$(get_project_compose "$name")
+    local env_file=$(get_project_env "$name")
+    if [[ ! -f "$compose_file" || ! -f "$env_file" ]]; then
+        error "Project '$name' not found\nHint: Use 'devenv.sh list' to see available projects or 'devenv.sh create' to make a new one"
     fi
 
     # Ensure shared cache volume exists
     docker volume create devenv-shared-cache 2>/dev/null || true
 
     export COMPOSE_PROJECT_NAME="$name"
-    docker compose -f "$BASE_COMPOSE" -f "$config_file" build
+    docker compose -f "$BASE_COMPOSE" -f "$compose_file" --env-file "$env_file" build
     success "Built project '$name'"
     
     echo ""
     warn "Resetting persistent volumes..."
-    docker compose -f "$BASE_COMPOSE" -f "$config_file" --profile reset up reset-cache reset-local
+    docker compose -f "$BASE_COMPOSE" -f "$compose_file" --env-file "$env_file" --profile reset up reset-cache reset-local
     success "Volumes reset complete"
 }
 
@@ -472,13 +489,14 @@ cmd_run() {
 
     validate_project_name "$name"
 
-    local config_file=$(get_project_config "$name")
-    if [[ ! -f "$config_file" ]]; then
-        error "Project '$name' not found at $config_file\nHint: Use 'devenv.sh list' to see available projects"
+    local compose_file=$(get_project_compose "$name")
+    local env_file=$(get_project_env "$name")
+    if [[ ! -f "$compose_file" || ! -f "$env_file" ]]; then
+        error "Project '$name' not found\nHint: Use 'devenv.sh list' to see available projects"
     fi
 
     export COMPOSE_PROJECT_NAME="$name"
-    docker compose -f "$BASE_COMPOSE" -f "$config_file" run --rm devenv "$@"
+    docker compose -f "$BASE_COMPOSE" -f "$compose_file" --env-file "$env_file" run --rm devenv "$@"
 }
 
 cmd_remove() {
@@ -490,15 +508,15 @@ cmd_remove() {
 
     validate_project_name "$name"
 
-    local config_file=$(get_project_config "$name")
-    if [[ ! -f "$config_file" ]]; then
-        error "Project '$name' not found at $config_file\nHint: Use 'devenv.sh list' to see available projects"
+    local project_dir=$(get_project_dir "$name")
+    if [[ ! -d "$project_dir" ]]; then
+        error "Project '$name' not found\nHint: Use 'devenv.sh list' to see available projects"
     fi
 
     read -p "Remove project '$name'? (y/N) " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        rm "$config_file"
+        rm -rf "$project_dir"
         success "Removed project '$name'"
         echo "Note: Docker volumes are preserved. To remove them, run:"
         echo "  docker volume rm devenv-$name-local"
