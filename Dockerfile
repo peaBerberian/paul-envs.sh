@@ -84,6 +84,7 @@ ARG INSTALL_NEOVIM=true
 ARG INSTALL_STARSHIP=true
 ARG INSTALL_ATUIN=true
 ARG INSTALL_MISE=true
+ARG INSTALL_ZELLIJ=true
 ARG NODE_VERSION=latest
 ARG GIT_AUTHOR_NAME=""
 ARG GIT_AUTHOR_EMAIL=""
@@ -106,6 +107,14 @@ RUN if [ "$INSTALL_NEOVIM" = "true" ]; then \
     tar -C /opt -xzf nvim-linux-x86_64.tar.gz && \
     rm nvim-linux-x86_64.tar.gz && \
     ln -s /opt/nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim; \
+  fi
+
+# Install Zellij (optional)
+RUN if [ "$INSTALL_ZELLIJ" = "true" ]; then \
+    curl -LO https://github.com/zellij-org/zellij/releases/latest/download/zellij-x86_64-unknown-linux-musl.tar.gz && \
+    tar -C /opt -xzf zellij-x86_64-unknown-linux-musl.tar.gz && \
+    rm zellij-x86_64-unknown-linux-musl.tar.gz && \
+    ln -s /opt/zellij /usr/local/bin/zellij; \
   fi
 
 # Install Starship (optional)

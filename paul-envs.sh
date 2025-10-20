@@ -190,6 +190,7 @@ INSTALL_NEOVIM="${gen_cfg[install_neovim]}"
 INSTALL_STARSHIP="${gen_cfg[install_starship]}"
 INSTALL_ATUIN="${gen_cfg[install_atuin]}"
 INSTALL_MISE="${gen_cfg[install_mise]}"
+INSTALL_ZELLIJ="${gen_cfg[install_zellij]}"
 EOF
 
     # Add git args if provided
@@ -280,6 +281,7 @@ cmd_create() {
         [install_starship]="true"
         [install_atuin]="true"
         [install_mise]="true"
+        [install_zellij]="true"
     )
 
     local name=""
@@ -356,6 +358,10 @@ cmd_create() {
                 ;;
             --no-mise)
                 config[install_mise]="false"
+                shift
+                ;;
+            --no-zellij)
+                config[install_zellij]="false"
                 shift
                 ;;
             --port)
@@ -573,6 +579,7 @@ Options for create:
   --no-starship                Don't install Starship prompt
   --no-atuin                   Don't install Atuin shell history
   --no-mise                    Don't install Mise tool manager
+  --no-zellij                  Don't install Zellij terminal multiplexer
   --port PORT                  Expose port (can be repeated)
   --volume HOST:CONTAINER:ro   Add volume (can be repeated)
 

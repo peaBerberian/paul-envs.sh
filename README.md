@@ -273,7 +273,7 @@ and performs the operations it advertises.
 
 The `Dockerfile` sets a simple Ubuntu LTS environment with a shell of your
 preference (either `bash` as default or `zsh` or `fish`) and optional popular
-CLI tools (`neovim`, `starship`, `atuin` and `mise`).
+CLI tools (`neovim`, `starship`, `atuin`, `zellij` and `mise`).
 
 It also copies the content of the `configs` directory inside of that container
 and sets-up `$HOME/.container-cache` and `$HOME/.container-local` directories

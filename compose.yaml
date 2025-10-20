@@ -59,6 +59,7 @@ services:
         INSTALL_STARSHIP: ${INSTALL_STARSHIP:-true}
         INSTALL_ATUIN: ${INSTALL_ATUIN:-true}
         INSTALL_MISE: ${INSTALL_MISE:-true}
+        INSTALL_ZELLIJ: ${INSTALL_ZELLIJ:-true}
 
         # Default Node.js version wanted.
         # (e.g. "22.11.0", also with "latest" being the latest one).
