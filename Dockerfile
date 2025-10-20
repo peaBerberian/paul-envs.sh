@@ -160,6 +160,7 @@ USER root
 
 RUN if [ "$INSTALL_MISE" != "true" ]; then \
     # Just install nodejs and npm from Ubuntu's repositories
+    echo "\033[1;33mWarning: Using Ubuntu's nodejs as \"INSTALL_MISE\" is not set to \"true\". NODE_VERSION=${NODE_VERSION} ignored.\033[0m" >&2; \
     apt-get update && apt-get install -y \
       nodejs \
       npm \

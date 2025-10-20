@@ -410,6 +410,10 @@ cmd_create() {
 
     config[project_path]=$project_path
 
+    if [[ ${config[install_mise]} != "true" ]]; then
+      warn "\`mise\` is not installed. We will use Ubuntu's nodejs instead of relying on NODE_VERSION."
+    fi
+
     if [[ ! -d "$project_path" ]]; then
         warn "Warning: Path $project_path does not exist"
         read -p "Create config anyway? (y/N) " -n 1 -r
