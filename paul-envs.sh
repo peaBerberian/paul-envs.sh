@@ -177,7 +177,7 @@ generate_project_compose() {
 
     mkdir -p "$(dirname "$compose_file")"
 
-		# Generate .env file
+    # Generate .env file
     cat >> "$env_file" <<EOF
 HOST_UID="${gen_cfg[host_uid]}"
 HOST_GID="${gen_cfg[host_gid]}"
@@ -471,7 +471,7 @@ cmd_build() {
     export COMPOSE_PROJECT_NAME="$name"
     docker compose -f "$BASE_COMPOSE" -f "$compose_file" --env-file "$env_file" build
     success "Built project '$name'"
-    
+
     echo ""
     warn "Resetting persistent volumes..."
     docker compose -f "$BASE_COMPOSE" -f "$compose_file" --env-file "$env_file" --profile reset up reset-cache reset-local

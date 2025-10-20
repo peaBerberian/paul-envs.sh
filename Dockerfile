@@ -43,7 +43,7 @@ RUN if [ "$USER_SHELL" = "fish" ]; then \
 RUN if id -u ubuntu >/dev/null 2>&1; then userdel -r ubuntu; fi && \
   groupadd -g ${HOST_GID} ${USERNAME} && \
   useradd -u ${HOST_UID} -g ${HOST_GID} -m -s /usr/bin/${USER_SHELL} ${USERNAME} && \
-	chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}
+  chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}
 
 USER ${USERNAME}
 
