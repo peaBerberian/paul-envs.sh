@@ -1,8 +1,18 @@
 #!/bin/bash
 set -e
 
-# Locate the base compose file, should be in the same directory than this script
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Small dance to resolve symlinks of this script
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+
+# Follow symlink until the actual script location
+while [ -L "$SCRIPT_PATH" ]; do
+  # Directory path when cd-ing into where the symlink is
+  SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+  SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+  # Handle relative symlinks by doing a concatenation if doesn't start with `/`
+  [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+done
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 BASE_COMPOSE="$SCRIPT_DIR/compose.yaml"
 
 # Directory where projects' yaml and env files will be created
