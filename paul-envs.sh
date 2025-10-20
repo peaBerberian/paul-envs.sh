@@ -194,6 +194,7 @@ HOST_GID="${gen_cfg[host_gid]}"
 USERNAME="${gen_cfg[username]}"
 USER_SHELL="${gen_cfg[shell]}"
 NODE_VERSION="${gen_cfg[node_version]}"
+PROJECT_NAME="${name}"
 PROJECT_PATH="${gen_cfg[project_path]}"
 SUPPLEMENTARY_PACKAGES="$safe_packages"
 INSTALL_NEOVIM="${gen_cfg[install_neovim]}"
@@ -614,9 +615,6 @@ Examples:
 
   # Then run it
   paul-envs.sh run myapp
-
-  # Or run a specific command
-  paul-envs.sh run myapp cd app && npm run test
 
   # Manage projects
   paul-envs.sh list

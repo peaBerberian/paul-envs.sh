@@ -89,7 +89,7 @@ isolation (same issue than with `devbox`).
 5. Then run the container each time you want to work on the project:
    `./paul-envs.sh run <NAME>`.
 
-   The mounted project is available in that container at `~/projects/app`.
+   The mounted project is available in that container at `~/projects/<NAME>`.
 
    The project, caches (npm/yarn caches etc.) and the pre-installed tools'
    storage (shell history, `mise` data etc.) are persisted, everything else is
@@ -216,8 +216,10 @@ For example, with a container named `myapp`, you would do:
 ./paul-envs.sh build myapp
 ```
 
-You will directly switch to that container's `$HOME/projects` directory.
-In it the `app` directory is the project you linked to that container.
+You will directly switch to that container's `$HOME/projects/<NAME>` directory
+(e.g. for a `myapp` project with a `dev` default username it will be
+`/home/dev/projects/myapp`) which contains the project you linked to that
+container.
 
 You can go out of that container at any time (e.g. by calling `exit`), as you
 exit that container, everything that is not part of the "persisted volume" (see
@@ -249,7 +251,7 @@ When working inside the container, here's what you can expect to be either
 "preserved" (changes will stay from container to container) or "ephemeral" (it
 will be removed when the container is exited).
 
-- **Preserved**: the mounted project directory (`~/projects/app`), the
+- **Preserved**: the mounted project directory (`~/projects/<NAME>`), the
   "cache" directory (mounted as `~/.container-cache`) and the "local" directory
   (mounted as `~/.container-local`) - see the "persisted volumes" chapter for
   those last two.
