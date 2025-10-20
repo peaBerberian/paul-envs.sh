@@ -1,16 +1,82 @@
 _paulenvs()
 {
-    local cur prev opts
+    local cur prev opts create_opts
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-    opts="create list build run remove"
 
-    case "${prev}" in
-        paul-envs.sh)
-            COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+    # Main commands
+    local commands="create list build run remove"
+
+    # Options for create command
+    local create_flags="--uid --gid --username --shell --node-version --git-name --git-email --packages --no-neovim --no-starship --no-atuin --no-mise --no-zellij --port --volume"
+
+    # Get list of existing containers from paul-envs.sh ls
+    _get_containers() {
+        paul-envs.sh ls 2>/dev/null | grep -E '^\s+-\s+' | sed 's/^\s*-\s*//'
+    }
+
+    # First argument (command)
+    if [[ $COMP_CWORD -eq 1 ]]; then
+        COMPREPLY=( $(compgen -W "${commands}" -- ${cur}) )
+        return 0
+    fi
+
+    local command="${COMP_WORDS[1]}"
+
+    case "${command}" in
+        create)
+            case "${prev}" in
+                --uid|--gid)
+                    # Could suggest current UID/GID
+                    COMPREPLY=( $(compgen -W "$(id -u) $(id -g)" -- ${cur}) )
+                    return 0
+                    ;;
+                --username|--git-name|--git-email|--packages|--node-version|--port)
+                    # Let user type freely
+                    COMPREPLY=()
+                    return 0
+                    ;;
+                --shell)
+                    COMPREPLY=( $(compgen -W "bash zsh fish" -- ${cur}) )
+                    return 0
+                    ;;
+                --volume)
+                    # Complete file paths
+                    COMPREPLY=( $(compgen -f -- ${cur}) )
+                    return 0
+                    ;;
+                create)
+                    # After 'create', expect project name (no completion)
+                    COMPREPLY=()
+                    return 0
+                    ;;
+                *)
+                    # If previous was a project name, suggest path completion
+                    # Otherwise suggest flags
+                    if [[ $COMP_CWORD -eq 3 ]]; then
+                        # Third argument: project path
+                        COMPREPLY=( $(compgen -d -- ${cur}) )
+                    else
+                        # Suggest create flags
+                        COMPREPLY=( $(compgen -W "${create_flags}" -- ${cur}) )
+                    fi
+                    return 0
+                    ;;
+            esac
+            ;;
+        build|run|remove)
+            # Complete with container names
+            if [[ $COMP_CWORD -eq 2 ]]; then
+                COMPREPLY=( $(compgen -W "$(_get_containers)" -- ${cur}) )
+            fi
+            return 0
+            ;;
+        list)
+            # No further completion
             return 0
             ;;
     esac
 }
-complete -F _paulenvs paul_envs.sh
+
+complete -F _paulenvs paul-envs.sh
