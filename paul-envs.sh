@@ -189,14 +189,51 @@ generate_project_compose() {
 
     # Generate .env file
     cat >> "$env_file" <<EOF
-HOST_UID="${gen_cfg[host_uid]}"
-HOST_GID="${gen_cfg[host_gid]}"
-USERNAME="${gen_cfg[username]}"
-USER_SHELL="${gen_cfg[shell]}"
-NODE_VERSION="${gen_cfg[node_version]}"
+# "Env file" for your project, which will be fed to \`docker compose\`
+# alongside "compose.yaml" in the same directory.
+#
+# Can be freely updated, with the condition of not removing a few
+# mandatory env values:
+# - PROJECT_NAME
+# - PROJECT_PATH
+
+# Name of the project directory inside the container.
 PROJECT_NAME="${name}"
+
+# Path to the project you want to mount in this container
+# Will be mounted in "\$HOME/projects/<PROJECT_NAME>" inside that container.
 PROJECT_PATH="${gen_cfg[project_path]}"
+
+# To align with your current uid.
+# This is to ensure the mounted volume from your host has compatible
+# permissions.
+# On POSIX-like systems, just run \`id -u\` with the wanted user to know it.
+HOST_UID="${gen_cfg[host_uid]}"
+
+# To align with your current gid (same reason than for "uid").
+# On POSIX-like systems, just run \`id -g\` with the wanted user to know it.
+HOST_GID="${gen_cfg[host_gid]}"
+
+# Username created in the container.
+# Not really important, just set it if you want something other than "dev".
+USERNAME="${gen_cfg[username]}"
+
+# The default shell wanted.
+# Only "bash", "zsh" or "fish" are supported for now.
+USER_SHELL="${gen_cfg[shell]}"
+
+# Default Node.js version wanted.
+# (e.g. "22.11.0", also with "latest" being the latest one).
+NODE_VERSION="${gen_cfg[node_version]}"
+
+# Additional packages outside the core base, separated by a space.
+# Have to be in Ubuntu's default repository
+# (e.g. "ripgrep fzf". Can be left empty for no supplementary packages)
 SUPPLEMENTARY_PACKAGES="$safe_packages"
+
+# Tools toggle.
+# "true" == install it
+# anything else == don't.
 INSTALL_NEOVIM="${gen_cfg[install_neovim]}"
 INSTALL_STARSHIP="${gen_cfg[install_starship]}"
 INSTALL_ATUIN="${gen_cfg[install_atuin]}"
@@ -206,14 +243,28 @@ EOF
 
     # Add git args if provided
     if [[ -n "$safe_git_name" ]]; then
-        echo "GIT_AUTHOR_NAME=\"$safe_git_name\"" >> "$env_file"
+        cat >> "$env_file" <<EOF
+
+# Git author and committer name used inside the container
+# Can also be empty to not set that in the container.
+GIT_AUTHOR_NAME="$safe_git_name"
+EOF
     fi
     if [[ -n "$safe_git_email" ]]; then
-        echo "GIT_AUTHOR_EMAIL=\"$safe_git_email\"" >> "$env_file"
+        cat >> "$env_file" <<EOF
+
+# Git author and committer e-mail used inside the container
+# Can also be empty to not set that in the container.
+GIT_AUTHOR_EMAIL="$safe_git_email"
+EOF
     fi
 
     # Generate YAML
     cat >> "$compose_file" <<EOF
+# Compose file for your project, which will be fed to \`docker compose\` alongside
+# ".env" in the same directory.
+#
+# Can be freely updated to update ports, volumes etc.
 services:
   paulenv:
     build:
