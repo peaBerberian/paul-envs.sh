@@ -1,16 +1,19 @@
 #!/bin/bash
 set -e
 
-# Small dance to resolve symlinks of this script
+# Small dance to resolve symlinks of this script (macOS compatible)
 SCRIPT_PATH="${BASH_SOURCE[0]}"
 
 # Follow symlink until the actual script location
 while [ -L "$SCRIPT_PATH" ]; do
-  # Directory path when cd-ing into where the symlink is
-  SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
-  SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
-  # Handle relative symlinks by doing a concatenation if doesn't start with `/`
-  [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+    # Directory path when cd-ing into where the symlink is
+    SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+    # macOS readlink doesn't support -f, so we use plain readlink and do tricks
+    # with it
+    SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+    # Handle relative symlinks by doing a concatenation if doesn't start with
+    # `/`
+    [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
 done
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 BASE_COMPOSE="$SCRIPT_DIR/compose.yaml"
@@ -26,14 +29,14 @@ NC='\033[0m' # No Color
 
 # Helper functions
 error() {
-  echo -e "${RED}Error: $1${NC}" >&2;
-  exit 1;
+    echo -e "${RED}Error: $1${NC}" >&2;
+    exit 1;
 }
 success() {
-  echo -e "${GREEN}$1${NC}";
+    echo -e "${GREEN}$1${NC}";
 }
 warn() {
-  echo -e "${YELLOW}$1${NC}";
+    echo -e "${YELLOW}$1${NC}";
 }
 
 # Security validation functions
@@ -165,25 +168,130 @@ get_project_env() {
     echo "$PROJECTS_DIR/$name/.env"
 }
 
+# I wanted to do some kind of Map to store the plethora of options of a `create`
+# command. Turns out it exists since Bash 4+ (2009 AD) as "associative arrays",
+# nice!
+#
+# But wait, MacOS is not relying on Bash 4+, because that ""new version"" (v4.0
+# was feb. 2009, Michael Jackson was still alive and Avatar wasn't out yet) had
+# a licence change, GPLv3, that has even more copyleft lingo than the v2 of the
+# previous versions - maybe that's why they're using zsh now huh?
+#
+# I could write that script in zsh instead, or in an actual language (probably
+# the best idea of all) but I began in bash, bash is (almost) everywhere without
+# needing to compile or install some interpreter so it's kind of comfy.
+#
+# So as often I chose a dumber idea: just implement some kind of dictionary in
+# the middle of my simple script which could be 5% of the current LOC amount if
+# it was in a modern-er and better-er language.
+
+# Array of keys
+declare -a CONFIG_KEYS
+
+# Array of values - Do you see where this is going? ;)
+declare -a CONFIG_VALUES
+
+# Add an entry in the config
+# Usage: config_set key value
+config_set() {
+  local key=$1
+  local value=$2
+  local i=0
+
+  # Check if key exists. If it does, update
+  for ((i=0; i<${#CONFIG_KEYS[@]}; i++)); do
+    if [[ "${CONFIG_KEYS[$i]}" == "$key" ]]; then
+      CONFIG_VALUES[i]="$value"
+      return
+    fi
+  done
+
+  CONFIG_KEYS+=("$key")
+  CONFIG_VALUES+=("$value")
+}
+
+# Get an entry from the config, or empty string if not found
+# Usage: config_get key
+config_get() {
+    local key=$1
+    local i=0
+
+    for ((i=0; i<${#CONFIG_KEYS[@]}; i++)); do
+        if [[ "${CONFIG_KEYS[$i]}" == "$key" ]]; then
+            echo "${CONFIG_VALUES[$i]}"
+            return
+        fi
+    done
+
+    echo ""
+}
+
+# Initialize/reset content of the config to its default value.
+config_init() {
+    CONFIG_KEYS=()
+    CONFIG_VALUES=()
+
+    config_set "host_uid" "$(id -u)"
+    config_set "host_gid" "$(id -g)"
+    config_set "username" "dev"
+    config_set "shell" "bash"
+    config_set "node_version" "latest"
+    config_set "git_name" ""
+    config_set "git_email" ""
+    config_set "packages" ""
+    config_set "install_neovim" "true"
+    config_set "install_starship" "true"
+    config_set "install_atuin" "true"
+    config_set "install_mise" "true"
+    config_set "install_zellij" "true"
+    config_set "project_path" ""
+}
+
 # Generate project compose file
-# Usage: generate_project_compose name config_array ports_array volumes_array
+# Usage: generate_project_compose name ports_array volumes_array
 generate_project_compose() {
     local name=$1
-    local -n gen_cfg=$2
-    local -n gen_ports=$3
-    local -n gen_volumes=$4
+    shift
 
-    local compose_file=$(get_project_compose "$name")
-    local env_file=$(get_project_env "$name")
+    # Remaining is ports + "VOLUMES_START" + volumes
+    local ports=("$@")
+
+    # Find where volumes start
+    local volumes=()
+    local in_volumes=0
+    local temp_ports=()
+
+    for item in "${ports[@]}"; do
+        if [[ "$item" == "VOLUMES_START" ]]; then
+            in_volumes=1
+            continue
+        fi
+
+        if [[ $in_volumes -eq 0 ]]; then
+            temp_ports+=("$item")
+        else
+            volumes+=("$item")
+        fi
+    done
+
+    ports=("${temp_ports[@]}")
+
+    local compose_file
+    local env_file
+    compose_file=$(get_project_compose "$name")
+    env_file=$(get_project_env "$name")
 
     if [[ -f "$compose_file" || -f "$env_file" ]]; then
         error "Project '$name' already exists\nHint: Use 'paul-envs.sh list' to see all projects or 'paul-envs.sh remove $name' to delete it"
     fi
 
     # Sanitize all user inputs
-    local safe_git_name=$(light_sanitize "${gen_cfg[git_name]}")
-    local safe_git_email=$(light_sanitize "${gen_cfg[git_email]}")
-    local safe_packages=$(light_sanitize "${gen_cfg[packages]}")
+    local safe_git_name
+    safe_git_name=$(light_sanitize "$(config_get git_name)")
+    local safe_git_email
+    safe_git_email=$(light_sanitize "$(config_get git_email)")
+    local safe_packages
+    safe_packages=$(light_sanitize "$(config_get packages)")
 
     mkdir -p "$(dirname "$compose_file")"
 
@@ -202,29 +310,29 @@ PROJECT_NAME="${name}"
 
 # Path to the project you want to mount in this container
 # Will be mounted in "\$HOME/projects/<PROJECT_NAME>" inside that container.
-PROJECT_PATH="${gen_cfg[project_path]}"
+PROJECT_PATH="$(config_get project_path)"
 
 # To align with your current uid.
 # This is to ensure the mounted volume from your host has compatible
 # permissions.
 # On POSIX-like systems, just run \`id -u\` with the wanted user to know it.
-HOST_UID="${gen_cfg[host_uid]}"
+HOST_UID="$(config_get host_uid)"
 
 # To align with your current gid (same reason than for "uid").
 # On POSIX-like systems, just run \`id -g\` with the wanted user to know it.
-HOST_GID="${gen_cfg[host_gid]}"
+HOST_GID="$(config_get host_gid)"
 
 # Username created in the container.
 # Not really important, just set it if you want something other than "dev".
-USERNAME="${gen_cfg[username]}"
+USERNAME="$(config_get username)"
 
 # The default shell wanted.
 # Only "bash", "zsh" or "fish" are supported for now.
-USER_SHELL="${gen_cfg[shell]}"
+USER_SHELL="$(config_get shell)"
 
 # Default Node.js version wanted.
 # (e.g. "22.11.0", also with "latest" being the latest one).
-NODE_VERSION="${gen_cfg[node_version]}"
+NODE_VERSION="$(config_get node_version)"
 
 # Additional packages outside the core base, separated by a space.
 # Have to be in Ubuntu's default repository
@@ -234,11 +342,11 @@ SUPPLEMENTARY_PACKAGES="$safe_packages"
 # Tools toggle.
 # "true" == install it
 # anything else == don't.
-INSTALL_NEOVIM="${gen_cfg[install_neovim]}"
-INSTALL_STARSHIP="${gen_cfg[install_starship]}"
-INSTALL_ATUIN="${gen_cfg[install_atuin]}"
-INSTALL_MISE="${gen_cfg[install_mise]}"
-INSTALL_ZELLIJ="${gen_cfg[install_zellij]}"
+INSTALL_NEOVIM="$(config_get install_neovim)"
+INSTALL_STARSHIP="$(config_get install_starship)"
+INSTALL_ATUIN="$(config_get install_atuin)"
+INSTALL_MISE="$(config_get install_mise)"
+INSTALL_ZELLIJ="$(config_get install_zellij)"
 EOF
 
     # Add git args if provided
@@ -271,9 +379,9 @@ services:
 EOF
 
     # Add ports if specified
-    if [[ ${#gen_ports[@]} -gt 0 ]]; then
+    if [[ ${#ports[@]} -gt 0 ]]; then
         echo "    ports:" >> "$compose_file"
-        for port in "${gen_ports[@]}"; do
+        for port in "${ports[@]}"; do
             echo "      - \"$port:$port\"" >> "$compose_file"
         done
     fi
@@ -283,7 +391,7 @@ EOF
     volumes:
 EOF
     # TODO: some kind of pre-validation?
-    for vol in "${gen_volumes[@]}"; do
+    for vol in "${volumes[@]}"; do
         echo "      - $vol" >> "$compose_file"
     done
 
@@ -293,7 +401,8 @@ EOF
 # Prompt for common credential mounts
 prompt_for_credentials() {
     local username=$1
-    local -n result_volumes=$2
+    shift
+    local result_volumes=("$@")
 
     echo ""
     echo "Mount common credentials/configs? (space-separated numbers, or Enter to skip)"
@@ -301,9 +410,10 @@ prompt_for_credentials() {
     echo "  2) Git credentials (~/.git-credentials)"
     echo "  3) AWS credentials (~/.aws)"
     echo "  4) Custom CA certificates (/etc/ssl/certs/custom-ca.crt)"
-    read -p "Choice [none]: " choices
+    read -p -r "Choice [none]: " choices
 
     if [[ -z "$choices" ]]; then
+        echo "${result_volumes[@]}"
         return
     fi
 
@@ -326,25 +436,13 @@ prompt_for_credentials() {
                 ;;
         esac
     done
+
+    echo "${result_volumes[@]}"
 }
 
 # Commands
 cmd_create() {
-    declare -A config=(
-        [host_uid]=$(id -u)
-        [host_gid]=$(id -g)
-        [username]="dev"
-        [shell]=""
-        [node_version]="latest"
-        [git_name]=""
-        [git_email]=""
-        [packages]=""
-        [install_neovim]="true"
-        [install_starship]="true"
-        [install_atuin]="true"
-        [install_mise]="true"
-        [install_zellij]="true"
-    )
+    config_init
 
     local name=""
     local project_path=""
@@ -368,62 +466,62 @@ cmd_create() {
         case $1 in
             --uid)
                 validate_uid_gid "$2" "UID"
-                config[host_uid]=$2
+                config_set "host_uid" "$2"
                 shift 2
                 ;;
             --gid)
                 validate_uid_gid "$2" "GID"
-                config[host_gid]=$2
+                config_set "host_gid" "$2"
                 shift 2
                 ;;
             --username)
                 validate_username "$2"
-                config[username]=$2
+                config_set "username" "$2"
                 shift 2
                 ;;
             --shell)
                 validate_shell "$2"
-                config[shell]=$2
+                config_set "shell" "$2"
                 shift 2
                 ;;
             --node-version)
                 validate_node_version "$2"
-                config[node_version]=$2
+                config_set "node_version" "$2"
                 shift 2
                 ;;
             --git-name)
                 validate_git_name "$2"
-                config[git_name]=$2
+                config_set "git_name" "$2"
                 shift 2
                 ;;
             --git-email)
                 validate_git_email "$2"
-                config[git_email]=$2
+                config_set "git_email" "$2"
                 shift 2
                 ;;
             --packages)
                 validate_apt_package_names "$2"
-                config[packages]=$2
+                config_set "packages" "$2"
                 shift 2
                 ;;
             --no-neovim)
-                config[install_neovim]="false"
+                config_set "install_neovim" "false"
                 shift
                 ;;
             --no-starship)
-                config[install_starship]="false"
+                config_set "install_starship" "false"
                 shift
                 ;;
             --no-atuin)
-                config[install_atuin]="false"
+                config_set "install_atuin" "false"
                 shift
                 ;;
             --no-mise)
-                config[install_mise]="false"
+                config_set "install_mise" "false"
                 shift
                 ;;
             --no-zellij)
-                config[install_zellij]="false"
+                config_set "install_zellij" "false"
                 shift
                 ;;
             --port)
@@ -444,23 +542,23 @@ cmd_create() {
     done
 
     # Ask for shell if not provided
-    if [[ -z "${config[shell]}" ]]; then
+    if [[ -z "$(config_get shell)" ]]; then
         echo "Select shell:"
         echo "  1) bash (default)"
         echo "  2) zsh"
         echo "  3) fish"
-        read -p "Choice [1]: " shell_choice
+        read -p -r "Choice [1]: " shell_choice
         case ${shell_choice:-1} in
-            1) config[shell]="bash" ;;
-            2) config[shell]="zsh" ;;
-            3) config[shell]="fish" ;;
-            *) config[shell]="bash" ;;
+            1) config_set "shell" "bash" ;;
+            2) config_set "shell" "zsh" ;;
+            3) config_set "shell" "fish" ;;
+            *) config_set "shell" "bash" ;;
         esac
     fi
 
     # Prompt for common credentials if no --volume flags were used
     if [[ ${#volumes[@]} -eq 0 ]]; then
-        prompt_for_credentials "${config[username]}" volumes
+        volumes=($(prompt_for_credentials "$(config_get username)" "${volumes[@]}"))
     fi
 
     # Validate and expand project path
@@ -476,9 +574,9 @@ cmd_create() {
         project_path="$(pwd)/$project_path"
     fi
 
-    config[project_path]=$project_path
+    config_set "project_path" "$project_path"
 
-    if [[ ${config[install_mise]} != "true" ]]; then
+    if [[ "$(config_get install_mise)" != "true" ]]; then
       warn "\`mise\` is not installed. We will use Ubuntu's nodejs instead of relying on NODE_VERSION."
     fi
 
@@ -490,7 +588,7 @@ cmd_create() {
     fi
 
     # Generate config
-    generate_project_compose "$name" config ports volumes
+    generate_project_compose "$name" "${ports[@]}" "VOLUMES_START" "${volumes[@]}"
 
     success "Created project '$name'"
 }
@@ -531,8 +629,10 @@ cmd_build() {
 
     validate_project_name "$name"
 
-    local compose_file=$(get_project_compose "$name")
-    local env_file=$(get_project_env "$name")
+    local compose_file
+    local env_file
+    compose_file=$(get_project_compose "$name")
+    env_file=$(get_project_env "$name")
     if [[ ! -f "$compose_file" || ! -f "$env_file" ]]; then
         error "Project '$name' not found\nHint: Use 'paul-envs.sh list' to see available projects or 'paul-envs.sh create' to make a new one"
     fi
@@ -561,8 +661,10 @@ cmd_run() {
 
     validate_project_name "$name"
 
-    local compose_file=$(get_project_compose "$name")
-    local env_file=$(get_project_env "$name")
+    local compose_file
+    local env_file
+    compose_file=$(get_project_compose "$name")
+    env_file=$(get_project_env "$name")
     if [[ ! -f "$compose_file" || ! -f "$env_file" ]]; then
         error "Project '$name' not found\nHint: Use 'paul-envs.sh list' to see available projects"
     fi
@@ -580,7 +682,8 @@ cmd_remove() {
 
     validate_project_name "$name"
 
-    local project_dir=$(get_project_dir "$name")
+    local project_dir
+    project_dir=$(get_project_dir "$name")
     if [[ ! -d "$project_dir" ]]; then
         error "Project '$name' not found\nHint: Use 'paul-envs.sh list' to see available projects"
     fi
