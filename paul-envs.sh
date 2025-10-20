@@ -556,7 +556,7 @@ cmd_run() {
     shift 1
 
     if [[ -z "$name" ]]; then
-        error "Usage: paul-envs.sh run <name> [command]\nHint: Use 'paul-envs.sh list' to see available projects"
+        error "Usage: paul-envs.sh run <name>\nHint: Use 'paul-envs.sh list' to see available projects"
     fi
 
     validate_project_name "$name"
@@ -568,7 +568,7 @@ cmd_run() {
     fi
 
     export COMPOSE_PROJECT_NAME="paulenv-$name"
-    docker compose -f "$BASE_COMPOSE" -f "$compose_file" --env-file "$env_file" run --rm paulenv "$@"
+    docker compose -f "$BASE_COMPOSE" -f "$compose_file" --env-file "$env_file" run --rm paulenv
 }
 
 cmd_remove() {
