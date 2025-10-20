@@ -468,7 +468,7 @@ cmd_build() {
     # Ensure shared cache volume exists
     docker volume create paulenv-shared-cache 2>/dev/null || true
 
-    export COMPOSE_PROJECT_NAME="$name"
+    export COMPOSE_PROJECT_NAME="paulenv-$name"
     docker compose -f "$BASE_COMPOSE" -f "$compose_file" --env-file "$env_file" build
     success "Built project '$name'"
 
@@ -495,7 +495,7 @@ cmd_run() {
         error "Project '$name' not found\nHint: Use 'paul-envs.sh list' to see available projects"
     fi
 
-    export COMPOSE_PROJECT_NAME="$name"
+    export COMPOSE_PROJECT_NAME="paulenv-$name"
     docker compose -f "$BASE_COMPOSE" -f "$compose_file" --env-file "$env_file" run --rm paulenv "$@"
 }
 

@@ -146,4 +146,4 @@ volumes:
 
   local-state:
     # Create project-specific volume with clean name
-    name: paulenv-${COMPOSE_PROJECT_NAME}-local
+    name: ${COMPOSE_PROJECT_NAME}-local
