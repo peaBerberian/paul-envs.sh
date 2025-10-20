@@ -35,7 +35,8 @@ project can be created with only a few flags, with the following features:
 
 ## Quick Start
 
-1. Ensure `docker compose` is installed locally and accessible in path.
+1. Clone this repository, `cd` to it, and ensure `docker compose` is installed
+   locally and accessible in path.
 
 2. Run `./paul-envs.sh create <NAME> <path/to/your/project>`.
 
@@ -106,7 +107,14 @@ through persistent volumes.
 
 ## How to run it
 
-Running `paul-envs.sh` without any argument will list all available operations
+First you need to clone this repository and make it your current working
+directory:
+```sh
+git clone https://github.com/peaBerberian/paul-envs.sh.git
+cd paul-envs.sh
+```
+
+Running `./paul-envs.sh` without any argument will list all available operations
 and corresponding flags:
 ```sh
 ./paul-envs.sh

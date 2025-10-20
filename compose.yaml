@@ -2,12 +2,22 @@
 # =================
 #
 # If you plan to just set-up a single container for a single project,
-# you can update this file directly instead of trusting my `paul-envs.sh`
-# script.
+# you can just create a .env file locally setting the env variables needed by
+# this compose file, and add e.g. ports and volumes you would like.
 #
-# The "args" in the `paulenv` service are probably the only things you want to
-# update in that case. You can also add `volumes` and `ports` to it or anything
-# you want, the sky is the limit.
+# All expected environment variables (many with defaults) are listed in the
+# `args` of the `paulenv` service which are fully documented if you want to
+# go directly through the `docker compose` route.
+#
+# If building directly from `docker compose build`, don't forget to first
+# initialize the "cache" docker volume:
+# ```sh
+# docker volume create paulenv-shared-cache 2>/dev/null || true
+# ``
+# And after a `build`, to initialize those "volumes":
+# ```sh
+# `docker compose --profile reset up reset-cache reset-local`
+# ```
 #
 # If you don't mind running the `paul-envs.sh` script, none of this is
 # necessary, the `paul-envs.sh` script extends this compose.yaml file into other
