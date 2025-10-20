@@ -4,34 +4,62 @@
 on multiple large projects with rapidly changing dependencies in isolated and
 minimal containers.
 
+## What's this
+
+`paul-envs` is built for me and other developers with similar needs: working on
+multiple projects simultaneously, relying on only terminal-based workflows
+(vim/neovim/kakoune/helix..., shell and CLI tools), and wanting protection from
+projects that might modify system state or require conflicting dependencies.
+This is done by providing a sane, mostly-ephemeral and minimal environment.
+
 It is both a wrapper over the `docker compose` tool and a configuration
 generator for it.
 Each of the created containers is similar in a way to [dev
 containers](https://containers.dev/) in that they are targeted for development
-usages.
+usages but mine is optimized for CLI-only, multi-projects workflows.
 
-However this tool is especially designed for a multiple projects setup where
-each project is linked to its own separate container. A container for another
-project can be created with only a few flags, with the following features:
+Key features:
 
--  Only project files and key directories (e.g. terminal history, installed
-   tools' stored data) are persisted. All other paths reset when the container
-   exits.
+-  **Ephemeral by default**: Only project files and key directories (e.g.
+   terminal history, installed tools' stored data, editor plugins...) are
+   persisted. Everything else resets on exit, keeping the environment clean.
 
-   This ensures the system stays minimal and clean over time.
+-  **Shared caches**: npm/yarn caches are shared across all projects to avoid 
+   redundant downloads.
 
--  Caches (e.g., npm, yarn) are shared across containers via a common persistent
-   volume.
+-  **Minimal base**: The containers are just Ubuntu LTS and your chosen CLI
+   tools. There's no GUI, no unnecessary packages.
 
--  The container is a minimal CLI-only environment: just an ubuntu LTS image
-   with a few optional binaries (including in my case, the `neovim` editor).
+-  **Fast setup**: Single shared `Dockerfile` means new project containers
+   build quickly.
 
-   Minimizing installed packages reduces opportunies for issues (package
-   conflicts, poor support of unusual system configuration...), attack surface
-   and simplifies debugging.
 
--  A shared `Dockerfile`, making new containers easy to set up and very fast to
-   build.
+## Comparison with other similar tools
+
+Regarding **alternatives**, `paul-envs` fit in a sweet spot for me:
+
+**vs. dev containers:**  
+Dev containers include IDE integration and a rich ecosystem. `paul-envs` is
+editor-agnostic, CLI-specialized, handle multiple projects directly and is much
+simpler conceptually (it's just a minimal Ubuntu LTS image with only CLI tools
+wanted and configured on top) if all that is needed is a terminal-based
+workflow.
+
+**vs. Devbox:**  
+Devbox has deterministic and reproducible environments thanks to `nix`, yet
+doesn't provide complete isolation - e.g. your own `$HOME` directory can still
+be updated by your project's scripts.
+`paul-envs` rely on full container isolation at the cost of less
+reproducibility, it also relies on a familiar Ubuntu LTS instead of `nix`.
+
+**vs. docker compose:**  
+`paul-envs` wraps `docker compose` calls and add multi-project management and
+good defaults and setup for a CLI-based development environment.
+It can be seen as a "convenience layer" on top of `docker compose`.
+
+**vs. nix-shell / direnv:**  
+These manipulate your environment (PATH, env vars) but don't provide container
+isolation (same issue than with `devbox`).
 
 ## Quick Start
 
@@ -318,6 +346,10 @@ shell history etc.) are persisted.
 In simple single-projects scenarios, it can also be relied on directly.
 Just set the right env variables listed in there (.e.g in an `env` file) and
 rely on `docker compose` directly (e.g. `docker compose build`). It works!
+
+If you just want to do that, refer to the `compose.yaml` file. It contains
+documentation on how to exploit `docker compose` directly instead of going
+through my `paul-envs.sh` script.
 
 ### The paul-envs.sh script
 
