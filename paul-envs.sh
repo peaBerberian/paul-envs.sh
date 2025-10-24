@@ -234,7 +234,7 @@ config_init() {
     config_set "host_uid" "$(id -u)"
     config_set "host_gid" "$(id -g)"
     config_set "username" "dev"
-    config_set "shell" "bash"
+    config_set "shell" ""
     config_set "node_version" "latest"
     config_set "git_name" ""
     config_set "git_email" ""
@@ -398,48 +398,6 @@ EOF
     echo "" >> "$compose_file"
 }
 
-# Prompt for common credential mounts
-prompt_for_credentials() {
-    local username=$1
-    shift
-    local result_volumes=("$@")
-
-    echo ""
-    echo "Mount common credentials/configs? (space-separated numbers, or Enter to skip)"
-    echo "  1) SSH keys (~/.ssh)"
-    echo "  2) Git credentials (~/.git-credentials)"
-    echo "  3) AWS credentials (~/.aws)"
-    echo "  4) Custom CA certificates (/etc/ssl/certs/custom-ca.crt)"
-    read -p -r "Choice [none]: " choices
-
-    if [[ -z "$choices" ]]; then
-        echo "${result_volumes[@]}"
-        return
-    fi
-
-    for choice in $choices; do
-        case $choice in
-            1)
-                result_volumes+=("$HOME/.ssh:/home/\${USERNAME}/.ssh:ro")
-                ;;
-            2)
-                result_volumes+=("$HOME/.git-credentials:/home/\${USERNAME}/.git-credentials:ro")
-                ;;
-            3)
-                result_volumes+=("$HOME/.aws:/home/\${USERNAME}/.aws:ro")
-                ;;
-            4)
-                result_volumes+=("/etc/ssl/certs/custom-ca.crt:/usr/local/share/ca-certificates/custom-ca.crt:ro")
-                ;;
-            *)
-                warn "Unknown choice: $choice (skipped)"
-                ;;
-        esac
-    done
-
-    echo "${result_volumes[@]}"
-}
-
 # Commands
 cmd_create() {
     config_init
@@ -547,7 +505,7 @@ cmd_create() {
         echo "  1) bash (default)"
         echo "  2) zsh"
         echo "  3) fish"
-        read -p -r "Choice [1]: " shell_choice
+        read -r -p "Choice [1]: " shell_choice
         case ${shell_choice:-1} in
             1) config_set "shell" "bash" ;;
             2) config_set "shell" "zsh" ;;
@@ -558,7 +516,33 @@ cmd_create() {
 
     # Prompt for common credentials if no --volume flags were used
     if [[ ${#volumes[@]} -eq 0 ]]; then
-        volumes=($(prompt_for_credentials "$(config_get username)" "${volumes[@]}"))
+        echo ""
+        echo "Mount common credentials/configs? (space-separated numbers, or Enter to skip)"
+        echo "  1) SSH keys (~/.ssh)"
+        echo "  2) Git credentials (~/.git-credentials)"
+        echo "  3) AWS credentials (~/.aws)"
+        echo "  4) Custom CA certificates (/etc/ssl/certs/custom-ca.crt)"
+        read -r -p "Choice [none]: " choices
+
+        for choice in $choices; do
+            case $choice in
+                1)
+                    volumes+=("$HOME/.ssh:/home/\${USERNAME}/.ssh:ro")
+                    ;;
+                2)
+                    volumes+=("$HOME/.git-credentials:/home/\${USERNAME}/.git-credentials:ro")
+                    ;;
+                3)
+                    volumes+=("$HOME/.aws:/home/\${USERNAME}/.aws:ro")
+                    ;;
+                4)
+                    volumes+=("/etc/ssl/certs/custom-ca.crt:/usr/local/share/ca-certificates/custom-ca.crt:ro")
+                    ;;
+                *)
+                    warn "Unknown choice: $choice (skipped)"
+                    ;;
+            esac
+        done
     fi
 
     # Validate and expand project path
