@@ -24,7 +24,7 @@ Key features:
    terminal history, installed tools' stored data, editor plugins...) are
    persisted. Everything else resets on exit, keeping the environment clean.
 
--  **Shared caches**: npm/yarn caches are shared across all projects to avoid 
+-  **Shared caches**: npm/yarn caches are shared across all projects to avoid
    redundant downloads.
 
 -  **Minimal base**: The containers are just Ubuntu LTS and your chosen CLI
@@ -38,26 +38,26 @@ Key features:
 
 Regarding **alternatives**, `paul-envs` fit in a sweet spot for me:
 
-**vs. dev containers:**  
+**vs. dev containers:**
 Dev containers include IDE integration and a rich ecosystem. `paul-envs` is
 editor-agnostic, CLI-specialized, handle multiple projects directly and is much
 simpler conceptually (it's just a minimal Ubuntu LTS image with only CLI tools
 wanted and configured on top) if all that is needed is a terminal-based
 workflow.
 
-**vs. Devbox:**  
+**vs. Devbox:**
 Devbox has deterministic and reproducible environments thanks to `nix`, yet
 doesn't provide complete isolation - e.g. your own `$HOME` directory can still
 be updated by your project's scripts.
 `paul-envs` rely on full container isolation at the cost of less
 reproducibility, it also relies on a familiar Ubuntu LTS instead of `nix`.
 
-**vs. docker compose:**  
+**vs. docker compose:**
 `paul-envs` wraps `docker compose` calls and add multi-project management and
 good defaults and setup for a CLI-based development environment.
 It can be seen as a "convenience layer" on top of `docker compose`.
 
-**vs. nix-shell / direnv:**  
+**vs. nix-shell / direnv:**
 These manipulate your environment (PATH, env vars) but don't provide container
 isolation (same issue than with `devbox`).
 
