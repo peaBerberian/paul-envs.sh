@@ -146,6 +146,10 @@ RUN if [ "$INSTALL_ATUIN" = "true" ]; then \
     elif [ "$USER_SHELL" = "fish" ]; then \
       printf "\n# Initialize atuin prompt\natuin init fish | source\n" >> /home/${USERNAME}/.config/fish/config.fish; \
     fi; \
+    if [ "$USER_SHELL" != "zsh" ]; then \
+      # atuin weirdly seems to create a default `.zshrc` with its setup inside. We don't need this, keep it minimal.
+      rm -f /home/${USERNAME}/.zshrc; \
+    fi; \
   fi
 
 # Install `mise` (optional)
