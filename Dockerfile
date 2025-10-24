@@ -57,9 +57,9 @@ RUN mkdir -p /home/${USERNAME}/.container-cache && \
 # NOTE: the `fish` shell already handle all this more sanely following `XDG` directories standards
 RUN echo "export HISTFILE=/home/${USERNAME}/.container-local/.bash_history" > /home/${USERNAME}/.container-overrides.bash && \
     echo "export HISTFILE=/home/${USERNAME}/.container-local/.zsh_history" > /home/${USERNAME}/.container-overrides.zsh && \
-    echo -e "\n# Container overrides\n[ -f ~/.container-overrides.bash ] && source ~/.container-overrides.bash" >> /home/${USERNAME}/.bashrc && \
+    printf "\n# Container overrides\n[ -f ~/.container-overrides.bash ] && source ~/.container-overrides.bash\n" >> /home/${USERNAME}/.bashrc && \
     if [ "$USER_SHELL" = "zsh" ]; then \
-      echo -e "\n# Container overrides\n[ -f ~/.container-overrides.zsh ] && source ~/.container-overrides.zsh" >> /home/${USERNAME}/.zshrc; \
+      printf "\n# Container overrides\n[ -f ~/.container-overrides.zsh ] && source ~/.container-overrides.zsh\n" >> /home/${USERNAME}/.zshrc; \
     fi
 
 # Set various persistent caches locations through env
@@ -129,33 +129,33 @@ USER ${USERNAME}
 
 # Install `starship` (optional)
 RUN if [ "$INSTALL_STARSHIP" = "true" ]; then \
-    echo -e "\n# Initialize starship prompt\neval \"\$(starship init bash)\"" >> /home/${USERNAME}/.bashrc && \
+    printf '\n# Initialize starship prompt\neval "$(starship init bash)"\n' >> /home/${USERNAME}/.bashrc && \
     if [ "$USER_SHELL" = "zsh" ]; then \
-      echo -e "\n# Initialize starship prompt\neval \"\$(starship init zsh)\"" >> /home/${USERNAME}/.zshrc; \
+      printf '\n# Initialize starship prompt\neval "$(starship init zsh)"\n' >> /home/${USERNAME}/.zshrc; \
     elif [ "$USER_SHELL" = "fish" ]; then \
-      echo -e "\n# Initialize starship prompt\nstarship init fish | source" >> /home/${USERNAME}/.config/fish/config.fish; \
+      printf '\n# Initialize starship prompt\nstarship init fish | source\n' >> /home/${USERNAME}/.config/fish/config.fish; \
     fi; \
   fi
 
 # Install `atuin` (optional)
 RUN if [ "$INSTALL_ATUIN" = "true" ]; then \
     curl --proto '=https' --tlsv1.2 -sSf https://setup.atuin.sh | bash && \
-    echo -e "\n# Initialize atuin\neval \"\$(atuin init bash)\"" >> /home/${USERNAME}/.bashrc && \
+    printf "\n# Initialize atuin\neval \"\$(atuin init bash)\"\n" >> /home/${USERNAME}/.bashrc && \
     if [ "$USER_SHELL" = "zsh" ]; then \
-      echo -e "\n# Initialize atuin\neval \"\$(atuin init zsh)\"" >> /home/${USERNAME}/.zshrc; \
+      printf "\n# Initialize atuin\neval \"\$(atuin init zsh)\"\n" >> /home/${USERNAME}/.zshrc; \
     elif [ "$USER_SHELL" = "fish" ]; then \
-      echo -e "\n# Initialize atuin prompt\natuin init fish | source" >> /home/${USERNAME}/.config/fish/config.fish; \
+      printf "\n# Initialize atuin prompt\natuin init fish | source\n" >> /home/${USERNAME}/.config/fish/config.fish; \
     fi; \
   fi
 
 # Install `mise` (optional)
 RUN if [ "$INSTALL_MISE" = "true" ]; then \
     curl https://mise.jdx.dev/install.sh | sh && \
-    echo -e "\n# Initialize mise\neval \"\$(mise activate bash)\"" >> /home/${USERNAME}/.bashrc && \
+    printf "\n# Initialize mise\neval \"\$(mise activate bash)\"\n" >> /home/${USERNAME}/.bashrc && \
     if [ "$USER_SHELL" = "fish" ]; then \
-      echo -e "\n# Initialize mise\nmise activate fish | source" >> /home/${USERNAME}/.config/fish/config.fish; \
+      printf "\n# Initialize mise\nmise activate fish | source\n" >> /home/${USERNAME}/.config/fish/config.fish; \
     elif [ "$USER_SHELL" = "zsh" ]; then \
-      echo -e "\n# Initialize mise\neval \"\$(mise activate zsh)\"" >> /home/${USERNAME}/.zshrc; \
+      printf "\n# Initialize mise\neval \"\$(mise activate zsh)\"\n" >> /home/${USERNAME}/.zshrc; \
     fi && \
     export PATH="/home/${USERNAME}/.local/bin:$PATH" && \
     mise use -g node@${NODE_VERSION} && \
@@ -199,11 +199,11 @@ RUN --mount=type=bind,source=configs,target=/tmp/configs \
 # Ensure HISTFILE override is still sourced after config copy
 # This guarantees history persistence even if user configs were copied
 RUN if [ -f /home/${USERNAME}/.bashrc ] && ! grep -qF 'container-overrides.bash' /home/${USERNAME}/.bashrc; then \
-    echo -e "\n# Container overrides\n[ -f ~/.container-overrides.bash ] && source ~/.container-overrides.bash" >> /home/${USERNAME}/.bashrc; \
+    printf "\n# Container overrides\n[ -f ~/.container-overrides.bash ] && source ~/.container-overrides.bash\n" >> /home/${USERNAME}/.bashrc; \
   fi
 
 RUN if [ "$USER_SHELL" = "zsh" ] && [ -f /home/${USERNAME}/.zshrc ] && ! grep -qF 'container-overrides.zsh' /home/${USERNAME}/.zshrc; then \
-    echo -e "\n# Container overrides\n[ -f ~/.container-overrides.zsh ] && source ~/.container-overrides.zsh" >> /home/${USERNAME}/.zshrc; \
+    printf "\n# Container overrides\n[ -f ~/.container-overrides.zsh ] && source ~/.container-overrides.zsh\n" >> /home/${USERNAME}/.zshrc; \
   fi
 
 # Pre-install nvim plugins if neovim is installed with `lazy.nvim` and config
