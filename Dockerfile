@@ -85,7 +85,8 @@ ARG INSTALL_STARSHIP=true
 ARG INSTALL_ATUIN=true
 ARG INSTALL_MISE=true
 ARG INSTALL_ZELLIJ=true
-ARG NODE_VERSION=latest
+ARG INSTALL_NODE=latest
+ARG INSTALL_RUST=none
 ARG GIT_AUTHOR_NAME=""
 ARG GIT_AUTHOR_EMAIL=""
 
@@ -162,24 +163,56 @@ RUN if [ "$INSTALL_MISE" = "true" ]; then \
       printf "\n# Initialize mise\nmise activate fish | source\n" >> /home/${USERNAME}/.config/fish/config.fish; \
     elif [ "$USER_SHELL" = "zsh" ]; then \
       printf "\n# Initialize mise\neval \"\$(mise activate zsh)\"\n" >> /home/${USERNAME}/.zshrc; \
-    fi && \
-    export PATH="/home/${USERNAME}/.local/bin:$PATH" && \
-    mise use -g node@${NODE_VERSION} && \
-    mise exec -- npm config set prefix "/home/${USERNAME}/.local" && \
-    mise exec -- npm config set cache /home/${USERNAME}/.container-cache/.npm && \
-    mise exec -- npm install -g yarn && \
-    mise exec -- yarn config set cacheFolder /home/${USERNAME}/.container-cache/.yarn; \
+    fi; \
+    if [ -n "$INSTALL_NODE" ] && [ "$INSTALL_NODE" != "none" ]; then \
+      export PATH="/home/${USERNAME}/.local/bin:$PATH" && \
+      mise use -g node@${INSTALL_NODE} && \
+      mise exec -- npm config set prefix "/home/${USERNAME}/.local" && \
+      mise exec -- npm config set cache /home/${USERNAME}/.container-cache/.npm && \
+      # Add yarn globally, just in case
+      mise exec -- npm install -g yarn && \
+      mise exec -- yarn config set cacheFolder /home/${USERNAME}/.container-cache/.yarn; \
+    fi; \
+    if [ -n "$INSTALL_RUST" ] && [ "$INSTALL_RUST" != "none" ]; then \
+      if [ "$INSTALL_RUST" = "latest" ]; then \
+        export PATH="/home/${USERNAME}/.local/bin:$PATH" && mise use -g rust@latest; \
+      else \
+        export PATH="/home/${USERNAME}/.local/bin:$PATH" && mise use -g rust@${INSTALL_RUST}; \
+      fi; \
+      # Add Wasm support, just in case. TODO: don't?
+      export PATH="/home/${USERNAME}/.local/bin:$PATH" && \
+      mise exec -- rustup target add wasm32-unknown-unknown; \
+    fi; \
   fi
 
 USER root
 
 RUN if [ "$INSTALL_MISE" != "true" ]; then \
     # Just install nodejs and npm from Ubuntu's repositories
-    echo "\033[1;33mWarning: Using Ubuntu's nodejs as \"INSTALL_MISE\" is not set to \"true\". NODE_VERSION=${NODE_VERSION} ignored.\033[0m" >&2; \
-    apt-get update && apt-get install -y \
-      nodejs \
-      npm \
-      && rm -rf /var/lib/apt/lists/*; \
+    if [ -n "$INSTALL_NODE" ] && [ "$INSTALL_NODE" != "none" ]; then \
+      if [ "$INSTALL_NODE" != "latest" ]; then \
+        echo "\033[1;33mWarning: Using Ubuntu's nodejs as \"INSTALL_MISE\" is not set to \"true\". NODE_VERSION=${INSTALL_NODE} ignored.\033[0m" >&2; \
+      fi; \
+      apt-get update && apt-get install -y \
+        nodejs \
+        npm \
+        && rm -rf /var/lib/apt/lists/*; \
+    fi; \
+    if [ -n "$INSTALL_RUST" ] && [ "$INSTALL_RUST" != "none" ]; then \
+      if [ "$INSTALL_RUST" != "latest" ]; then \
+        echo "\033[1;33mWarning: Using Ubuntu's rust as \"INSTALL_MISE\" is not set to \"true\". RUST_VERSION=${INSTALL_RUST} ignored.\033[0m" >&2; \
+      fi; \
+      su - ${USERNAME} -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
+        . /home/${USERNAME}/.cargo/env && \
+        rustup default stable && \
+        rustup target add wasm32-unknown-unknown"; \
+      echo '. $HOME/.cargo/env' >> /home/${USERNAME}/.bashrc; \
+      if [ "$USER_SHELL" = "zsh" ]; then \
+        echo '. $HOME/.cargo/env' >> /home/${USERNAME}/.zshrc; \
+      elif [ "$USER_SHELL" = "fish" ]; then \
+        echo 'set -gx PATH $HOME/.cargo/bin $PATH' >> /home/${USERNAME}/.config/fish/config.fish; \
+      fi; \
+    fi; \
   fi
 
 USER ${USERNAME}

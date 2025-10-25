@@ -62,11 +62,16 @@ validate_shell() {
     esac
 }
 
-validate_node_version() {
+validate_version_arg() {
     local version=$1
-    # Allow "latest" or semantic versioning patterns
-    if [[ "$version" != "latest" && ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        error "Invalid node version '$version'. Must be 'latest' or semantic version (e.g., 20.10.0)"
+    # Allow "none", latest" or semantic versioning patterns
+    if [[
+      -n "$version" &&
+        "$version" != "latest" &&
+        "$version" != "none" &&
+        ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$
+      ]]; then
+        error "Invalid version argument: '$version'. Must be either \"none\", \"latest\" or semantic versioning (e.g., 20.10.0)"
     fi
 }
 
@@ -235,7 +240,8 @@ config_init() {
     config_set "host_gid" "$(id -g)"
     config_set "username" "dev"
     config_set "shell" ""
-    config_set "node_version" "latest"
+    config_set "install_node" "latest"
+    config_set "install_rust" "none"
     config_set "git_name" ""
     config_set "git_email" ""
     config_set "packages" ""
@@ -330,9 +336,26 @@ USERNAME="$(config_get username)"
 # Only "bash", "zsh" or "fish" are supported for now.
 USER_SHELL="$(config_get shell)"
 
-# Default Node.js version wanted.
-# (e.g. "22.11.0", also with "latest" being the latest one).
-NODE_VERSION="$(config_get node_version)"
+# Whether to install Node.js, and the version wanted.
+# Note that a WebAssembly target is also automatically ready.
+#
+# Values can be:
+# - if \`none\`: don't install Node.js
+# - if \`latest\`: Install Ubuntu's default package for Node.js
+# - If anything else: The exact version to install (e.g. "1.90.0").
+#   That last type of value will only work if \`INSTALL_MISE\` is \`true\`.
+INSTALL_NODE="$(config_get install_node)"
+
+# Whether to install Rust and Cargo, and the version wanted.
+# Note that a WebAssembly target is also automatically ready.
+#
+# Values can be:
+# - if \`none\`: don't install Rust
+# - if \`latest\`: Install Ubuntu's default package for Rust
+#   Ubuntu base's repositories
+# - If anything else: The exact version to install (e.g. "1.90.0").
+#   That last type of value will only work if \`INSTALL_MISE\` is \`true\`.
+INSTALL_RUST="$(config_get install_rust)"
 
 # Additional packages outside the core base, separated by a space.
 # Have to be in Ubuntu's default repository
@@ -442,9 +465,14 @@ cmd_create() {
                 config_set "shell" "$2"
                 shift 2
                 ;;
-            --node-version)
-                validate_node_version "$2"
-                config_set "node_version" "$2"
+            --nodejs)
+                validate_version_arg "$2"
+                config_set "install_node" "$2"
+                shift 2
+                ;;
+            --rust)
+                validate_version_arg "$2"
+                config_set "install_rust" "$2"
                 shift 2
                 ;;
             --git-name)
@@ -561,7 +589,7 @@ cmd_create() {
     config_set "project_path" "$project_path"
 
     if [[ "$(config_get install_mise)" != "true" ]]; then
-      warn "\`mise\` is not installed. We will use Ubuntu's nodejs instead of relying on NODE_VERSION."
+      warn "\`mise\` is not installed. We will use Ubuntu's repositories for Rust and Node.js versions, if needed."
     fi
 
     if [[ ! -d "$project_path" ]]; then
@@ -719,33 +747,43 @@ Options for create:
   --uid UID                    Host UID (default: current user)
   --gid GID                    Host GID (default: current group)
   --username NAME              Container username (default: dev)
-  --shell SHELL                User shell: bash|zsh|fish (prompted if not set)
-  --node-version VERSION       Node.js version (default: latest)
-  --git-name NAME              Git author name (optional)
-  --git-email EMAIL            Git author email (optional)
-  --packages "PKG1 PKG2"       Additional Ubuntu packages (optional)
-  --no-neovim                  Don't install Neovim
-  --no-starship                Don't install Starship prompt
-  --no-atuin                   Don't install Atuin shell history
-  --no-mise                    Don't install Mise tool manager
-  --no-zellij                  Don't install Zellij terminal multiplexer
-  --port PORT                  Expose port (can be repeated)
-  --volume HOST:CONTAINER:ro   Add volume (can be repeated)
+  --shell SHELL                User shell: bash|zsh|fish (prompted if not specified)
+  --nodejs VERSION             Node.js installation:
+                                 'none' - skip installation of Node.js
+                                 'latest' - use Ubuntu default package
+                                 '20.10.0' - specific version (via mise)
+                               (default: latest)
+  --rust VERSION               Rust installation:
+                                 'none' - skip installation of Rust
+                                 'latest' - latest stable via rustup
+                                 '1.75.0' - specific version (via mise)
+                               (default: none)
+  --git-name NAME              Git user.name (optional)
+  --git-email EMAIL            Git user.email (optional)
+  --packages "PKG1 PKG2"       Additional Ubuntu packages (space-separated)
+  --no-neovim                  Skip Neovim installation
+  --no-starship                Skip Starship prompt installation
+  --no-atuin                   Skip Atuin shell history installation
+  --no-mise                    Skip Mise tool manager installation
+  --no-zellij                  Skip Zellij terminal multiplexer installation
+  --port PORT                  Expose container port (can be repeated)
+  --volume HOST:CONTAINER[:ro] Mount volume (can be repeated)
 
 Examples:
-  # Create a project (will ask for shell and credentials)
+  # Minimal (interactive prompts for shell and credential files)
   paul-envs.sh create myapp ~/projects/myapp
 
-  # Create with all options
-  paul-envs.sh create myapp ~/work/api \\
-    --shell zsh \\
-    --node-version 20.10.0 \\
-    --git-name "John Doe" \\
-    --git-email "john@example.com" \\
-    --packages "ripgrep fzf" \\
-    --no-atuin \\
-    --port 3000 \\
-    --port 5432 \\
+  # Full configuration
+  paul-envs.sh create myapp ~/work/api \
+    --shell zsh \
+    --nodejs 20.10.0 \
+    --rust latest \
+    --git-name "John Doe" \
+    --git-email "john@example.com" \
+    --packages "ripgrep fzf bat" \
+    --no-atuin \
+    --port 3000 \
+    --port 5432 \
     --volume ~/.git-credentials:/home/dev/.git-credentials:ro
 
   # Then build it

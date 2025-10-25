@@ -33,7 +33,8 @@ _paulenvs() {
                         '--gid[Host GID]:gid:($(id -g))' \
                         '--username[Container username]:username:' \
                         '--shell[User shell]:shell:(bash zsh fish)' \
-                        '--node-version[Node.js version]:version:' \
+                        '--nodejs[Node.js installation]:version:' \
+                        '--rust[Rust installation]:version:' \
                         '--git-name[Git author name]:name:' \
                         '--git-email[Git author email]:email:' \
                         '--packages[Additional packages]:packages:' \

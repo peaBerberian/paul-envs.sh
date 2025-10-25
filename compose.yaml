@@ -61,9 +61,26 @@ services:
         INSTALL_MISE: ${INSTALL_MISE:-true}
         INSTALL_ZELLIJ: ${INSTALL_ZELLIJ:-true}
 
-        # Default Node.js version wanted.
-        # (e.g. "22.11.0", also with "latest" being the latest one).
-        NODE_VERSION: ${NODE_VERSION:-latest}
+        # Whether to install Node.js, and the version wanted.
+        # Note that a WebAssembly target is also automatically ready.
+        #
+        # Values can be:
+        # - if `none`: don't install Node.js
+        # - if `latest`: Install Ubuntu's default package for Node.js
+        # - If anything else: The exact version to install (e.g. "1.90.0").
+        #   That last type of value will only work if `INSTALL_MISE` is `true`.
+        INSTALL_NODE: ${INSTALL_NODE:-latest}
+
+        # Whether to install Rust and Cargo, and the version wanted.
+        # Note that a WebAssembly target is also automatically ready.
+        #
+        # Values can be:
+        # - if `none`: don't install Rust
+        # - if `latest`: Install Ubuntu's default package for Rust
+        #   Ubuntu base's repositories
+        # - If anything else: The exact version to install (e.g. "1.90.0").
+        #   That last type of value will only work if `INSTALL_MISE` is `true`.
+        INSTALL_RUST: ${INSTALL_RUST:-none}
 
         # Git basic information.
         # Can also be empty to not set that in the container.
