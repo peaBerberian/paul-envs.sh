@@ -242,6 +242,8 @@ config_init() {
     config_set "shell" ""
     config_set "install_node" "latest"
     config_set "install_rust" "none"
+    config_set "install_python" "none"
+    config_set "install_go" "none"
     config_set "git_name" ""
     config_set "git_email" ""
     config_set "packages" ""
@@ -356,6 +358,25 @@ INSTALL_NODE="$(config_get install_node)"
 # - If anything else: The exact version to install (e.g. "1.90.0").
 #   That last type of value will only work if \`INSTALL_MISE\` is \`true\`.
 INSTALL_RUST="$(config_get install_rust)"
+ 
+# Whether to install Python, and the version wanted.
+#
+# Values can be:
+# - if \`none\`: don't install Python
+# - if \`latest\`: Install Ubuntu's default package for Python
+# - If anything else: The exact version to install (e.g. "3.12.0").
+#   That last type of value will only work if \`INSTALL_MISE\` is \`true\`.
+INSTALL_PYTHON="$(config_get install_python)"
+
+# Whether to install Go, and the version wanted.
+# Note that GOPATH is automatically set to ~/go
+#
+# Values can be:
+# - if \`none\`: don't install Go
+# - if \`latest\`: Install Ubuntu's default package for Go
+# - If anything else: The exact version to install (e.g. "1.21.5").
+#   That last type of value will only work if \`INSTALL_MISE\` is \`true\`.
+INSTALL_GO="$(config_get install_go)"
 
 # Additional packages outside the core base, separated by a space.
 # Have to be in Ubuntu's default repository
@@ -475,6 +496,16 @@ cmd_create() {
                 config_set "install_rust" "$2"
                 shift 2
                 ;;
+            --python)
+                validate_version_arg "$2"
+                config_set "install_python" "$2"
+                shift 2
+                ;;
+            --go)
+                validate_version_arg "$2"
+                config_set "install_go" "$2"
+                shift 2
+                ;;
             --git-name)
                 validate_git_name "$2"
                 config_set "git_name" "$2"
@@ -589,7 +620,7 @@ cmd_create() {
     config_set "project_path" "$project_path"
 
     if [[ "$(config_get install_mise)" != "true" ]]; then
-      warn "\`mise\` is not installed. We will use Ubuntu's repositories for Rust and Node.js versions, if needed."
+      warn "\`mise\` is not installed. We will use Ubuntu's repositories for language runtime versions, if needed."
     fi
 
     if [[ ! -d "$project_path" ]]; then
@@ -758,6 +789,16 @@ Options for create:
                                  'latest' - latest stable via rustup
                                  '1.75.0' - specific version (via mise)
                                (default: none)
+  --python VERSION             Python installation:
+                                 'none' - skip installation of Python
+                                 'latest' - use Ubuntu default package
+                                 '3.12.0' - specific version (via mise)
+                               (default: none)
+  --go VERSION                 Go installation:
+                                 'none' - skip installation of Go
+                                 'latest' - use Ubuntu default package
+                                 '1.21.5' - specific version (via mise)
+                               (default: none)
   --git-name NAME              Git user.name (optional)
   --git-email EMAIL            Git user.email (optional)
   --packages "PKG1 PKG2"       Additional Ubuntu packages (space-separated)
@@ -778,6 +819,8 @@ Examples:
     --shell zsh \
     --nodejs 20.10.0 \
     --rust latest \
+    --python 3.12.0 \
+    --go latest \
     --git-name "John Doe" \
     --git-email "john@example.com" \
     --packages "ripgrep fzf bat" \

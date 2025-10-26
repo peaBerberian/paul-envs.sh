@@ -87,6 +87,8 @@ ARG INSTALL_MISE=true
 ARG INSTALL_ZELLIJ=true
 ARG INSTALL_NODE=latest
 ARG INSTALL_RUST=none
+ARG INSTALL_PYTHON=none
+ARG INSTALL_GO=none
 ARG GIT_AUTHOR_NAME=""
 ARG GIT_AUTHOR_EMAIL=""
 
@@ -155,7 +157,7 @@ RUN if [ "$INSTALL_ATUIN" = "true" ]; then \
     fi; \
   fi
 
-# Install `mise` (optional)
+# Install `mise` + languages (optional)
 RUN if [ "$INSTALL_MISE" = "true" ]; then \
     curl https://mise.jdx.dev/install.sh | sh && \
     printf "\n# Initialize mise\neval \"\$(mise activate bash)\"\n" >> /home/${USERNAME}/.bashrc && \
@@ -166,27 +168,22 @@ RUN if [ "$INSTALL_MISE" = "true" ]; then \
     fi; \
     if [ -n "$INSTALL_NODE" ] && [ "$INSTALL_NODE" != "none" ]; then \
       export PATH="/home/${USERNAME}/.local/bin:$PATH" && \
-      mise use -g node@${INSTALL_NODE} && \
-      mise exec -- npm config set prefix "/home/${USERNAME}/.local" && \
-      mise exec -- npm config set cache /home/${USERNAME}/.container-cache/.npm && \
-      # Add yarn globally, just in case
-      mise exec -- npm install -g yarn && \
-      mise exec -- yarn config set cacheFolder /home/${USERNAME}/.container-cache/.yarn; \
+      mise use -g node@${INSTALL_NODE}; \
     fi; \
     if [ -n "$INSTALL_RUST" ] && [ "$INSTALL_RUST" != "none" ]; then \
-      if [ "$INSTALL_RUST" = "latest" ]; then \
-        export PATH="/home/${USERNAME}/.local/bin:$PATH" && mise use -g rust@latest; \
-      else \
-        export PATH="/home/${USERNAME}/.local/bin:$PATH" && mise use -g rust@${INSTALL_RUST}; \
-      fi; \
-      # Add Wasm support, just in case. TODO: don't?
-      export PATH="/home/${USERNAME}/.local/bin:$PATH" && \
-      mise exec -- rustup target add wasm32-unknown-unknown; \
+      export PATH="/home/${USERNAME}/.local/bin:$PATH" && mise use -g rust@${INSTALL_RUST}; \
+    fi; \
+    if [ -n "$INSTALL_PYTHON" ] && [ "$INSTALL_PYTHON" != "none" ]; then \
+      export PATH="/home/${USERNAME}/.local/bin:$PATH" && mise use -g python@${INSTALL_PYTHON}; \
+    fi; \
+    if [ -n "$INSTALL_GO" ] && [ "$INSTALL_GO" != "none" ]; then \
+      export PATH="/home/${USERNAME}/.local/bin:$PATH" && mise use -g go@${INSTALL_GO}; \
     fi; \
   fi
 
 USER root
 
+# If `mise` is not installed, install languages through Ubuntu's repositories
 RUN if [ "$INSTALL_MISE" != "true" ]; then \
     # Just install nodejs and npm from Ubuntu's repositories
     if [ -n "$INSTALL_NODE" ] && [ "$INSTALL_NODE" != "none" ]; then \
@@ -204,8 +201,55 @@ RUN if [ "$INSTALL_MISE" != "true" ]; then \
       fi; \
       su - ${USERNAME} -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
         . /home/${USERNAME}/.cargo/env && \
-        rustup default stable && \
-        rustup target add wasm32-unknown-unknown"; \
+        rustup default stable"; \
+    fi; \
+    if [ -n "$INSTALL_PYTHON" ] && [ "$INSTALL_PYTHON" != "none" ]; then \
+      if [ "$INSTALL_PYTHON" != "latest" ]; then \
+        echo "\033[1;33mWarning: Using Ubuntu's python as \"INSTALL_MISE\" is not set to \"true\". PYTHON_VERSION=${INSTALL_PYTHON} ignored.\033[0m" >&2; \
+      fi; \
+      apt-get update && apt-get install -y \
+        python3 \
+        python3-pip \
+        python3-venv \
+        && rm -rf /var/lib/apt/lists/*; \
+      # Set up python3 as default python
+      update-alternatives --install /usr/bin/python python /usr/bin/python3 1; \
+    fi; \
+    if [ -n "$INSTALL_GO" ] && [ "$INSTALL_GO" != "none" ]; then \
+      if [ "$INSTALL_GO" != "latest" ]; then \
+        echo "\033[1;33mWarning: Using Ubuntu's go as \"INSTALL_MISE\" is not set to \"true\". GO_VERSION=${INSTALL_GO} ignored.\033[0m" >&2; \
+      fi; \
+      apt-get update && apt-get install -y \
+        golang-go \
+        && rm -rf /var/lib/apt/lists/*; \
+    fi; \
+  fi
+
+USER ${USERNAME}
+
+# Set-up language envs
+RUN if [ -n "$INSTALL_NODE" ] && [ "$INSTALL_NODE" != "none" ]; then \
+      # Setup dirs and add yarn globally, just in case
+      if [ "$INSTALL_MISE" != "true" ]; then \
+        npm config set prefix "/home/${USERNAME}/.local" && \
+        npm config set cache /home/${USERNAME}/.container-cache/.npm && \
+        npm install -g yarn && \
+        yarn config set cacheFolder /home/${USERNAME}/.container-cache/.yarn; \
+      else \
+        mise exec -- npm config set prefix "/home/${USERNAME}/.local" && \
+        mise exec -- npm config set cache /home/${USERNAME}/.container-cache/.npm && \
+        mise exec -- npm install -g yarn && \
+        mise exec -- yarn config set cacheFolder /home/${USERNAME}/.container-cache/.yarn; \
+      fi; \
+    fi; \
+    if [ -n "$INSTALL_RUST" ] && [ "$INSTALL_RUST" != "none" ]; then \
+      # Add Wasm support, just in case. TODO: don't?
+      if [ "$INSTALL_MISE" != "true" ]; then \
+        rustup target add wasm32-unknown-unknown; \
+      else \
+        export PATH="/home/${USERNAME}/.local/bin:$PATH" && \
+        mise exec -- rustup target add wasm32-unknown-unknown; \
+      fi; \
       echo '. $HOME/.cargo/env' >> /home/${USERNAME}/.bashrc; \
       if [ "$USER_SHELL" = "zsh" ]; then \
         echo '. $HOME/.cargo/env' >> /home/${USERNAME}/.zshrc; \
@@ -213,17 +257,31 @@ RUN if [ "$INSTALL_MISE" != "true" ]; then \
         echo 'set -gx PATH $HOME/.cargo/bin $PATH' >> /home/${USERNAME}/.config/fish/config.fish; \
       fi; \
     fi; \
-  fi
-
-USER ${USERNAME}
-
-# Configure npm and yarn when not using mise
-RUN if [ "$INSTALL_MISE" != "true" ]; then \
-    npm config set prefix "/home/${USERNAME}/.local" && \
-    npm config set cache /home/${USERNAME}/.container-cache/.npm && \
-    npm install -g yarn && \
-    yarn config set cacheFolder /home/${USERNAME}/.container-cache/.yarn; \
-  fi
+    if [ -n "$INSTALL_PYTHON" ] && [ "$INSTALL_PYTHON" != "none" ]; then \
+      mkdir -p /home/${USERNAME}/.container-cache/pip; \
+      echo 'export PIP_CACHE_DIR="$HOME/.container-cache/pip"' >> /home/${USERNAME}/.bashrc; \
+      if [ "$USER_SHELL" = "zsh" ]; then \
+        echo 'export PIP_CACHE_DIR="$HOME/.container-cache/pip"' >> /home/${USERNAME}/.zshrc; \
+      elif [ "$USER_SHELL" = "fish" ]; then \
+        echo 'set -gx PIP_CACHE_DIR $HOME/.container-cache/pip' >> /home/${USERNAME}/.config/fish/config.fish; \
+      fi; \
+    fi; \
+    if [ -n "$INSTALL_GO" ] && [ "$INSTALL_GO" != "none" ]; then \
+      # Set up Go paths for persistence
+      mkdir -p /home/${USERNAME}/.container-local/gopath /home/${USERNAME}/.container-cache/go/mod; \
+      echo 'export GOPATH="$HOME/.container-local/gopath"' >> /home/${USERNAME}/.bashrc; \
+      echo 'export GOMODCACHE="$HOME/.container-cache/go/mod"' >> /home/${USERNAME}/.bashrc; \
+      echo 'export PATH="$GOPATH/bin:$PATH"' >> /home/${USERNAME}/.bashrc; \
+      if [ "$USER_SHELL" = "zsh" ]; then \
+          echo 'export GOPATH="$HOME/.container-local/gopath"' >> /home/${USERNAME}/.zshrc; \
+          echo 'export GOMODCACHE="$HOME/.container-cache/go/mod"' >> /home/${USERNAME}/.zshrc; \
+          echo 'export PATH="$GOPATH/bin:$PATH"' >> /home/${USERNAME}/.zshrc; \
+      elif [ "$USER_SHELL" = "fish" ]; then \
+          echo 'set -gx GOPATH $HOME/.container-local/gopath' >> /home/${USERNAME}/.config/fish/config.fish; \
+          echo 'set -gx GOMODCACHE $HOME/.container-cache/go/mod' >> /home/${USERNAME}/.config/fish/config.fish; \
+          echo 'set -gx PATH $GOPATH/bin $PATH' >> /home/${USERNAME}/.config/fish/config.fish; \
+      fi; \
+    fi
 
 # That one should just be default everywhere
 # Done before file copying to ensure that it can be overwritten

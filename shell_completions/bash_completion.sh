@@ -9,7 +9,7 @@ _paulenvs()
     local commands="create list build run remove"
 
     # Options for create command
-    local create_flags="--uid --gid --username --shell --nodejs --git-name --git-email --packages --no-neovim --no-starship --no-atuin --no-mise --no-zellij --port --volume"
+    local create_flags="--uid --gid --username --shell --nodejs --rust --python --go --git-name --git-email --packages --no-neovim --no-starship --no-atuin --no-mise --no-zellij --port --volume"
 
     # Get list of existing containers from paul-envs.sh ls
     _get_containers() {
@@ -32,7 +32,7 @@ _paulenvs()
                     COMPREPLY=( $(compgen -W "$(id -u) $(id -g)" -- ${cur}) )
                     return 0
                     ;;
-                --username|--git-name|--git-email|--packages|--nodejs|--rust|--port)
+                --username|--git-name|--git-email|--packages|--nodejs|--rust|--python|--go|--port)
                     # Let user type freely
                     COMPREPLY=()
                     return 0

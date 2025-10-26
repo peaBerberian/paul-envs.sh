@@ -35,6 +35,8 @@ _paulenvs() {
                         '--shell[User shell]:shell:(bash zsh fish)' \
                         '--nodejs[Node.js installation]:version:' \
                         '--rust[Rust installation]:version:' \
+                        '--python[Python installation]:version:' \
+                        '--go[Go installation]:version:' \
                         '--git-name[Git author name]:name:' \
                         '--git-email[Git author email]:email:' \
                         '--packages[Additional packages]:packages:' \

@@ -19,6 +19,8 @@ complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l username -d 
 complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l shell -d 'User shell' -xa 'bash zsh fish'
 complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l nodejs -d 'Node.js installation' -x
 complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l rust -d 'Rust installation' -x
+complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l python -d 'Python installation' -x
+complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l go -d 'Go installation' -x
 complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l git-name -d 'Git author name' -x
 complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l git-email -d 'Git author email' -x
 complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l packages -d 'Additional Ubuntu packages' -x
