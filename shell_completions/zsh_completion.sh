@@ -40,11 +40,11 @@ _paulenvs() {
                         '--git-name[Git author name]:name:' \
                         '--git-email[Git author email]:email:' \
                         '--packages[Additional packages]:packages:' \
-                        '--no-neovim[Skip Neovim installation]' \
-                        '--no-starship[Skip Starship installation]' \
-                        '--no-atuin[Skip Atuin installation]' \
-                        '--no-mise[Skip Mise installation]' \
-                        '--no-zellij[Skip Zellij installation]' \
+                        '--neovim[Install latest Neovim]' \
+                        '--starship[Install latest Starship]' \
+                        '--atuin[Install latest Atuin]' \
+                        '--mise[Install latest Mise]' \
+                        '--zellij[Install latest Zellij]' \
                         '*--port[Expose port]:port:' \
                         '*--volume[Add volume]:volume:_files'
                     ;;

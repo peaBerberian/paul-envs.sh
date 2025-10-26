@@ -24,11 +24,11 @@ complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l go -d 'Go in
 complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l git-name -d 'Git author name' -x
 complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l git-email -d 'Git author email' -x
 complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l packages -d 'Additional Ubuntu packages' -x
-complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l no-neovim -d "Don't install Neovim" -f
-complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l no-starship -d "Don't install Starship" -f
-complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l no-atuin -d "Don't install Atuin" -f
-complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l no-mise -d "Don't install Mise" -f
-complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l no-zellij -d "Don't install Zellij" -f
+complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l neovim -d "Install Neovim" -f
+complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l starship -d "Install Starship" -f
+complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l atuin -d "Install Atuin" -f
+complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l mise -d "Install Mise" -f
+complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l zellij -d "Install Zellij" -f
 complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l port -d 'Expose port' -x
 complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l volume -d 'Add volume' -r
 

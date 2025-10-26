@@ -270,6 +270,42 @@ check_inexistent_name() {
     fi
 }
 
+# Check if specific versions were requested but mise is not installed
+# usage mise_check no_prompt
+mise_check() {
+    local needs_mise_warning=0
+    if does_lang_version_needs_mise "$(config_get install_node)" || \
+       does_lang_version_needs_mise "$(config_get install_rust)" || \
+       does_lang_version_needs_mise "$(config_get install_python)" || \
+       does_lang_version_needs_mise "$(config_get install_go)"; then
+        if [[ "$(config_get install_mise)" != "true" ]]; then
+            needs_mise_warning=1
+        fi
+    fi
+
+    if [[ $needs_mise_warning -eq 1 ]]; then
+        echo ""
+        warn "WARNING: You specified exact version(s) for language runtimes, but Mise is not enabled."
+        warn "Exact versions require Mise to be installed. Without Mise, Ubuntu's default packages will be used instead."
+        if [[ $1 -eq 0 ]]; then
+            read -r -p "Would you like to enable Mise now? (Y/n): " mise_choice
+            if [[ ! $mise_choice =~ ^[Nn]$ ]]; then
+                config_set "install_mise" "true"
+                success "Mise enabled"
+            fi
+        fi
+    fi
+}
+
+# Check if a specific version requires mise
+does_lang_version_needs_mise() {
+    local version=$1
+    if [[ "$version" != "none" && "$version" != "latest" && "$version" != "" ]]; then
+        return 0
+    fi
+    return 1
+}
+
 # Generate project compose file
 # Usage: generate_project_compose name ports_array volumes_array
 generate_project_compose() {
@@ -575,28 +611,24 @@ prompt_tools() {
 
     if [[ $tools_set -eq 1 ]]; then
         # Set defaults for unspecified tools
-        [[ -z "$(config_get install_neovim)" ]] && config_set "install_neovim" "true"
-        [[ -z "$(config_get install_starship)" ]] && config_set "install_starship" "true"
-        [[ -z "$(config_get install_atuin)" ]] && config_set "install_atuin" "true"
-        [[ -z "$(config_get install_mise)" ]] && config_set "install_mise" "true"
-        [[ -z "$(config_get install_zellij)" ]] && config_set "install_zellij" "true"
+        [[ -z "$(config_get install_neovim)" ]] && config_set "install_neovim" "false"
+        [[ -z "$(config_get install_starship)" ]] && config_set "install_starship" "false"
+        [[ -z "$(config_get install_atuin)" ]] && config_set "install_atuin" "false"
+        [[ -z "$(config_get install_mise)" ]] && config_set "install_mise" "false"
+        [[ -z "$(config_get install_zellij)" ]] && config_set "install_zellij" "false"
         return
     fi
 
     echo ""
     info "=== Development Tools ==="
-    echo "Which tools do you want to install? (space-separated numbers, or Enter for all)"
+    echo "Some dev tools are not pulled from Ubuntu's repositories to get their latest version instead."
+    echo "Which of those tools do you want to install? (space-separated numbers, or Enter to skip all)"
     echo "  1) Neovim (text editor)"
     echo "  2) Starship (prompt)"
     echo "  3) Atuin (shell history)"
-    echo "  4) Mise (version manager)"
+    echo "  4) Mise (version manager - required for specific language versions)"
     echo "  5) Zellij (terminal multiplexer)"
-    read -r -p "Choice [all]: " tool_choices
-
-    # Default to all if empty
-    if [[ -z "$tool_choices" ]]; then
-        tool_choices="1 2 3 4 5"
-    fi
+    read -r -p "Choice [none]: " tool_choices
 
     # Set all to false first
     config_set "install_neovim" "false"
@@ -790,24 +822,24 @@ cmd_create() {
                 config_set "packages" "$2"
                 shift 2
                 ;;
-            --no-neovim)
-                config_set "install_neovim" "false"
+            --neovim)
+                config_set "install_neovim" "true"
                 shift
                 ;;
-            --no-starship)
-                config_set "install_starship" "false"
+            --starship)
+                config_set "install_starship" "true"
                 shift
                 ;;
-            --no-atuin)
-                config_set "install_atuin" "false"
+            --atuin)
+                config_set "install_atuin" "true"
                 shift
                 ;;
-            --no-mise)
-                config_set "install_mise" "false"
+            --mise)
+                config_set "install_mise" "true"
                 shift
                 ;;
-            --no-zellij)
-                config_set "install_zellij" "false"
+            --zellij)
+                config_set "install_zellij" "true"
                 shift
                 ;;
             --port)
@@ -853,18 +885,20 @@ cmd_create() {
         [[ -z "$(config_get install_go)" ]] && config_set "install_go" "none"
         [[ -z "$(config_get enable_wasm)" ]] && config_set "enable_wasm" "false"
         [[ -z "$(config_get enable_sudo)" ]] && config_set "enable_sudo" "false"
-        [[ -z "$(config_get install_neovim)" ]] && config_set "install_neovim" "true"
-        [[ -z "$(config_get install_starship)" ]] && config_set "install_starship" "true"
-        [[ -z "$(config_get install_atuin)" ]] && config_set "install_atuin" "true"
-        [[ -z "$(config_get install_mise)" ]] && config_set "install_mise" "true"
-        [[ -z "$(config_get install_zellij)" ]] && config_set "install_zellij" "true"
+        [[ -z "$(config_get install_neovim)" ]] && config_set "install_neovim" "false"
+        [[ -z "$(config_get install_starship)" ]] && config_set "install_starship" "false"
+        [[ -z "$(config_get install_atuin)" ]] && config_set "install_atuin" "false"
+        [[ -z "$(config_get install_mise)" ]] && config_set "install_mise" "false"
+        [[ -z "$(config_get install_zellij)" ]] && config_set "install_zellij" "false"
+        mise_check $no_prompt
     else
         # Interactive mode - prompt for missing values
         prompt_shell
         prompt_languages
-        prompt_packages
         prompt_tools
+        mise_check $no_prompt
         prompt_sudo
+        prompt_packages
 
         # Only prompt for ports if none were specified
         if [[ ${#ports[@]} -eq 0 ]]; then
@@ -882,10 +916,6 @@ cmd_create() {
 
     local final_path
     final_path="$(config_get project_host_path)"
-
-    if [[ "$(config_get install_mise)" != "true" ]]; then
-      warn "\`mise\` is not installed. We will use Ubuntu's repositories for language runtime versions, if needed."
-    fi
 
     if [[ ! -d "$final_path" && $no_prompt -eq 0 ]]; then
         warn "Warning: Path $final_path does not exist"
@@ -1057,22 +1087,22 @@ Options for create:
   --nodejs VERSION         Node.js installation:
                              'none' - skip installation of Node.js
                              'latest' - use Ubuntu default package
-                             '20.10.0' - specific version (via mise)
+                             '20.10.0' - specific version (requires mise)
                            (prompted if not specified)
   --rust VERSION           Rust installation:
                              'none' - skip installation of Rust
                              'latest' - latest stable via rustup
-                             '1.75.0' - specific version (via mise)
+                             '1.75.0' - specific version (requires mise)
                            (prompted if not specified)
   --python VERSION         Python installation:
                              'none' - skip installation of Python
                              'latest' - use Ubuntu default package
-                             '3.12.0' - specific version (via mise)
+                             '3.12.0' - specific version (requires mise)
                            (prompted if not specified)
   --go VERSION             Go installation:
                              'none' - skip installation of Go
                              'latest' - use Ubuntu default package
-                             '1.21.5' - specific version (via mise)
+                             '1.21.5' - specific version (requires mise)
                            (prompted if not specified)
   --enable-wasm            Add WASM-specialized tools (binaryen, Rust wasm target if enabled)
   --enable-sudo            Enable sudo access in container with a "dev" password
@@ -1080,11 +1110,11 @@ Options for create:
   --git-name NAME          Git user.name (optional)
   --git-email EMAIL        Git user.email (optional)
   --packages "PKG1 PKG2"   Additional Ubuntu packages (prompted if not specified)
-  --no-neovim              Skip Neovim installation
-  --no-starship            Skip Starship prompt installation
-  --no-atuin               Skip Atuin shell history installation
-  --no-mise                Skip Mise tool manager installation
-  --no-zellij              Skip Zellij terminal multiplexer installation
+  --neovim                 Install Neovim (text editor)
+  --starship               Install Starship (prompt)
+  --atuin                  Install Atuin (shell history)
+  --mise                   Install Mise (version manager - required for specific language versions)
+  --zellij                 Install Zellij (terminal multiplexer)
   --port PORT              Expose container port (prompted if not specified, can be repeated)
   --volume HOST:CONT[:ro]  Mount volume (prompted if not specified, can be repeated)
 
@@ -1096,8 +1126,8 @@ Non-Interactive Mode:
   paul-envs.sh create ~/projects/myapp --no-prompt --shell bash --nodejs latest
 
 Mixed Mode (some flags + prompts):
-  paul-envs.sh create ~/projects/myapp --nodejs 20.10.0 --rust latest
-  # Will prompt for shell, packages, tools, sudo, ports, and volumes
+  paul-envs.sh create ~/projects/myapp --nodejs 20.10.0 --rust latest --mise
+  # Will prompt for shell, sudo, packages, ports, and volumes
 
 Full Configuration Example:
   paul-envs.sh create ~/work/api \\
@@ -1107,11 +1137,14 @@ Full Configuration Example:
     --rust latest \\
     --python 3.12.0 \\
     --go latest \\
+    --mise \\
+    --neovim \\
+    --starship \\
+    --zellij \\
     --enable-sudo \\
     --git-name "John Doe" \\
     --git-email "john@example.com" \\
     --packages "ripgrep fzf bat" \\
-    --no-atuin \\
     --port 3000 \\
     --port 5432 \\
     --volume ~/.git-credentials:/home/dev/.git-credentials:ro

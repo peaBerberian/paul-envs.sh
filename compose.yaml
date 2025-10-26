@@ -55,11 +55,11 @@ services:
 
         # Tools toggle.
         # `true` == install it, anything else == don't.
-        INSTALL_NEOVIM: ${INSTALL_NEOVIM:-true}
-        INSTALL_STARSHIP: ${INSTALL_STARSHIP:-true}
-        INSTALL_ATUIN: ${INSTALL_ATUIN:-true}
-        INSTALL_MISE: ${INSTALL_MISE:-true}
-        INSTALL_ZELLIJ: ${INSTALL_ZELLIJ:-true}
+        INSTALL_NEOVIM: ${INSTALL_NEOVIM:-false}
+        INSTALL_STARSHIP: ${INSTALL_STARSHIP:-false}
+        INSTALL_ATUIN: ${INSTALL_ATUIN:-false}
+        INSTALL_MISE: ${INSTALL_MISE:-false}
+        INSTALL_ZELLIJ: ${INSTALL_ZELLIJ:-false}
 
         # Whether to install Node.js, and the version wanted.
         # Note that a WebAssembly target is also automatically ready.
@@ -69,7 +69,7 @@ services:
         # - if `latest`: Install Ubuntu's default package for Node.js
         # - If anything else: The exact version to install (e.g. "1.90.0").
         #   That last type of value will only work if `INSTALL_MISE` is `true`.
-        INSTALL_NODE: ${INSTALL_NODE:-latest}
+        INSTALL_NODE: ${INSTALL_NODE:-none}
 
         # Whether to install Rust and Cargo, and the version wanted.
         # Note that a WebAssembly target is also automatically ready.
