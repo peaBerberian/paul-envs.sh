@@ -25,10 +25,8 @@ ARG USER_SHELL=bash
 # Install base packages
 RUN apt-get update && apt-get install -y \
   build-essential \
-  bash \
   git \
   curl \
-  unzip \
   && rm -rf /var/lib/apt/lists/*
 
 # Install optional shells
@@ -185,8 +183,7 @@ RUN if [ "$INSTALL_MISE" = "true" ]; then \
       printf "\n# Initialize mise\neval \"\$(mise activate zsh)\"\n" >> /home/${USERNAME}/.zshrc; \
     fi; \
     if [ -n "$INSTALL_NODE" ] && [ "$INSTALL_NODE" != "none" ]; then \
-      export PATH="/home/${USERNAME}/.local/bin:$PATH" && \
-      mise use -g node@${INSTALL_NODE}; \
+      export PATH="/home/${USERNAME}/.local/bin:$PATH" && mise use -g node@${INSTALL_NODE}; \
     fi; \
     if [ -n "$INSTALL_RUST" ] && [ "$INSTALL_RUST" != "none" ]; then \
       export PATH="/home/${USERNAME}/.local/bin:$PATH" && mise use -g rust@${INSTALL_RUST}; \
@@ -254,6 +251,7 @@ RUN if [ -n "$INSTALL_NODE" ] && [ "$INSTALL_NODE" != "none" ]; then \
         npm install -g yarn && \
         yarn config set cacheFolder /home/${USERNAME}/.container-cache/.yarn; \
       else \
+        export PATH="/home/${USERNAME}/.local/bin:$PATH" && \
         mise exec -- npm config set prefix "/home/${USERNAME}/.local" && \
         mise exec -- npm config set cache /home/${USERNAME}/.container-cache/.npm && \
         mise exec -- npm install -g yarn && \

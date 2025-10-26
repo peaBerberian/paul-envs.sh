@@ -547,6 +547,9 @@ prompt_packages() {
 
     echo ""
     info "=== Additional Packages ==="
+    echo "The following packages are already installed on top of an Ubuntu:24.04 image:"
+    echo "curl git build-essential"
+    echo ""
     echo "Enter additional Ubuntu packages (space-separated, or Enter to skip):"
     echo "Examples: ripgrep fzf bat htop"
     read -r -p "Packages: " packages
