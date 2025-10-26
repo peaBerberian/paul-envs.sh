@@ -25,18 +25,22 @@ PROJECTS_DIR="$SCRIPT_DIR/projects"
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Helper functions
 error() {
-    echo -e "${RED}Error: $1${NC}" >&2;
+    printf "${RED}Error: %s${NC}\n" "$1" >&2;
     exit 1;
 }
 success() {
-    echo -e "${GREEN}$1${NC}";
+    printf "${GREEN}%s${NC}\n" "$1";
 }
 warn() {
-    echo -e "${YELLOW}$1${NC}";
+    printf "${YELLOW}%s${NC}\n" "$1";
+}
+info() {
+    printf "${BLUE}%s${NC}\n" "$1";
 }
 
 # Security validation functions
@@ -65,12 +69,7 @@ validate_shell() {
 validate_version_arg() {
     local version=$1
     # Allow "none", latest" or semantic versioning patterns
-    if [[
-      -n "$version" &&
-        "$version" != "latest" &&
-        "$version" != "none" &&
-        ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$
-      ]]; then
+    if [[ -n "$version" && "$version" != "latest" && "$version" != "none" && ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         error "Invalid version argument: '$version'. Must be either \"none\", \"latest\" or semantic versioning (e.g., 20.10.0)"
     fi
 }
@@ -240,20 +239,21 @@ config_init() {
     config_set "host_gid" "$(id -g)"
     config_set "username" "dev"
     config_set "shell" ""
-    config_set "install_node" "latest"
-    config_set "install_rust" "none"
-    config_set "install_python" "none"
-    config_set "install_go" "none"
-    config_set "enable_sudo" "false"
+    config_set "install_node" ""
+    config_set "install_rust" ""
+    config_set "install_python" ""
+    config_set "install_go" ""
+    config_set "enable_sudo" ""
     config_set "git_name" ""
     config_set "git_email" ""
     config_set "packages" ""
-    config_set "install_neovim" "true"
-    config_set "install_starship" "true"
-    config_set "install_atuin" "true"
-    config_set "install_mise" "true"
-    config_set "install_zellij" "true"
+    config_set "install_neovim" ""
+    config_set "install_starship" ""
+    config_set "install_atuin" ""
+    config_set "install_mise" ""
+    config_set "install_zellij" ""
     config_set "project_path" ""
+    config_set "prompted" "false"
 }
 
 # Generate project compose file
@@ -291,7 +291,7 @@ generate_project_compose() {
     env_file=$(get_project_env "$name")
 
     if [[ -f "$compose_file" || -f "$env_file" ]]; then
-        error "Project '$name' already exists\nYou can have multiple configurations for the same project by calling \`create\` with the \`--name\` flag.\n\nHint: Use 'paul-envs.sh list' to see all projects or 'paul-envs.sh remove $name' to delete it"
+        error "Project '$name' already exists. You can have multiple configurations for the same project by calling 'create' with the '--name' flag. Hint: Use 'paul-envs.sh list' to see all projects or 'paul-envs.sh remove $name' to delete it"
     fi
 
     # Sanitize all user inputs
@@ -359,7 +359,7 @@ INSTALL_NODE="$(config_get install_node)"
 # - If anything else: The exact version to install (e.g. "1.90.0").
 #   That last type of value will only work if \`INSTALL_MISE\` is \`true\`.
 INSTALL_RUST="$(config_get install_rust)"
- 
+
 # Whether to install Python, and the version wanted.
 #
 # Values can be:
@@ -436,13 +436,252 @@ EOF
     echo "" >> "$compose_file"
 }
 
+# Prompt for shell if not set
+prompt_shell() {
+    if [[ -n "$(config_get shell)" ]]; then
+        return
+    fi
+
+    echo ""
+    info "=== Shell Selection ==="
+    echo "Select shell:"
+    echo "  1) bash (default)"
+    echo "  2) zsh"
+    echo "  3) fish"
+    read -r -p "Choice [1]: " shell_choice
+    case ${shell_choice:-1} in
+        1) config_set "shell" "bash" ;;
+        2) config_set "shell" "zsh" ;;
+        3) config_set "shell" "fish" ;;
+        *) config_set "shell" "bash" ;;
+    esac
+}
+
+# Prompt for language runtimes if not set
+prompt_languages() {
+    local has_any_lang=0
+
+    # Check if any language was explicitly set
+    if [[ -n "$(config_get install_node)" ]] || \
+       [[ -n "$(config_get install_rust)" ]] || \
+       [[ -n "$(config_get install_python)" ]] || \
+       [[ -n "$(config_get install_go)" ]]; then
+        has_any_lang=1
+    fi
+
+    if [[ $has_any_lang -eq 1 ]]; then
+        # Set defaults for unspecified languages
+        [[ -z "$(config_get install_node)" ]] && config_set "install_node" "none"
+        [[ -z "$(config_get install_rust)" ]] && config_set "install_rust" "none"
+        [[ -z "$(config_get install_python)" ]] && config_set "install_python" "none"
+        [[ -z "$(config_get install_go)" ]] && config_set "install_go" "none"
+        return
+    fi
+
+    echo ""
+    info "=== Language Runtimes ==="
+    echo "Which language runtimes do you need? (space-separated numbers, or Enter to skip)"
+    echo "  1) Node.js"
+    echo "  2) Rust"
+    echo "  3) Python"
+    echo "  4) Go"
+    read -r -p "Choice [none]: " lang_choices
+
+    # Set all to none first
+    config_set "install_node" "none"
+    config_set "install_rust" "none"
+    config_set "install_python" "none"
+    config_set "install_go" "none"
+
+    for choice in $lang_choices; do
+        case $choice in
+            1)
+                read -r -p "Node.js version (latest/none/X.Y.Z) [latest]: " node_ver
+                config_set "install_node" "${node_ver:-latest}"
+                ;;
+            2)
+                read -r -p "Rust version (latest/none/X.Y.Z) [latest]: " rust_ver
+                config_set "install_rust" "${rust_ver:-latest}"
+                ;;
+            3)
+                read -r -p "Python version (latest/none/X.Y.Z) [latest]: " python_ver
+                config_set "install_python" "${python_ver:-latest}"
+                ;;
+            4)
+                read -r -p "Go version (latest/none/X.Y.Z) [latest]: " go_ver
+                config_set "install_go" "${go_ver:-latest}"
+                ;;
+            *)
+                warn "Unknown choice: $choice (skipped)"
+                ;;
+        esac
+    done
+}
+
+# Prompt for supplementary packages if not set
+prompt_packages() {
+    if [[ -n "$(config_get prompted)" && "$(config_get prompted)" == "true" ]]; then
+        # Already prompted via flag
+        return
+    fi
+
+    echo ""
+    info "=== Additional Packages ==="
+    echo "Enter additional Ubuntu packages (space-separated, or Enter to skip):"
+    echo "Examples: ripgrep fzf bat htop"
+    read -r -p "Packages: " packages
+
+    if [[ -n "$packages" ]]; then
+        validate_apt_package_names "$packages"
+        config_set "packages" "$packages"
+    fi
+}
+
+# Prompt for tools if not set
+prompt_tools() {
+    local tools_set=0
+
+    # Check if any tool was explicitly set
+    if [[ -n "$(config_get install_neovim)" ]] || \
+       [[ -n "$(config_get install_starship)" ]] || \
+       [[ -n "$(config_get install_atuin)" ]] || \
+       [[ -n "$(config_get install_mise)" ]] || \
+       [[ -n "$(config_get install_zellij)" ]]; then
+        tools_set=1
+    fi
+
+    if [[ $tools_set -eq 1 ]]; then
+        # Set defaults for unspecified tools
+        [[ -z "$(config_get install_neovim)" ]] && config_set "install_neovim" "true"
+        [[ -z "$(config_get install_starship)" ]] && config_set "install_starship" "true"
+        [[ -z "$(config_get install_atuin)" ]] && config_set "install_atuin" "true"
+        [[ -z "$(config_get install_mise)" ]] && config_set "install_mise" "true"
+        [[ -z "$(config_get install_zellij)" ]] && config_set "install_zellij" "true"
+        return
+    fi
+
+    echo ""
+    info "=== Development Tools ==="
+    echo "Which tools do you want to install? (space-separated numbers, or Enter for all)"
+    echo "  1) Neovim (text editor)"
+    echo "  2) Starship (prompt)"
+    echo "  3) Atuin (shell history)"
+    echo "  4) Mise (version manager)"
+    echo "  5) Zellij (terminal multiplexer)"
+    read -r -p "Choice [all]: " tool_choices
+
+    # Default to all if empty
+    if [[ -z "$tool_choices" ]]; then
+        tool_choices="1 2 3 4 5"
+    fi
+
+    # Set all to false first
+    config_set "install_neovim" "false"
+    config_set "install_starship" "false"
+    config_set "install_atuin" "false"
+    config_set "install_mise" "false"
+    config_set "install_zellij" "false"
+
+    for choice in $tool_choices; do
+        case $choice in
+            1) config_set "install_neovim" "true" ;;
+            2) config_set "install_starship" "true" ;;
+            3) config_set "install_atuin" "true" ;;
+            4) config_set "install_mise" "true" ;;
+            5) config_set "install_zellij" "true" ;;
+            *)
+                warn "Unknown choice: $choice (skipped)"
+                ;;
+        esac
+    done
+}
+
+# Prompt for sudo if not set
+prompt_sudo() {
+    if [[ -n "$(config_get enable_sudo)" ]]; then
+        return
+    fi
+
+    echo ""
+    info "=== Sudo Access ==="
+    read -r -p "Enable sudo access in container? (y/N): " sudo_choice
+    if [[ $sudo_choice =~ ^[Yy]$ ]]; then
+        config_set "enable_sudo" "true"
+    else
+        config_set "enable_sudo" "false"
+    fi
+}
+
+# Prompt for ports if not set
+prompt_ports() {
+    local ports_var="$1"
+
+    echo ""
+    info "=== Port Forwarding ==="
+    echo "Enter ports to expose (space-separated, or Enter to skip):"
+    echo "Examples: 3000 5432 8080"
+    read -r -p "Ports: " port_input
+
+    for port in $port_input; do
+        validate_port "$port"
+        eval "$ports_var+=('$port')"
+    done
+}
+
+# Prompt for volumes/credentials
+prompt_volumes() {
+    local volumes_var="$1"
+
+    echo ""
+    info "=== Credentials & Volumes ==="
+    echo "Mount common credentials/configs? (space-separated numbers, or Enter to skip)"
+    echo "  1) SSH keys (~/.ssh)"
+    echo "  2) Git credentials (~/.git-credentials)"
+    echo "  3) AWS credentials (~/.aws)"
+    echo "  4) Custom CA certificates (/etc/ssl/certs/custom-ca.crt)"
+    read -r -p "Choice [none]: " choices
+
+    for choice in $choices; do
+        case $choice in
+            1)
+                eval "$volumes_var+=('$HOME/.ssh:/home/\${USERNAME}/.ssh:ro')"
+                ;;
+            2)
+                eval "$volumes_var+=('$HOME/.git-credentials:/home/\${USERNAME}/.git-credentials:ro')"
+                ;;
+            3)
+                eval "$volumes_var+=('$HOME/.aws:/home/\${USERNAME}/.aws:ro')"
+                ;;
+            4)
+                eval "$volumes_var+=('/etc/ssl/certs/custom-ca.crt:/usr/local/share/ca-certificates/custom-ca.crt:ro')"
+                ;;
+            *)
+                warn "Unknown choice: $choice (skipped)"
+                ;;
+        esac
+    done
+
+    echo ""
+    echo "Add custom volumes? (one per line, Enter on empty line to finish)"
+    echo "Format: /host/path:/container/path[:ro]"
+    while true; do
+        read -r -p "Volume: " vol
+        if [[ -z "$vol" ]]; then
+            break
+        fi
+        eval "$volumes_var+=('$vol')"
+    done
+}
+
 # Commands
 cmd_create() {
     config_init
 
+    local name=""
     local project_path=""
     local ports=()
     local volumes=()
+    local no_prompt=0
 
     # First two positional args
     if [[ $# -lt 1 ]]; then
@@ -450,11 +689,16 @@ cmd_create() {
     fi
 
     project_path=$1
+    config_set "project_path" "$project_path"
     shift 1
 
     # Parse flags
     while [[ $# -gt 0 ]]; do
         case $1 in
+            --no-prompt)
+                no_prompt=1
+                shift
+                ;;
             --name)
                 # `name` is validated below
                 name="$2"
@@ -556,78 +800,57 @@ cmd_create() {
         esac
     done
 
+    # If --no-prompt, validate we have everything needed
+    if [[ $no_prompt -eq 1 ]]; then
+        # Set defaults for anything not specified
+        [[ -z "$(config_get shell)" ]] && config_set "shell" "bash"
+        [[ -z "$(config_get install_node)" ]] && config_set "install_node" "none"
+        [[ -z "$(config_get install_rust)" ]] && config_set "install_rust" "none"
+        [[ -z "$(config_get install_python)" ]] && config_set "install_python" "none"
+        [[ -z "$(config_get install_go)" ]] && config_set "install_go" "none"
+        [[ -z "$(config_get enable_sudo)" ]] && config_set "enable_sudo" "false"
+        [[ -z "$(config_get install_neovim)" ]] && config_set "install_neovim" "true"
+        [[ -z "$(config_get install_starship)" ]] && config_set "install_starship" "true"
+        [[ -z "$(config_get install_atuin)" ]] && config_set "install_atuin" "true"
+        [[ -z "$(config_get install_mise)" ]] && config_set "install_mise" "true"
+        [[ -z "$(config_get install_zellij)" ]] && config_set "install_zellij" "true"
+    else
+        # Interactive mode - prompt for missing values
+        prompt_shell
+        prompt_languages
+        prompt_packages
+        prompt_tools
+        prompt_sudo
+
+        # Only prompt for ports if none were specified
+        if [[ ${#ports[@]} -eq 0 ]]; then
+            prompt_ports ports
+        fi
+
+        # Only prompt for volumes if none were specified
+        if [[ ${#volumes[@]} -eq 0 ]]; then
+            prompt_volumes volumes
+        fi
+    fi
+
+    # Determine project name
     if [[ -z "$name" ]]; then
-        name="$(basename "$project_path")"
+        name="$(basename "$(config_get project_path)")"
     fi
     validate_project_name "$name"
 
-    # Ask for shell if not provided
-    if [[ -z "$(config_get shell)" ]]; then
-        echo "Select shell:"
-        echo "  1) bash (default)"
-        echo "  2) zsh"
-        echo "  3) fish"
-        read -r -p "Choice [1]: " shell_choice
-        case ${shell_choice:-1} in
-            1) config_set "shell" "bash" ;;
-            2) config_set "shell" "zsh" ;;
-            3) config_set "shell" "fish" ;;
-            *) config_set "shell" "bash" ;;
-        esac
-    fi
-
-    # Prompt for common credentials if no --volume flags were used
-    if [[ ${#volumes[@]} -eq 0 ]]; then
-        echo ""
-        echo "Mount common credentials/configs? (space-separated numbers, or Enter to skip)"
-        echo "  1) SSH keys (~/.ssh)"
-        echo "  2) Git credentials (~/.git-credentials)"
-        echo "  3) AWS credentials (~/.aws)"
-        echo "  4) Custom CA certificates (/etc/ssl/certs/custom-ca.crt)"
-        read -r -p "Choice [none]: " choices
-
-        for choice in $choices; do
-            case $choice in
-                1)
-                    volumes+=("$HOME/.ssh:/home/\${USERNAME}/.ssh:ro")
-                    ;;
-                2)
-                    volumes+=("$HOME/.git-credentials:/home/\${USERNAME}/.git-credentials:ro")
-                    ;;
-                3)
-                    volumes+=("$HOME/.aws:/home/\${USERNAME}/.aws:ro")
-                    ;;
-                4)
-                    volumes+=("/etc/ssl/certs/custom-ca.crt:/usr/local/share/ca-certificates/custom-ca.crt:ro")
-                    ;;
-                *)
-                    warn "Unknown choice: $choice (skipped)"
-                    ;;
-            esac
-        done
-    fi
-
-    # Validate and expand project path
+    # Validate path exists or warn
     mkdir -p "$PROJECTS_DIR"
 
-    # Safe tilde expansion without eval
-    if [[ "$project_path" == "~"* ]]; then
-        project_path="${HOME}${project_path:1}"
-    fi
-
-    # Resolve to absolute path if relative
-    if [[ "$project_path" != /* ]]; then
-        project_path="$(pwd)/$project_path"
-    fi
-
-    config_set "project_path" "$project_path"
+    local final_path
+    final_path="$(config_get project_path)"
 
     if [[ "$(config_get install_mise)" != "true" ]]; then
       warn "\`mise\` is not installed. We will use Ubuntu's repositories for language runtime versions, if needed."
     fi
 
-    if [[ ! -d "$project_path" ]]; then
-        warn "Warning: Path $project_path does not exist"
+    if [[ ! -d "$final_path" && $no_prompt -eq 0 ]]; then
+        warn "Warning: Path $final_path does not exist"
         read -p "Create config anyway? (y/N) " -n 1 -r
         echo
         [[ ! $REPLY =~ ^[Yy]$ ]] && exit 1
@@ -637,13 +860,22 @@ cmd_create() {
     generate_project_compose "$name" "${ports[@]}" "VOLUMES_START" "${volumes[@]}"
 
     success "Created project '$name'"
+    echo ""
+    echo "Next steps:"
+    echo "  1. Review/edit configuration:"
+    echo "     - $(get_project_env "$name")"
+    echo "     - $(get_project_compose "$name")"
+    echo "  2. Build the environment:"
+    echo "     paul-envs.sh build $name"
+    echo "  3. Run the environment:"
+    echo "     paul-envs.sh run $name"
 }
 
 cmd_list() {
     check_base_compose
     if [[ ! -d "$PROJECTS_DIR" ]]; then
         echo "No project created yet"
-        echo "Hint: Create one with 'paul-envs.sh create <name> <path>'"
+        echo "Hint: Create one with 'paul-envs.sh create <path>'"
         exit 0
     fi
 
@@ -661,7 +893,7 @@ cmd_list() {
 
     if [[ $found -eq 0 ]]; then
         echo "  (no project found)"
-        echo "Hint: Create one with 'paul-envs.sh create <name> <path>'"
+        echo "Hint: Create one with 'paul-envs.sh create <path>'"
     fi
 }
 
@@ -680,7 +912,7 @@ cmd_build() {
     compose_file=$(get_project_compose "$name")
     env_file=$(get_project_env "$name")
     if [[ ! -f "$compose_file" || ! -f "$env_file" ]]; then
-        error "Project '$name' not found\nHint: Use 'paul-envs.sh list' to see available projects or 'paul-envs.sh create' to make a new one"
+        error "Project '$name' not found. Hint: Use 'paul-envs.sh list' to see available projects or 'paul-envs.sh create' to make a new one"
     fi
 
     # Ensure shared cache volume exists
@@ -778,78 +1010,75 @@ Usage:
   paul-envs.sh remove <name>
 
 Options for create:
-  --name                       Name of this project (default: directory name)
-  --uid UID                    Host UID (default: current user)
-  --gid GID                    Host GID (default: current group)
-  --username NAME              Container username (default: dev)
-  --shell SHELL                User shell: bash|zsh|fish (prompted if not specified)
-  --nodejs VERSION             Node.js installation:
-                                 'none' - skip installation of Node.js
-                                 'latest' - use Ubuntu default package
-                                 '20.10.0' - specific version (via mise)
-                               (default: latest)
-  --rust VERSION               Rust installation:
-                                 'none' - skip installation of Rust
-                                 'latest' - latest stable via rustup
-                                 '1.75.0' - specific version (via mise)
-                               (default: none)
-  --python VERSION             Python installation:
-                                 'none' - skip installation of Python
-                                 'latest' - use Ubuntu default package
-                                 '3.12.0' - specific version (via mise)
-                               (default: none)
-  --go VERSION                 Go installation:
-                                 'none' - skip installation of Go
-                                 'latest' - use Ubuntu default package
-                                 '1.21.5' - specific version (via mise)
-                               (default: none)
-  --enable-sudo                Enable sudo access in container, the password is
-                               set to "dev" (default: false)
-  --git-name NAME              Git user.name (optional)
-  --git-email EMAIL            Git user.email (optional)
-  --packages "PKG1 PKG2"       Additional Ubuntu packages (space-separated)
-  --no-neovim                  Skip Neovim installation
-  --no-starship                Skip Starship prompt installation
-  --no-atuin                   Skip Atuin shell history installation
-  --no-mise                    Skip Mise tool manager installation
-  --no-zellij                  Skip Zellij terminal multiplexer installation
-  --port PORT                  Expose container port (can be repeated)
-  --volume HOST:CONTAINER[:ro] Mount volume (can be repeated)
+  --no-prompt              Non-interactive mode (uses defaults)
+  --name NAME              Name of this project (default: directory name)
+  --uid UID                Host UID (default: current user)
+  --gid GID                Host GID (default: current group)
+  --username NAME          Container username (default: dev)
+  --shell SHELL            User shell: bash|zsh|fish (prompted if not specified)
+  --nodejs VERSION         Node.js installation:
+                             'none' - skip installation of Node.js
+                             'latest' - use Ubuntu default package
+                             '20.10.0' - specific version (via mise)
+                           (prompted if not specified)
+  --rust VERSION           Rust installation:
+                             'none' - skip installation of Rust
+                             'latest' - latest stable via rustup
+                             '1.75.0' - specific version (via mise)
+                           (prompted if not specified)
+  --python VERSION         Python installation:
+                             'none' - skip installation of Python
+                             'latest' - use Ubuntu default package
+                             '3.12.0' - specific version (via mise)
+                           (prompted if not specified)
+  --go VERSION             Go installation:
+                             'none' - skip installation of Go
+                             'latest' - use Ubuntu default package
+                             '1.21.5' - specific version (via mise)
+                           (prompted if not specified)
+  --enable-sudo            Enable sudo access in container (prompted if not specified)
+  --git-name NAME          Git user.name (optional)
+  --git-email EMAIL        Git user.email (optional)
+  --packages "PKG1 PKG2"   Additional Ubuntu packages (prompted if not specified)
+  --no-neovim              Skip Neovim installation
+  --no-starship            Skip Starship prompt installation
+  --no-atuin               Skip Atuin shell history installation
+  --no-mise                Skip Mise tool manager installation
+  --no-zellij              Skip Zellij terminal multiplexer installation
+  --port PORT              Expose container port (prompted if not specified, can be repeated)
+  --volume HOST:CONT[:ro]  Mount volume (prompted if not specified, can be repeated)
 
-Examples:
-  # Minimal (interactive prompts for shell and credential files)
+Interactive Mode (default):
   paul-envs.sh create ~/projects/myapp
+  # Will prompt for all unspecified options
 
-  # Full configuration
-  paul-envs.sh create ~/work/api \
-    --name myApp
-    --shell zsh \
-    --nodejs 20.10.0 \
-    --rust latest \
-    --python 3.12.0 \
-    --go latest \
-    --enable-sudo \
-    --git-name "John Doe" \
-    --git-email "john@example.com" \
-    --packages "ripgrep fzf bat" \
-    --no-atuin \
-    --port 3000 \
-    --port 5432 \
+Non-Interactive Mode:
+  paul-envs.sh create ~/projects/myapp --no-prompt --shell bash --nodejs latest
+
+Mixed Mode (some flags + prompts):
+  paul-envs.sh create ~/projects/myapp --nodejs 20.10.0 --rust latest
+  # Will prompt for shell, packages, tools, sudo, ports, and volumes
+
+Full Configuration Example:
+  paul-envs.sh create ~/work/api \\
+    --name myApp \\
+    --shell zsh \\
+    --nodejs 20.10.0 \\
+    --rust latest \\
+    --python 3.12.0 \\
+    --go latest \\
+    --enable-sudo \\
+    --git-name "John Doe" \\
+    --git-email "john@example.com" \\
+    --packages "ripgrep fzf bat" \\
+    --no-atuin \\
+    --port 3000 \\
+    --port 5432 \\
     --volume ~/.git-credentials:/home/dev/.git-credentials:ro
-
-  # Then build it
-  paul-envs.sh build myapp
-
-  # Then run it
-  paul-envs.sh run myapp
-
-  # Manage projects
-  paul-envs.sh list
-  paul-envs.sh remove myapp
 
 Configuration:
   Base compose: $BASE_COMPOSE
-  Projects: Stored in directory you specify
+  Projects directory: $PROJECTS_DIR
 EOF
         ;;
 esac
