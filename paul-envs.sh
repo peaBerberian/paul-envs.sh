@@ -889,8 +889,8 @@ cmd_create() {
 
     config_set "project_dest_path" "$name"
 
-    # stripping the name here
-    name=$(printf '%s' "$name" | sed 's/[^a-z0-9_-]//g')
+    # Normalize the name: lowercase and strip invalid characters
+    name=$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_-]//g')
 
     check_inexistent_name "$name"
 
