@@ -1096,44 +1096,50 @@ Usage:
   paul-envs.sh run <name> [command]
   paul-envs.sh remove <name>
 
-Options for create:
+Options for create (all optional):
   --no-prompt              Non-interactive mode (uses defaults)
-  --name NAME              Name of this project (default: host directory name)
-  --uid UID                Host UID (default: current user)
-  --gid GID                Host GID (default: current group)
+  --name NAME              Name of this project (default: directory name)
+  --uid UID                Container UID (default: current user)
+  --gid GID                Container GID (default: current group)
   --username NAME          Container username (default: dev)
   --shell SHELL            User shell: bash|zsh|fish (prompted if not specified)
   --nodejs VERSION         Node.js installation:
                              'none' - skip installation of Node.js
                              'latest' - use Ubuntu default package
                              '20.10.0' - specific version (requires mise)
-                           (prompted if not specified)
+                           (prompted if no language specified)
   --rust VERSION           Rust installation:
                              'none' - skip installation of Rust
                              'latest' - latest stable via rustup
                              '1.75.0' - specific version (requires mise)
-                           (prompted if not specified)
+                           (prompted if no language specified)
   --python VERSION         Python installation:
                              'none' - skip installation of Python
                              'latest' - use Ubuntu default package
                              '3.12.0' - specific version (requires mise)
-                           (prompted if not specified)
+                           (prompted if no language specified)
   --go VERSION             Go installation:
                              'none' - skip installation of Go
                              'latest' - use Ubuntu default package
                              '1.21.5' - specific version (requires mise)
-                           (prompted if not specified)
+                           (prompted if no language specified)
   --enable-wasm            Add WASM-specialized tools (binaryen, Rust wasm target if enabled)
+                           (prompted if no language specified)
   --enable-sudo            Enable sudo access in container with a "dev" password
                            (prompted if not specified)
   --git-name NAME          Git user.name (optional)
   --git-email EMAIL        Git user.email (optional)
-  --packages "PKG1 PKG2"   Additional Ubuntu packages (prompted if not specified)
   --neovim                 Install Neovim (text editor)
+                           (prompted if no tool specified)
   --starship               Install Starship (prompt)
+                           (prompted if no tool specified)
   --atuin                  Install Atuin (shell history)
+                           (prompted if no tool specified)
   --mise                   Install Mise (version manager - required for specific language versions)
+                           (prompted if no tool specified)
   --zellij                 Install Zellij (terminal multiplexer)
+                           (prompted if no tool specified)
+  --packages "PKG1 PKG2"   Additional Ubuntu packages (prompted if not specified)
   --port PORT              Expose container port (prompted if not specified, can be repeated)
   --volume HOST:CONT[:ro]  Mount volume (prompted if not specified, can be repeated)
 
