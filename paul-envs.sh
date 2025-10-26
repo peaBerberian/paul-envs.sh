@@ -395,25 +395,15 @@ INSTALL_STARSHIP="$(config_get install_starship)"
 INSTALL_ATUIN="$(config_get install_atuin)"
 INSTALL_MISE="$(config_get install_mise)"
 INSTALL_ZELLIJ="$(config_get install_zellij)"
-EOF
-
-    # Add git args if provided
-    if [[ -n "$safe_git_name" ]]; then
-        cat >> "$env_file" <<EOF
 
 # Git author and committer name used inside the container
 # Can also be empty to not set that in the container.
 GIT_AUTHOR_NAME="$safe_git_name"
-EOF
-    fi
-    if [[ -n "$safe_git_email" ]]; then
-        cat >> "$env_file" <<EOF
 
 # Git author and committer e-mail used inside the container
 # Can also be empty to not set that in the container.
 GIT_AUTHOR_EMAIL="$safe_git_email"
 EOF
-    fi
 
     # Generate YAML
     cat >> "$compose_file" <<EOF
