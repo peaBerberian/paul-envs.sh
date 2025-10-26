@@ -43,6 +43,25 @@ info() {
     printf "${BLUE}%s${NC}\n" "$1";
 }
 
+get_absolute_path() {
+    local path="$1"
+
+    # Try realpath -m first (allows non-existent paths)
+    if command -v realpath &> /dev/null; then
+        realpath -m "$path" 2>/dev/null && return 0
+    fi
+
+    # Fallback: manual resolution
+    # Handle absolute paths
+    if [[ "$path" = /* ]]; then
+        echo "$path"
+        return 0
+    fi
+
+    # Handle relative paths - prepend current directory
+    echo "$(pwd)/$path"
+}
+
 # Security validation functions
 validate_project_name() {
     local name=$1
@@ -743,7 +762,7 @@ cmd_create() {
         error "Usage: paul-envs.sh create <project-path> [options]"
     fi
 
-    project_host_path=$1
+    project_host_path=$(get_absolute_path "$1")
     config_set "project_host_path" "$project_host_path"
     shift 1
 
