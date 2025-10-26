@@ -391,11 +391,11 @@ INSTALL_PYTHON="$(config_get install_python)"
 #   That last type of value will only work if \`INSTALL_MISE\` is \`true\`.
 INSTALL_GO="$(config_get install_go)"
 
-# Add WebAssembly-specialized tools, such as \`binaryen\` and a
+# If \`true\`, add WebAssembly-specialized tools such as \`binaryen\` and a
 # WebAssembly target for Rust if it is installed.
 ENABLE_WASM="$(config_get enable_wasm)"
 
-# If \`true\`, \`sudo\` will be installed, passwordless.
+# If \`true\`, \`sudo\` will be installed, with a password set to "dev".
 ENABLE_SUDO="$(config_get enable_sudo)"
 
 # Additional packages outside the core base, separated by a space.
@@ -624,7 +624,7 @@ prompt_sudo() {
 
     echo ""
     info "=== Sudo Access ==="
-    read -r -p "Enable sudo access in container? (y/N): " sudo_choice
+    read -r -p "Enable sudo access in container (password:\"dev\")? (y/N): " sudo_choice
     if [[ $sudo_choice =~ ^[Yy]$ ]]; then
         config_set "enable_sudo" "true"
     else
@@ -1072,7 +1072,8 @@ Options for create:
                              '1.21.5' - specific version (via mise)
                            (prompted if not specified)
   --enable-wasm            Add WASM-specialized tools (binaryen, Rust wasm target if enabled)
-  --enable-sudo            Enable sudo access in container (prompted if not specified)
+  --enable-sudo            Enable sudo access in container with a "dev" password
+                           (prompted if not specified)
   --git-name NAME          Git user.name (optional)
   --git-email EMAIL        Git user.email (optional)
   --packages "PKG1 PKG2"   Additional Ubuntu packages (prompted if not specified)
