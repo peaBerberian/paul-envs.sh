@@ -252,7 +252,7 @@ config_init() {
     config_set "install_atuin" ""
     config_set "install_mise" ""
     config_set "install_zellij" ""
-    config_set "project_path" ""
+    config_set "project_host_path" ""
     config_set "prompted" "false"
 }
 
@@ -326,11 +326,11 @@ generate_project_compose() {
 # - PROJECT_PATH
 
 # Name of the project directory inside the container.
-PROJECT_DIRNAME="${name}"
+PROJECT_DIRNAME="$(config_get project_dest_path)"
 
 # Path to the project you want to mount in this container
 # Will be mounted in "\$HOME/projects/<PROJECT_DIRNAME>" inside that container.
-PROJECT_PATH="$(config_get project_path)"
+PROJECT_PATH="$(config_get project_host_path)"
 
 # To align with your current uid.
 # This is to ensure the mounted volume from your host has compatible
@@ -689,7 +689,7 @@ cmd_create() {
     config_init
 
     local name=""
-    local project_path=""
+    local project_host_path=""
     local ports=()
     local volumes=()
     local no_prompt=0
@@ -699,8 +699,8 @@ cmd_create() {
         error "Usage: paul-envs.sh create <project-path> [options]"
     fi
 
-    project_path=$1
-    config_set "project_path" "$project_path"
+    project_host_path=$1
+    config_set "project_host_path" "$project_host_path"
     shift 1
 
     # Parse flags
@@ -711,7 +711,7 @@ cmd_create() {
                 shift
                 ;;
             --name)
-                # `name` is validated below
+                validate_project_name "$2"
                 name="$2"
                 shift 2
                 ;;
@@ -813,9 +813,18 @@ cmd_create() {
 
     # Determine project name
     if [[ -z "$name" ]]; then
-        name="$(basename "$(config_get project_path)")"
+        name="$(basename "$(config_get project_host_path)")"
     fi
-    validate_project_name "$name"
+
+    if [[ ! "$name" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+        error "\"Risky\" project directory name '$name'. Only alphanumeric characters, dots, hyphens, and underscores are allowed.\nUse the \`--name\` flag to set a safer directory name"
+    fi
+
+    config_set "project_dest_path" "$name"
+
+    # stripping the name here
+    name=$(printf '%s' "$name" | sed 's/[^a-z0-9_-]//g')
+
     check_inexistent_name "$name"
 
     # If --no-prompt, validate we have everything needed
@@ -855,7 +864,7 @@ cmd_create() {
     mkdir -p "$PROJECTS_DIR"
 
     local final_path
-    final_path="$(config_get project_path)"
+    final_path="$(config_get project_host_path)"
 
     if [[ "$(config_get install_mise)" != "true" ]]; then
       warn "\`mise\` is not installed. We will use Ubuntu's repositories for language runtime versions, if needed."
@@ -897,7 +906,7 @@ cmd_list() {
         if [[ -d "$dir" && -f "$dir/compose.yaml" ]]; then
             found=1
             name=$(basename "$dir")
-            path=$(grep "PROJECT_PATH=" "$dir"/.env | head -1 | sed 's/PROJECT_PATH=//' | tr -d '"')
+            path=$(grep "project_host_path=" "$dir"/.env | head -1 | sed 's/project_host_path=//' | tr -d '"')
             echo "  - $name"
             echo "      Path: $path"
         fi
@@ -1023,7 +1032,7 @@ Usage:
 
 Options for create:
   --no-prompt              Non-interactive mode (uses defaults)
-  --name NAME              Name of this project (default: directory name)
+  --name NAME              Name of this project (default: host directory name)
   --uid UID                Host UID (default: current user)
   --gid GID                Host GID (default: current group)
   --username NAME          Container username (default: dev)
