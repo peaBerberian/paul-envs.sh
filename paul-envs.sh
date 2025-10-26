@@ -244,6 +244,7 @@ config_init() {
     config_set "install_rust" "none"
     config_set "install_python" "none"
     config_set "install_go" "none"
+    config_set "enable_sudo" "false"
     config_set "git_name" ""
     config_set "git_email" ""
     config_set "packages" ""
@@ -378,6 +379,9 @@ INSTALL_PYTHON="$(config_get install_python)"
 #   That last type of value will only work if \`INSTALL_MISE\` is \`true\`.
 INSTALL_GO="$(config_get install_go)"
 
+# If `true`, `sudo` will be installed, passwordless.
+ENABLE_SUDO="$(config_get enable_sudo)"
+
 # Additional packages outside the core base, separated by a space.
 # Have to be in Ubuntu's default repository
 # (e.g. "ripgrep fzf". Can be left empty for no supplementary packages)
@@ -506,6 +510,10 @@ cmd_create() {
                 config_set "install_go" "$2"
                 shift 2
                 ;;
+            --enable-sudo|--sudo)
+              config_set "enable_sudo" "true"
+              shift
+              ;;
             --git-name)
                 validate_git_name "$2"
                 config_set "git_name" "$2"
@@ -799,6 +807,8 @@ Options for create:
                                  'latest' - use Ubuntu default package
                                  '1.21.5' - specific version (via mise)
                                (default: none)
+  --enable-sudo                Enable sudo access in container, the password is
+                               set to "dev" (default: false)
   --git-name NAME              Git user.name (optional)
   --git-email EMAIL            Git user.email (optional)
   --packages "PKG1 PKG2"       Additional Ubuntu packages (space-separated)
@@ -821,6 +831,7 @@ Examples:
     --rust latest \
     --python 3.12.0 \
     --go latest \
+    --enable-sudo \
     --git-name "John Doe" \
     --git-email "john@example.com" \
     --packages "ripgrep fzf bat" \

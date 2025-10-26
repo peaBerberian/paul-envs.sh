@@ -89,6 +89,7 @@ ARG INSTALL_NODE=latest
 ARG INSTALL_RUST=none
 ARG INSTALL_PYTHON=none
 ARG INSTALL_GO=none
+ARG ENABLE_SUDO=false
 ARG GIT_AUTHOR_NAME=""
 ARG GIT_AUTHOR_EMAIL=""
 
@@ -98,6 +99,13 @@ USER root
 ENV _ZO_DATA_DIR=/home/${USERNAME}/.container-local/zoxide \
     STARSHIP_CACHE=/home/${USERNAME}/.container-local/starship \
     ATUIN_DB_PATH=/home/${USERNAME}/.container-local/atuin/history.db
+
+# Install sudo and configure it (optional)
+RUN if [ "$ENABLE_SUDO" = "true" ]; then \
+    apt-get update && apt-get install -y sudo && rm -rf /var/lib/apt/lists/* && \
+    usermod -aG sudo ${USERNAME} && \
+    echo "${USERNAME}:dev" | chpasswd; \
+  fi
 
 # Install packages the user listed as "supplementary"
 RUN if [ -n "$SUPPLEMENTARY_PACKAGES" ]; then \

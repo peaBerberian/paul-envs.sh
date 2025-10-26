@@ -101,6 +101,9 @@ services:
         #   That last type of value will only work if `INSTALL_MISE` is `true`.
         INSTALL_GO: ${INSTALL_GO:-none}
 
+        # If `true`, `sudo` will be installed, (password set to `dev`).
+        ENABLE_SUDO: ${ENABLE_SUDO:-false}
+
         # Git basic information.
         # Can also be empty to not set that in the container.
         GIT_AUTHOR_NAME: ${GIT_AUTHOR_NAME:-}
