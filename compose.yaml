@@ -115,16 +115,16 @@ services:
         SUPPLEMENTARY_PACKAGES: ${SUPPLEMENTARY_PACKAGES:-}
 
         # Name of the project directory inside the container.
-        PROJECT_NAME: ${PROJECT_NAME}
+        PROJECT_DIRNAME: ${PROJECT_DIRNAME}
 
         # Path to the project you want to mount in this container
-        # Will be mounted in `$HOME/projects/<PROJECT_NAME>` inside that container.
+        # Will be mounted in `$HOME/projects/<PROJECT_DIRNAME>` inside that container.
         PROJECT_PATH: ${PROJECT_PATH}
 
     # Persistent volumes mounted. Those three are necessary, but you can add
     # supplementary ones with different access rules if you want.
     volumes:
-      - ${PROJECT_PATH}:/home/${USERNAME:-dev}/projects/${PROJECT_NAME}
+      - ${PROJECT_PATH}:/home/${USERNAME:-dev}/projects/${PROJECT_DIRNAME}
       - shared-cache:/home/${USERNAME:-dev}/.container-cache
       - local-state:/home/${USERNAME:-dev}/.container-local
       # Git credentials for HTTPS auth
@@ -141,7 +141,7 @@ services:
 
       # Add your own:
       # - /host/path:/container/path:ro
-    working_dir: /home/${USERNAME:-dev}/projects/${PROJECT_NAME}
+    working_dir: /home/${USERNAME:-dev}/projects/${PROJECT_DIRNAME}
 
   # Reset cache directory to its state at build-time.
   # The "cache directory" corresponds to cached data such as the one for

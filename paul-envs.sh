@@ -322,14 +322,14 @@ generate_project_compose() {
 #
 # Can be freely updated, with the condition of not removing a few
 # mandatory env values:
-# - PROJECT_NAME
+# - PROJECT_DIRNAME
 # - PROJECT_PATH
 
 # Name of the project directory inside the container.
-PROJECT_NAME="${name}"
+PROJECT_DIRNAME="${name}"
 
 # Path to the project you want to mount in this container
-# Will be mounted in "\$HOME/projects/<PROJECT_NAME>" inside that container.
+# Will be mounted in "\$HOME/projects/<PROJECT_DIRNAME>" inside that container.
 PROJECT_PATH="$(config_get project_path)"
 
 # To align with your current uid.
