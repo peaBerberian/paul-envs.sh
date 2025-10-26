@@ -66,10 +66,12 @@ isolation (same issue than with `devbox`).
 1. Clone this repository, `cd` to it, and ensure `docker compose` is installed
    locally and accessible in path.
 
-2. Run `./paul-envs.sh create <NAME> <path/to/your/project>`.
+2. Run `./paul-envs.sh create <path/to/your/project> --name myApp`.
 
    This will just create a compose and env file in a new `projects/` directory
-   with the right preset properties.
+   with the right preset properties and name the project `myApp`. If no
+   `--name` flag is provided, the choosen name will be the name of the project's
+   directory.
 
 3. Optionally, put the "dotfiles" that you want to retrieve in the container's
    home directory in `configs`. They will be copied to the container when it is
@@ -81,15 +83,15 @@ isolation (same issue than with `devbox`).
 
    If you want to copy some of those, see `./paul-envs.sh create` flags.
 
-4. Run `./paul-envs.sh build <NAME>`.
+4. Run `./paul-envs.sh build myApp`.
 
    It will build the container through the right `docker compose build`
    invokation and initialize persistent volumes.
 
 5. Then run the container each time you want to work on the project:
-   `./paul-envs.sh run <NAME>`.
+   `./paul-envs.sh run myApp`.
 
-   The mounted project is available in that container at `~/projects/<NAME>`.
+   The mounted project is available in that container at `~/projects/myApp`.
 
    The project, caches (npm/yarn caches etc.) and the pre-installed tools'
    storage (shell history, `mise` data etc.) are persisted, everything else is
@@ -159,10 +161,7 @@ through the `paul-envs.sh create` "command".
 
 First ensure the target project is present locally in your host, then run:
 ```sh
-./paul-envs.sh create <NAME> <path/to/your/project>
-# With:
-# 1. `<NAME>` being a name of your choosing to refer to that container
-# 2. `<path/to/your/project>` the path in your host to that project.
+./paul-envs.sh create <path/to/your/project>
 ```
 
 Optionally, you may add a lot of flags to better configure that container.
@@ -171,6 +170,7 @@ Here's an example of a real-life usage:
 # Will create a container named `myapp` with a default `zsh` shell and many
 # configurations. Also mount your `.git-credentials` readonly to the container.
 ./paul-envs.sh create myapp ~/work/api \
+  --name myProject
   --shell zsh \
   --node-version 22.11.0 \
   --git-name "John Doe" \
@@ -188,8 +188,8 @@ What this step does is just to create both a `yaml` and a `.env` file containing
 your container's configuration. It doesn't build anything yet.
 
 Those files will be written in a new `./projects/<NAME>` directory, with
-`<NAME>` being the name you chose, and can be directly edited if you want
-(though it should already be complete).
+`<NAME>` being the name you chose under the `--name` flag or the directory's
+name by default. Those files can be directly edited if you want.
 
 ### 2. Build the container
 
@@ -199,9 +199,9 @@ configuration to define the container we want to build.
 This step relies on `docker compose`, which you should have locally installed.
 
 To build a container, just run the `paul-envs.sh build <NAME>` command.
-For example, with a container named `myapp`, you would just do:
+For example, with a container named `myApp`, you would just do:
 ```sh
-./paul-envs.sh build myapp
+./paul-envs.sh build myApp
 ```
 
 This will take some time as the initialization of the container is going on:
@@ -211,14 +211,14 @@ packages are loaded, tools are set-up etc.
 
 Now that the container is built. It can be run at any time, with the
 `./paul-envs.sh run` command.
-For example, with a container named `myapp`, you would do:
+For example, with a container named `myApp`, you would do:
 ```sh
-./paul-envs.sh build myapp
+./paul-envs.sh build myApp
 ```
 
 You will directly switch to that container's `$HOME/projects/<NAME>` directory
-(e.g. for a `myapp` project with a `dev` default username it will be
-`/home/dev/projects/myapp`) which contains the project you linked to that
+(e.g. for a `myApp` project with a `dev` default username it will be
+`/home/dev/projects/myApp`) which contains the project you linked to that
 container.
 
 You can go out of that container at any time (e.g. by calling `exit`), as you
@@ -241,8 +241,8 @@ respectively:
 # List all created configurations, built or not
 ./paul-envs.sh list
 
-# Remove the configuration file for the `myapp` container
-./paul-envs.sh remove myapp
+# Remove the configuration file for the `myApp` container
+./paul-envs.sh remove myApp
 ```
 
 ## What gets preserved vs. ephemeral

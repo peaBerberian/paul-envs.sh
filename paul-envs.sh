@@ -291,7 +291,7 @@ generate_project_compose() {
     env_file=$(get_project_env "$name")
 
     if [[ -f "$compose_file" || -f "$env_file" ]]; then
-        error "Project '$name' already exists\nHint: Use 'paul-envs.sh list' to see all projects or 'paul-envs.sh remove $name' to delete it"
+        error "Project '$name' already exists\nYou can have multiple configurations for the same project by calling \`create\` with the \`--name\` flag.\n\nHint: Use 'paul-envs.sh list' to see all projects or 'paul-envs.sh remove $name' to delete it"
     fi
 
     # Sanitize all user inputs
@@ -379,7 +379,7 @@ INSTALL_PYTHON="$(config_get install_python)"
 #   That last type of value will only work if \`INSTALL_MISE\` is \`true\`.
 INSTALL_GO="$(config_get install_go)"
 
-# If `true`, `sudo` will be installed, passwordless.
+# If \`true\`, \`sudo\` will be installed, passwordless.
 ENABLE_SUDO="$(config_get enable_sudo)"
 
 # Additional packages outside the core base, separated by a space.
@@ -450,26 +450,26 @@ EOF
 cmd_create() {
     config_init
 
-    local name=""
     local project_path=""
     local ports=()
     local volumes=()
 
     # First two positional args
-    if [[ $# -lt 2 ]]; then
-        error "Usage: paul-envs.sh create <name> <project-path> [options]"
+    if [[ $# -lt 1 ]]; then
+        error "Usage: paul-envs.sh create <project-path> [options]"
     fi
 
-    name=$1
-    project_path=$2
-    shift 2
-
-    # Validate project name early
-    validate_project_name "$name"
+    project_path=$1
+    shift 1
 
     # Parse flags
     while [[ $# -gt 0 ]]; do
         case $1 in
+            --name)
+                # `name` is validated below
+                name="$2"
+                shift 2
+                ;;
             --uid)
                 validate_uid_gid "$2" "UID"
                 config_set "host_uid" "$2"
@@ -565,6 +565,11 @@ cmd_create() {
                 ;;
         esac
     done
+
+    if [[ -z "$name" ]]; then
+        name="$(basename "$project_path")"
+    fi
+    validate_project_name "$name"
 
     # Ask for shell if not provided
     if [[ -z "$(config_get shell)" ]]; then
@@ -776,13 +781,14 @@ case ${1:-} in
 paul-envs.sh - Development Environment Manager
 
 Usage:
-  paul-envs.sh create <name> <path> [options]
+  paul-envs.sh create <path> [options]
   paul-envs.sh list
   paul-envs.sh build <name>
   paul-envs.sh run <name> [command]
   paul-envs.sh remove <name>
 
 Options for create:
+  --name                       Name of this project (default: directory name)
   --uid UID                    Host UID (default: current user)
   --gid GID                    Host GID (default: current group)
   --username NAME              Container username (default: dev)
@@ -822,10 +828,11 @@ Options for create:
 
 Examples:
   # Minimal (interactive prompts for shell and credential files)
-  paul-envs.sh create myapp ~/projects/myapp
+  paul-envs.sh create ~/projects/myapp
 
   # Full configuration
-  paul-envs.sh create myapp ~/work/api \
+  paul-envs.sh create ~/work/api \
+    --name myApp
     --shell zsh \
     --nodejs 20.10.0 \
     --rust latest \
