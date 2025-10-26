@@ -256,6 +256,19 @@ config_init() {
     config_set "prompted" "false"
 }
 
+# Check that the given name does not have already project files. Exits on error if so.
+# Usage: check_inexistent_name name
+check_inexistent_name() {
+    local compose_file
+    local env_file
+    compose_file=$(get_project_compose "$1")
+    env_file=$(get_project_env "$1")
+
+    if [[ -f "$compose_file" || -f "$env_file" ]]; then
+        error "Project '$name' already exists. You can have multiple configurations for the same project by calling 'create' with the '--name' flag. Hint: Use 'paul-envs.sh list' to see all projects or 'paul-envs.sh remove $name' to delete it"
+    fi
+}
+
 # Generate project compose file
 # Usage: generate_project_compose name ports_array volumes_array
 generate_project_compose() {
@@ -290,9 +303,7 @@ generate_project_compose() {
     compose_file=$(get_project_compose "$name")
     env_file=$(get_project_env "$name")
 
-    if [[ -f "$compose_file" || -f "$env_file" ]]; then
-        error "Project '$name' already exists. You can have multiple configurations for the same project by calling 'create' with the '--name' flag. Hint: Use 'paul-envs.sh list' to see all projects or 'paul-envs.sh remove $name' to delete it"
-    fi
+    check_inexistent_name "$name"
 
     # Sanitize all user inputs
     local safe_git_name
@@ -800,6 +811,13 @@ cmd_create() {
         esac
     done
 
+    # Determine project name
+    if [[ -z "$name" ]]; then
+        name="$(basename "$(config_get project_path)")"
+    fi
+    validate_project_name "$name"
+    check_inexistent_name "$name"
+
     # If --no-prompt, validate we have everything needed
     if [[ $no_prompt -eq 1 ]]; then
         # Set defaults for anything not specified
@@ -832,12 +850,6 @@ cmd_create() {
             prompt_volumes volumes
         fi
     fi
-
-    # Determine project name
-    if [[ -z "$name" ]]; then
-        name="$(basename "$(config_get project_path)")"
-    fi
-    validate_project_name "$name"
 
     # Validate path exists or warn
     mkdir -p "$PROJECTS_DIR"
