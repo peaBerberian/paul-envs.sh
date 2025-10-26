@@ -923,7 +923,7 @@ cmd_list() {
         if [[ -d "$dir" && -f "$dir/compose.yaml" ]]; then
             found=1
             name=$(basename "$dir")
-            path=$(grep "project_host_path=" "$dir"/.env | head -1 | sed 's/project_host_path=//' | tr -d '"')
+            path=$(grep "PROJECT_PATH=" "$dir"/.env | head -1 | sed 's/PROJECT_PATH=//' | tr -d '"')
             echo "  - $name"
             echo "      Path: $path"
         fi
