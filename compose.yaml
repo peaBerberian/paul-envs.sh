@@ -101,6 +101,10 @@ services:
         #   That last type of value will only work if `INSTALL_MISE` is `true`.
         INSTALL_GO: ${INSTALL_GO:-none}
 
+        # Add WebAssembly-specialized tools, such as `binaryen` and a
+        # WebAssembly target for Rust if it is installed.
+        ENABLE_WASM: ${ENABLE_WASM:-false}
+
         # If `true`, `sudo` will be installed, (password set to `dev`).
         ENABLE_SUDO: ${ENABLE_SUDO:-false}
 

@@ -89,6 +89,7 @@ ARG INSTALL_NODE=latest
 ARG INSTALL_RUST=none
 ARG INSTALL_PYTHON=none
 ARG INSTALL_GO=none
+ARG ENABLE_WASM=false
 ARG ENABLE_SUDO=false
 ARG GIT_AUTHOR_NAME=""
 ARG GIT_AUTHOR_EMAIL=""
@@ -131,6 +132,15 @@ RUN if [ "$INSTALL_ZELLIJ" = "true" ]; then \
 # Install Starship (optional)
 RUN if [ "$INSTALL_STARSHIP" = "true" ]; then \
     curl -sS https://starship.rs/install.sh | sh -s -- -y; \
+  fi
+
+RUN if [ "$ENABLE_WASM" = "true" ]; then \
+    BINARYEN_VERSION=$(curl -s https://api.github.com/repos/WebAssembly/binaryen/releases/latest | grep -o '"tag_name": *"[^"]*"' | sed 's/"tag_name": *"//;s/"//') && \
+    curl -L "https://github.com/WebAssembly/binaryen/releases/download/${BINARYEN_VERSION}/binaryen-${BINARYEN_VERSION}-x86_64-linux.tar.gz" -o binaryen.tar.gz && \
+    tar -xzf binaryen.tar.gz && \
+    mv binaryen-${BINARYEN_VERSION} /opt/binaryen && \
+    ln -s /opt/binaryen/bin/* /usr/local/bin/ && \
+    rm binaryen.tar.gz; \
   fi
 
 USER ${USERNAME}
@@ -251,12 +261,13 @@ RUN if [ -n "$INSTALL_NODE" ] && [ "$INSTALL_NODE" != "none" ]; then \
       fi; \
     fi; \
     if [ -n "$INSTALL_RUST" ] && [ "$INSTALL_RUST" != "none" ]; then \
-      # Add Wasm support, just in case. TODO: don't?
-      if [ "$INSTALL_MISE" != "true" ]; then \
-        rustup target add wasm32-unknown-unknown; \
-      else \
-        export PATH="/home/${USERNAME}/.local/bin:$PATH" && \
-        mise exec -- rustup target add wasm32-unknown-unknown; \
+      if [ "$ENABLE_WASM" = "true" ]; then \
+        if [ "$INSTALL_MISE" != "true" ]; then \
+          rustup target add wasm32-unknown-unknown; \
+        else \
+          export PATH="/home/${USERNAME}/.local/bin:$PATH" && \
+          mise exec -- rustup target add wasm32-unknown-unknown; \
+        fi; \
       fi; \
       echo '. $HOME/.cargo/env' >> /home/${USERNAME}/.bashrc; \
       if [ "$USER_SHELL" = "zsh" ]; then \

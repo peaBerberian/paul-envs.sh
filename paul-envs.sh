@@ -243,6 +243,7 @@ config_init() {
     config_set "install_rust" ""
     config_set "install_python" ""
     config_set "install_go" ""
+    config_set "enable_wasm" ""
     config_set "enable_sudo" ""
     config_set "git_name" ""
     config_set "git_email" ""
@@ -390,6 +391,10 @@ INSTALL_PYTHON="$(config_get install_python)"
 #   That last type of value will only work if \`INSTALL_MISE\` is \`true\`.
 INSTALL_GO="$(config_get install_go)"
 
+# Add WebAssembly-specialized tools, such as \`binaryen\` and a
+# WebAssembly target for Rust if it is installed.
+ENABLE_WASM="$(config_get enable_wasm)"
+
 # If \`true\`, \`sudo\` will be installed, passwordless.
 ENABLE_SUDO="$(config_get enable_sudo)"
 
@@ -496,6 +501,7 @@ prompt_languages() {
     echo "  2) Rust"
     echo "  3) Python"
     echo "  4) Go"
+    echo "  5) WebAssembly tools (Binaryen, Rust WASM target if Rust is enabled)"
     read -r -p "Choice [none]: " lang_choices
 
     # Set all to none first
@@ -521,6 +527,9 @@ prompt_languages() {
             4)
                 read -r -p "Go version (latest/none/X.Y.Z) [latest]: " go_ver
                 config_set "install_go" "${go_ver:-latest}"
+                ;;
+            5)
+                config_set "enable_wasm" "true"
                 ;;
             *)
                 warn "Unknown choice: $choice (skipped)"
@@ -755,6 +764,10 @@ cmd_create() {
                 config_set "install_go" "$2"
                 shift 2
                 ;;
+            --enable-wasm|--wasm)
+              config_set "enable_wasm" "true"
+              shift
+              ;;
             --enable-sudo|--sudo)
               config_set "enable_sudo" "true"
               shift
@@ -835,6 +848,7 @@ cmd_create() {
         [[ -z "$(config_get install_rust)" ]] && config_set "install_rust" "none"
         [[ -z "$(config_get install_python)" ]] && config_set "install_python" "none"
         [[ -z "$(config_get install_go)" ]] && config_set "install_go" "none"
+        [[ -z "$(config_get enable_wasm)" ]] && config_set "enable_wasm" "false"
         [[ -z "$(config_get enable_sudo)" ]] && config_set "enable_sudo" "false"
         [[ -z "$(config_get install_neovim)" ]] && config_set "install_neovim" "true"
         [[ -z "$(config_get install_starship)" ]] && config_set "install_starship" "true"
@@ -1057,6 +1071,7 @@ Options for create:
                              'latest' - use Ubuntu default package
                              '1.21.5' - specific version (via mise)
                            (prompted if not specified)
+  --enable-wasm            Add WASM-specialized tools (binaryen, Rust wasm target if enabled)
   --enable-sudo            Enable sudo access in container (prompted if not specified)
   --git-name NAME          Git user.name (optional)
   --git-email EMAIL        Git user.email (optional)
