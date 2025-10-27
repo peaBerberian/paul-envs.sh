@@ -13,7 +13,9 @@ while [ -L "$SCRIPT_PATH" ]; do
     SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
     # Handle relative symlinks by doing a concatenation if doesn't start with
     # `/`
-    [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+    if [[ "$SCRIPT_PATH" != /* ]]; then
+        SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+    fi
 done
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 BASE_COMPOSE="$SCRIPT_DIR/compose.yaml"
@@ -542,10 +544,18 @@ prompt_languages() {
 
     if [[ $has_any_lang -eq 1 ]]; then
         # Set defaults for unspecified languages
-        [[ -z "$(config_get install_node)" ]] && config_set "install_node" "none"
-        [[ -z "$(config_get install_rust)" ]] && config_set "install_rust" "none"
-        [[ -z "$(config_get install_python)" ]] && config_set "install_python" "none"
-        [[ -z "$(config_get install_go)" ]] && config_set "install_go" "none"
+        if [[ -z "$(config_get install_node)" ]]; then
+            config_set "install_node" "none"
+        fi
+        if [[ -z "$(config_get install_rust)" ]]; then
+            config_set "install_rust" "none"
+        fi
+        if [[ -z "$(config_get install_python)" ]]; then
+            config_set "install_python" "none"
+        fi
+        if [[ -z "$(config_get install_go)" ]]; then
+            config_set "install_go" "none"
+        fi
         return
     fi
 
@@ -630,11 +640,21 @@ prompt_tools() {
 
     if [[ $tools_set -eq 1 ]]; then
         # Set defaults for unspecified tools
-        [[ -z "$(config_get install_neovim)" ]] && config_set "install_neovim" "false"
-        [[ -z "$(config_get install_starship)" ]] && config_set "install_starship" "false"
-        [[ -z "$(config_get install_atuin)" ]] && config_set "install_atuin" "false"
-        [[ -z "$(config_get install_mise)" ]] && config_set "install_mise" "false"
-        [[ -z "$(config_get install_zellij)" ]] && config_set "install_zellij" "false"
+        if [[ -z "$(config_get install_neovim)" ]]; then
+            config_set "install_neovim" "false"
+        fi
+        if [[ -z "$(config_get install_starship)" ]]; then
+            config_set "install_starship" "false"
+        fi
+        if [[ -z "$(config_get install_atuin)" ]]; then
+            config_set "install_atuin" "false"
+        fi
+        if [[ -z "$(config_get install_mise)" ]]; then
+            config_set "install_mise" "false"
+        fi
+        if [[ -z "$(config_get install_zellij)" ]]; then
+            config_set "install_zellij" "false"
+        fi
         return
     fi
 
@@ -897,18 +917,42 @@ cmd_create() {
     # If --no-prompt, validate we have everything needed
     if [[ $no_prompt -eq 1 ]]; then
         # Set defaults for anything not specified
-        [[ -z "$(config_get shell)" ]] && config_set "shell" "bash"
-        [[ -z "$(config_get install_node)" ]] && config_set "install_node" "none"
-        [[ -z "$(config_get install_rust)" ]] && config_set "install_rust" "none"
-        [[ -z "$(config_get install_python)" ]] && config_set "install_python" "none"
-        [[ -z "$(config_get install_go)" ]] && config_set "install_go" "none"
-        [[ -z "$(config_get enable_wasm)" ]] && config_set "enable_wasm" "false"
-        [[ -z "$(config_get enable_sudo)" ]] && config_set "enable_sudo" "false"
-        [[ -z "$(config_get install_neovim)" ]] && config_set "install_neovim" "false"
-        [[ -z "$(config_get install_starship)" ]] && config_set "install_starship" "false"
-        [[ -z "$(config_get install_atuin)" ]] && config_set "install_atuin" "false"
-        [[ -z "$(config_get install_mise)" ]] && config_set "install_mise" "false"
-        [[ -z "$(config_get install_zellij)" ]] && config_set "install_zellij" "false"
+        if [[ -z "$(config_get shell)" ]]; then
+            config_set "shell" "bash"
+        fi
+        if [[ -z "$(config_get install_node)" ]]; then
+            config_set "install_node" "none"
+        fi
+        if [[ -z "$(config_get install_rust)" ]]; then
+            config_set "install_rust" "none"
+        fi
+        if [[ -z "$(config_get install_python)" ]]; then
+            config_set "install_python" "none"
+        fi
+        if [[ -z "$(config_get install_go)" ]]; then
+            config_set "install_go" "none"
+        fi
+        if [[ -z "$(config_get enable_wasm)" ]]; then
+            config_set "enable_wasm" "false"
+        fi
+        if [[ -z "$(config_get enable_sudo)" ]]; then
+            config_set "enable_sudo" "false"
+        fi
+        if [[ -z "$(config_get install_neovim)" ]]; then
+            config_set "install_neovim" "false"
+        fi
+        if [[ -z "$(config_get install_starship)" ]]; then
+            config_set "install_starship" "false"
+        fi
+        if [[ -z "$(config_get install_atuin)" ]]; then
+            config_set "install_atuin" "false"
+        fi
+        if [[ -z "$(config_get install_mise)" ]]; then
+            config_set "install_mise" "false"
+        fi
+        if [[ -z "$(config_get install_zellij)" ]]; then
+            config_set "install_zellij" "false"
+        fi
         mise_check $no_prompt
     else
         # Interactive mode - prompt for missing values
@@ -940,7 +984,9 @@ cmd_create() {
         warn "Warning: Path $final_path does not exist"
         read -p "Create config anyway? (y/N) " -n 1 -r
         echo
-        [[ ! $REPLY =~ ^[Yy]$ ]] && exit 1
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            exit 1
+        fi
     fi
 
     # Generate config
