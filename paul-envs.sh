@@ -275,7 +275,6 @@ config_init() {
     config_set "install_mise" ""
     config_set "install_zellij" ""
     config_set "project_host_path" ""
-    config_set "prompted" "false"
 }
 
 # Check that the given name does not have already project files. Exits on error if so.
@@ -605,8 +604,8 @@ prompt_languages() {
 
 # Prompt for supplementary packages if not set
 prompt_packages() {
-    if [[ -n "$(config_get prompted)" && "$(config_get prompted)" == "true" ]]; then
-        # Already prompted via flag
+    if [[ -n "$(config_get packages)" ]]; then
+        # Already explicitly set
         return
     fi
 
