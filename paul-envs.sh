@@ -997,9 +997,11 @@ cmd_create() {
     echo "  1. Review/edit configuration:"
     echo "     - $(get_project_env "$name")"
     echo "     - $(get_project_compose "$name")"
-    echo "  2. Build the environment:"
+    echo "  2. Put the \$HOME dotfiles you want to port in:"
+    echo "     - $SCRIPT_DIR/configs/"
+    echo "  3. Build the environment:"
     echo "     paul-envs.sh build $name"
-    echo "  3. Run the environment:"
+    echo "  4. Run the environment:"
     echo "     paul-envs.sh run $name"
 }
 
