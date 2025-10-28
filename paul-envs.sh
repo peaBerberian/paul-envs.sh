@@ -1,6 +1,46 @@
 #!/bin/bash
 set -e
 
+# Detect if running on Windows (Git Bash, MSYS2, Cygwin, WSL)
+detect_windows() {
+    if [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]] || [[ "$OSTYPE" == "win32" ]]; then
+        return 0
+    elif [[ -n "$WINDIR" ]] || [[ -n "$SYSTEMROOT" ]]; then
+        return 0
+    fi
+    return 1
+}
+
+IS_WINDOWS=0
+if detect_windows; then
+    IS_WINDOWS=1
+fi
+
+# Convert Windows paths to Unix paths for Docker
+normalize_path() {
+    local path="$1"
+
+    if [[ $IS_WINDOWS -eq 1 ]]; then
+        # Handle Windows drive letters (C:\ -> /c/)
+        if [[ "$path" =~ ^([A-Za-z]):[\\/](.*)$ ]]; then
+            local drive="${BASH_REMATCH[1]}"
+            local rest="${BASH_REMATCH[2]}"
+            drive=$(echo "$drive" | tr '[:upper:]' '[:lower:]')
+            rest="${rest//\\//}"
+            echo "/$drive/$rest"
+        # Handle Git Bash paths (/c/Users/...)
+        elif [[ "$path" =~ ^/([a-z])/(.*)$ ]]; then
+            echo "$path"
+        # Handle relative paths
+        else
+            path="${path//\\//}"
+            echo "$path"
+        fi
+    else
+        echo "$path"
+    fi
+}
+
 # Small dance to resolve symlinks of this script (macOS compatible)
 SCRIPT_PATH="${BASH_SOURCE[0]}"
 
@@ -18,6 +58,7 @@ while [ -L "$SCRIPT_PATH" ]; do
     fi
 done
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+SCRIPT_DIR=$(normalize_path "$SCRIPT_DIR")
 BASE_COMPOSE="$SCRIPT_DIR/compose.yaml"
 
 # Directory where projects' yaml and env files will be created
@@ -48,20 +89,35 @@ info() {
 get_absolute_path() {
     local path="$1"
 
+    # Normalize backslashes first
+    path="${path//\\//}"
+
     # Try realpath -m first (allows non-existent paths)
     if command -v realpath &> /dev/null; then
-        realpath -m "$path" 2>/dev/null && return 0
+        local result
+        result=$(realpath -m "$path" 2>/dev/null)
+        if [[ -n "$result" ]]; then
+            normalize_path "$result"
+            return 0
+        fi
     fi
 
     # Fallback: manual resolution
-    # Handle absolute paths
-    if [[ "$path" = /* ]]; then
-        echo "$path"
+    # Handle absolute paths (Windows or Unix)
+    if [[ "$path" =~ ^[A-Za-z]:[\\/] ]]; then
+        # Windows absolute path
+        normalize_path "$path"
+        return 0
+    elif [[ "$path" = /* ]]; then
+        # Unix absolute path
+        normalize_path "$path"
         return 0
     fi
 
     # Handle relative paths - prepend current directory
-    echo "$(pwd)/$path"
+    local cwd="$(pwd)"
+    cwd=$(normalize_path "$cwd")
+    echo "$cwd/$path"
 }
 
 # Security validation functions
@@ -256,8 +312,15 @@ config_init() {
     CONFIG_KEYS=()
     CONFIG_VALUES=()
 
-    config_set "host_uid" "$(id -u)"
-    config_set "host_gid" "$(id -g)"
+    # On Windows, use fixed UID/GID suitable for Docker
+    if [[ $IS_WINDOWS -eq 1 ]]; then
+        config_set "host_uid" "1000"
+        config_set "host_gid" "1000"
+    else
+        config_set "host_uid" "$(id -u)"
+        config_set "host_gid" "$(id -g)"
+    fi
+
     config_set "username" "dev"
     config_set "shell" ""
     config_set "install_node" ""
@@ -734,16 +797,24 @@ prompt_volumes() {
     echo "  4) Custom CA certificates (/etc/ssl/certs/custom-ca.crt)"
     read -r -p "Choice [none]: " choices
 
+    # Get user's home directory and normalize it
+    local user_home
+    if [[ $IS_WINDOWS -eq 1 ]]; then
+        user_home=$(normalize_path "$HOME")
+    else
+        user_home="$HOME"
+    fi
+
     for choice in $choices; do
         case $choice in
             1)
-                eval "$volumes_var+=('$HOME/.ssh:/home/\${USERNAME}/.ssh:ro')"
+                eval "$volumes_var+=('$user_home/.ssh:/home/\${USERNAME}/.ssh:ro')"
                 ;;
             2)
-                eval "$volumes_var+=('$HOME/.git-credentials:/home/\${USERNAME}/.git-credentials:ro')"
+                eval "$volumes_var+=('$user_home/.git-credentials:/home/\${USERNAME}/.git-credentials:ro')"
                 ;;
             3)
-                eval "$volumes_var+=('$HOME/.aws:/home/\${USERNAME}/.aws:ro')"
+                eval "$volumes_var+=('$user_home/.aws:/home/\${USERNAME}/.aws:ro')"
                 ;;
             4)
                 eval "$volumes_var+=('/etc/ssl/certs/custom-ca.crt:/usr/local/share/ca-certificates/custom-ca.crt:ro')"
@@ -761,6 +832,13 @@ prompt_volumes() {
         read -r -p "Volume: " vol
         if [[ -z "$vol" ]]; then
             break
+        fi
+        # Normalize the host path portion if it looks like an absolute path
+        if [[ "$vol" =~ ^([^:]+):(.+)$ ]]; then
+            local host_part="${BASH_REMATCH[1]}"
+            local container_part="${BASH_REMATCH[2]}"
+            host_part=$(normalize_path "$host_part")
+            vol="$host_part:$container_part"
         fi
         eval "$volumes_var+=('$vol')"
     done
@@ -886,9 +964,15 @@ cmd_create() {
                 shift 2
                 ;;
             --volume)
-                # Volumes are passed to docker-compose which validates them
-                # We just store them as-is
-                volumes+=("$2")
+                # Normalize volume host paths
+                local vol="$2"
+                if [[ "$vol" =~ ^([^:]+):(.+)$ ]]; then
+                    local host_part="${BASH_REMATCH[1]}"
+                    local container_part="${BASH_REMATCH[2]}"
+                    host_part=$(normalize_path "$host_part")
+                    vol="$host_part:$container_part"
+                fi
+                volumes+=("$vol")
                 shift 2
                 ;;
             *)
@@ -1146,8 +1230,8 @@ Usage:
 Options for create (all optional):
   --no-prompt              Non-interactive mode (uses defaults)
   --name NAME              Name of this project (default: directory name)
-  --uid UID                Container UID (default: current user)
-  --gid GID                Container GID (default: current group)
+  --uid UID                Container UID (default: current user - or 1000 on windows)
+  --gid GID                Container GID (default: current group - or 1000 on windows)
   --username NAME          Container username (default: dev)
   --shell SHELL            User shell: bash|zsh|fish (prompted if not specified)
   --nodejs VERSION         Node.js installation:
@@ -1189,6 +1273,11 @@ Options for create (all optional):
   --packages "PKG1 PKG2"   Additional Ubuntu packages (prompted if not specified)
   --port PORT              Expose container port (prompted if not specified, can be repeated)
   --volume HOST:CONT[:ro]  Mount volume (prompted if not specified, can be repeated)
+
+Windows/Git Bash Notes:
+  - Paths are automatically converted (C:\Users\... -> /c/Users/...)
+  - UID/GID default to 1000 on Windows (Docker Desktop requirement)
+  - Use forward slashes or let the script normalize paths for you
 
 Interactive Mode (default):
   paul-envs.sh create ~/projects/myapp
