@@ -393,3 +393,8 @@ those directories for the aforementioned purposes.
 _I made use both of the XDG spec and of tool-specific configuration for this._
 
 Along the mounted project, those are the only directories which are persisted.
+
+## TODO:
+
+- Add jujutsu
+- Add Kakoune and Helix as potential tools
