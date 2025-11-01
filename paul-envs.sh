@@ -115,7 +115,8 @@ get_absolute_path() {
     fi
 
     # Handle relative paths - prepend current directory
-    local cwd="$(pwd)"
+    local cwd
+    cwd="$(pwd)"
     cwd=$(normalize_path "$cwd")
     echo "$cwd/$path"
 }
