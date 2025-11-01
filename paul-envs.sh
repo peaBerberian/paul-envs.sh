@@ -1194,6 +1194,13 @@ cmd_remove() {
     fi
 }
 
+cmd_version() {
+    echo "paul-envs.sh version 0.1.0"
+    echo "Bash version: $BASH_VERSION"
+    echo "Docker version: $(docker --version 2>/dev/null || echo 'not installed')"
+}
+
+
 # Main command dispatcher
 case ${1:-} in
     create)
@@ -1215,6 +1222,9 @@ case ${1:-} in
     remove|rm)
         shift
         cmd_remove "$@"
+        ;;
+    version|--version|-v)
+        cmd_version
         ;;
     *)
         cat <<EOF
