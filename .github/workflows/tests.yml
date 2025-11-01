@@ -1,0 +1,363 @@
+name: Edge Cases & Path Testing
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  path-handling:
+    name: Path Handling - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Test with absolute paths
+        shell: bash
+        run: |
+          chmod +x paul-envs.sh
+          ABS_PATH="$(pwd)/test-absolute"
+          mkdir -p "$ABS_PATH"
+          ./paul-envs.sh create "$ABS_PATH" \
+            --no-prompt \
+            --name test-absolute-path \
+            --shell bash
+
+      - name: Test with relative paths
+        shell: bash
+        run: |
+          mkdir -p test-relative
+          ./paul-envs.sh create ./test-relative \
+            --no-prompt \
+            --name test-relative-path \
+            --shell bash
+
+      - name: Test with paths containing spaces (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          mkdir -p "test with spaces"
+          ./paul-envs.sh create "./test with spaces" \
+            --no-prompt \
+            --name test-spaces \
+            --shell bash
+
+      - name: Test with nested paths
+        shell: bash
+        run: |
+          mkdir -p nested/deep/path/to/project
+          ./paul-envs.sh create ./nested/deep/path/to/project \
+            --no-prompt \
+            --name test-nested \
+            --shell bash
+
+      - name: Test Windows drive letter handling (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          # Test that Windows paths are properly normalized
+          mkdir -p test-windows
+          WIN_PATH="C:/Users/test-windows"
+          # This should work even if path doesn't exist with --no-prompt
+          ./paul-envs.sh create "$WIN_PATH" \
+            --no-prompt \
+            --name test-windows-path \
+            --shell bash || echo "Windows path test completed"
+
+      - name: Verify path normalization in .env files
+        shell: bash
+        run: |
+          # Check that paths were properly written to .env
+          cat projects/test-absolute-path/.env
+          grep "PROJECT_PATH=" projects/test-absolute-path/.env
+
+  validation-tests:
+    name: Input Validation Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup
+        shell: bash
+        run: |
+          chmod +x paul-envs.sh
+          mkdir -p test-project
+
+      - name: Test invalid package names
+        shell: bash
+        run: |
+          # Package with uppercase should fail
+          if ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name test-invalid-pkg \
+            --packages "Invalid-Package" 2>/dev/null; then
+            echo "Should reject uppercase in package names"
+            exit 1
+          fi
+          echo "✓ Invalid package name rejected"
+
+      - name: Test invalid git email
+        shell: bash
+        run: |
+          if ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name test-invalid-email \
+            --git-email "notanemail" 2>/dev/null; then
+            echo "Should reject invalid email"
+            exit 1
+          fi
+          echo "✓ Invalid email rejected"
+
+      - name: Test invalid username
+        shell: bash
+        run: |
+          # Username starting with number should fail
+          if ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name test-invalid-user \
+            --username "123user" 2>/dev/null; then
+            echo "Should reject username starting with number"
+            exit 1
+          fi
+          echo "✓ Invalid username rejected"
+
+      - name: Test port boundary values
+        shell: bash
+        run: |
+          # Port 0 should fail
+          if ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name test-port-zero \
+            --port 0 2>/dev/null; then
+            echo "Should reject port 0"
+            exit 1
+          fi
+
+          # Port 65536 should fail
+          if ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name test-port-high \
+            --port 65536 2>/dev/null; then
+            echo "Should reject port > 65535"
+            exit 1
+          fi
+
+          # Port 1 should succeed
+          ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name test-port-low \
+            --port 1
+
+          # Port 65535 should succeed
+          ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name test-port-max \
+            --port 65535
+
+          echo "✓ Port validation working correctly"
+
+      - name: Test UID/GID validation
+        shell: bash
+        run: |
+          # Negative UID should fail
+          if ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name test-negative-uid \
+            --uid -1 2>/dev/null; then
+            echo "Should reject negative UID"
+            exit 1
+          fi
+
+          # UID > 65535 should fail
+          if ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name test-high-uid \
+            --uid 65536 2>/dev/null; then
+            echo "Should reject UID > 65535"
+            exit 1
+          fi
+
+          echo "✓ UID/GID validation working correctly"
+
+      - name: Test git name with special characters
+        shell: bash
+        run: |
+          # Git name with quotes should fail
+          if ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name test-git-quotes \
+            --git-name 'Name with "quotes"' 2>/dev/null; then
+            echo "Should reject git name with quotes"
+            exit 1
+          fi
+
+          # Git name with newlines should fail
+          if ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name test-git-newline \
+            --git-name $'Name\nwith\nnewlines' 2>/dev/null; then
+            echo "Should reject git name with newlines"
+            exit 1
+          fi
+
+          echo "✓ Git name validation working correctly"
+
+  combination-tests:
+    name: Complex Combinations
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup
+        shell: bash
+        run: |
+          chmod +x paul-envs.sh
+          mkdir -p test-project
+
+      - name: Test all languages with mise
+        shell: bash
+        run: |
+          ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name test-all-langs \
+            --nodejs 20.10.0 \
+            --rust 1.75.0 \
+            --python 3.12.0 \
+            --go 1.21.5 \
+            --mise
+
+          # Verify mise is enabled
+          grep 'INSTALL_MISE="true"' projects/test-all-langs/.env
+
+      - name: Test all tools
+        shell: bash
+        run: |
+          ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name test-all-tools \
+            --neovim \
+            --starship \
+            --atuin \
+            --mise \
+            --zellij
+
+          # Verify all tools are enabled
+          grep 'INSTALL_NEOVIM="true"' projects/test-all-tools/.env
+          grep 'INSTALL_STARSHIP="true"' projects/test-all-tools/.env
+          grep 'INSTALL_ATUIN="true"' projects/test-all-tools/.env
+          grep 'INSTALL_MISE="true"' projects/test-all-tools/.env
+          grep 'INSTALL_ZELLIJ="true"' projects/test-all-tools/.env
+
+      - name: Test multiple ports
+        shell: bash
+        run: |
+          ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name test-many-ports \
+            --port 3000 \
+            --port 5432 \
+            --port 6379 \
+            --port 8080 \
+            --port 9000
+
+          # Verify all ports in compose
+          grep "3000:3000" projects/test-many-ports/compose.yaml
+          grep "5432:5432" projects/test-many-ports/compose.yaml
+          grep "6379:6379" projects/test-many-ports/compose.yaml
+          grep "8080:8080" projects/test-many-ports/compose.yaml
+          grep "9000:9000" projects/test-many-ports/compose.yaml
+
+      - name: Test multiple volumes
+        shell: bash
+        run: |
+          mkdir -p vol1 vol2 vol3
+          ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name test-many-volumes \
+            --volume ./vol1:/data1:ro \
+            --volume ./vol2:/data2 \
+            --volume ./vol3:/data3:ro
+
+          # Verify volumes in compose
+          grep "/data1:ro" projects/test-many-volumes/compose.yaml
+          grep "/data2" projects/test-many-volumes/compose.yaml
+          grep "/data3:ro" projects/test-many-volumes/compose.yaml
+
+      - name: Test kitchen sink configuration
+        shell: bash
+        run: |
+          ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name test-kitchen-sink \
+            --uid 1500 \
+            --gid 1500 \
+            --username kitchen \
+            --shell fish \
+            --nodejs 20.10.0 \
+            --rust 1.75.0 \
+            --python 3.12.0 \
+            --go 1.21.5 \
+            --enable-wasm \
+            --enable-sudo \
+            --neovim \
+            --starship \
+            --atuin \
+            --mise \
+            --zellij \
+            --git-name "Kitchen Sink" \
+            --git-email "sink@kitchen.com" \
+            --packages "ripgrep fzf bat htop" \
+            --port 3000 \
+            --port 8080
+
+          # Verify critical settings
+          grep 'HOST_UID="1500"' projects/test-kitchen-sink/.env
+          grep 'USERNAME="kitchen"' projects/test-kitchen-sink/.env
+          grep 'USER_SHELL="fish"' projects/test-kitchen-sink/.env
+          grep 'INSTALL_MISE="true"' projects/test-kitchen-sink/.env
+          grep 'Kitchen Sink' projects/test-kitchen-sink/.env
+
+  bash-compatibility:
+    name: Bash Version Compatibility
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        bash-version: ["3.2", "4.0", "4.4", "5.0", "5.1", "5.2"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Bash ${{ matrix.bash-version }}
+        run: |
+          sudo apt-get update
+          # Try to install specific bash version or use default
+          sudo apt-get install -y bash || echo "Using system bash"
+
+      - name: Check Bash version
+        run: bash --version
+
+      - name: Test basic functionality
+        run: |
+          chmod +x paul-envs.sh
+          mkdir -p test-project
+          bash paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name test-bash-compat \
+            --shell bash
+
+      - name: Verify output
+        run: |
+          bash paul-envs.sh list

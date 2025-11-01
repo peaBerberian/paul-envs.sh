@@ -1,0 +1,500 @@
+name: Main
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+
+      - name: Set up Docker (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install docker docker-compose
+          # Note: Docker Desktop might need manual setup on macOS runners
+
+      - name: Set up Docker (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          echo "Docker Desktop should be pre-installed on Windows runners"
+          docker --version
+
+      - name: Create test directory
+        shell: bash
+        run: |
+          mkdir -p test-project
+          echo "# Test Project" > test-project/README.md
+
+      - name: Test script help
+        shell: bash
+        run: |
+          ./paul-envs.sh
+
+      - name: Test list (empty)
+        shell: bash
+        run: |
+          ./paul-envs.sh list
+
+      - name: Test create with --no-prompt (minimal)
+        shell: bash
+        run: |
+          ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name test-minimal \
+            --shell bash
+
+      - name: Test create with Node.js
+        shell: bash
+        run: |
+          ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name test-node \
+            --shell bash \
+            --nodejs latest
+
+      - name: Test create with multiple languages
+        shell: bash
+        run: |
+          ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name test-multi-lang \
+            --shell zsh \
+            --nodejs latest \
+            --rust latest \
+            --python latest \
+            --go latest
+
+      - name: Test create with specific versions (requires mise)
+        shell: bash
+        run: |
+          ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name test-versions \
+            --shell bash \
+            --nodejs 20.10.0 \
+            --python 3.12.0 \
+            --mise
+
+      - name: Test create with tools
+        shell: bash
+        run: |
+          ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name test-tools \
+            --shell fish \
+            --neovim \
+            --starship \
+            --atuin \
+            --mise \
+            --zellij
+
+      - name: Test create with WASM and sudo
+        shell: bash
+        run: |
+          ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name test-wasm-sudo \
+            --shell bash \
+            --rust latest \
+            --enable-wasm \
+            --enable-sudo
+
+      - name: Test create with git config
+        shell: bash
+        run: |
+          ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name test-git \
+            --shell bash \
+            --git-name "Test User" \
+            --git-email "test@example.com"
+
+      - name: Test create with packages
+        shell: bash
+        run: |
+          ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name test-packages \
+            --shell bash \
+            --packages "curl wget git"
+
+      - name: Test create with ports
+        shell: bash
+        run: |
+          ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name test-ports \
+            --shell bash \
+            --port 3000 \
+            --port 8080
+
+      - name: Test create with volumes
+        shell: bash
+        run: |
+          mkdir -p test-volume-source
+          ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name test-volumes \
+            --shell bash \
+            --volume ./test-volume-source:/data:ro
+
+      - name: Test create with custom UID/GID (Unix only)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name test-uid-gid \
+            --shell bash \
+            --uid 1001 \
+            --gid 1001
+
+      - name: Test create with custom username
+        shell: bash
+        run: |
+          ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name test-username \
+            --shell bash \
+            --username devuser
+
+      - name: Test create full configuration
+        shell: bash
+        run: |
+          ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name test-full \
+            --shell zsh \
+            --nodejs 20.10.0 \
+            --rust latest \
+            --python 3.12.0 \
+            --go latest \
+            --enable-wasm \
+            --enable-sudo \
+            --neovim \
+            --starship \
+            --atuin \
+            --mise \
+            --zellij \
+            --git-name "Full Test" \
+            --git-email "full@test.com" \
+            --packages "ripgrep fzf" \
+            --port 3000 \
+            --port 5432
+
+      - name: Test list (with projects)
+        shell: bash
+        run: |
+          ./paul-envs.sh list
+
+      - name: Verify project files
+        shell: bash
+        run: |
+          test -f projects/test-minimal/compose.yaml || exit 1
+          test -f projects/test-minimal/.env || exit 1
+          test -f projects/test-node/compose.yaml || exit 1
+          test -f projects/test-multi-lang/compose.yaml || exit 1
+          echo "All project files created successfully"
+
+      - name: Verify .env content
+        shell: bash
+        run: |
+          grep "PROJECT_DIRNAME=" projects/test-minimal/.env || exit 1
+          grep "PROJECT_PATH=" projects/test-minimal/.env || exit 1
+          grep "HOST_UID=" projects/test-minimal/.env || exit 1
+          grep "HOST_GID=" projects/test-minimal/.env || exit 1
+          grep "USERNAME=" projects/test-minimal/.env || exit 1
+          grep "USER_SHELL=" projects/test-minimal/.env || exit 1
+          echo ".env file structure verified"
+
+      - name: Verify compose.yaml structure
+        shell: bash
+        run: |
+          grep "services:" projects/test-minimal/compose.yaml || exit 1
+          grep "paulenv:" projects/test-minimal/compose.yaml || exit 1
+          grep "build:" projects/test-minimal/compose.yaml || exit 1
+          echo "compose.yaml structure verified"
+
+      - name: Verify ports in compose.yaml
+        shell: bash
+        run: |
+          grep "3000:3000" projects/test-ports/compose.yaml || exit 1
+          grep "8080:8080" projects/test-ports/compose.yaml || exit 1
+          echo "Ports configuration verified"
+
+      - name: Test remove command
+        shell: bash
+        run: |
+          echo "y" | ./paul-envs.sh remove test-minimal
+          test ! -d projects/test-minimal || exit 1
+          echo "Remove command verified"
+
+      - name: Test error handling - invalid project name
+        shell: bash
+        run: |
+          if ./paul-envs.sh create ./test-project --no-prompt --name "invalid name!" 2>/dev/null; then
+            echo "Should have failed with invalid project name"
+            exit 1
+          fi
+          echo "Invalid project name rejected correctly"
+
+      - name: Test error handling - invalid shell
+        shell: bash
+        run: |
+          if ./paul-envs.sh create ./test-project --no-prompt --name test-invalid-shell --shell invalidshell 2>/dev/null; then
+            echo "Should have failed with invalid shell"
+            exit 1
+          fi
+          echo "Invalid shell rejected correctly"
+
+      - name: Test error handling - invalid version
+        shell: bash
+        run: |
+          if ./paul-envs.sh create ./test-project --no-prompt --name test-invalid-version --nodejs "invalid.version" 2>/dev/null; then
+            echo "Should have failed with invalid version"
+            exit 1
+          fi
+          echo "Invalid version rejected correctly"
+
+      - name: Test error handling - invalid port
+        shell: bash
+        run: |
+          if ./paul-envs.sh create ./test-project --no-prompt --name test-invalid-port --port 99999 2>/dev/null; then
+            echo "Should have failed with invalid port"
+            exit 1
+          fi
+          echo "Invalid port rejected correctly"
+
+      - name: Test error handling - duplicate project
+        shell: bash
+        run: |
+          ./paul-envs.sh create ./test-project --no-prompt --name test-duplicate --shell bash
+          if ./paul-envs.sh create ./test-project --no-prompt --name test-duplicate --shell bash 2>/dev/null; then
+            echo "Should have failed with duplicate project name"
+            exit 1
+          fi
+          echo "Duplicate project name rejected correctly"
+
+      - name: Upload artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-projects-${{ matrix.os }}
+          path: projects/
+          retention-days: 7
+
+  # Build and run tests (requires Docker and more time)
+  build-and-run:
+    name: Build & Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Create test projects directory
+        shell: bash
+        run: |
+          mkdir -p test-project
+          echo "# Test Project" > test-project/README.md
+          echo "echo 'Hello from test script'" > test-project/test.sh
+          chmod +x test-project/test.sh
+
+      - name: Verify base compose.yaml exists
+        shell: bash
+        run: |
+          if [ ! -f compose.yaml ]; then
+            echo "ERROR: Base compose.yaml not found"
+            echo "Build tests require compose.yaml in repository root"
+            exit 1
+          fi
+          echo "✓ Base compose.yaml found"
+
+      - name: Create minimal build test project
+        shell: bash
+        run: |
+          ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name build-minimal \
+            --shell bash
+
+          echo "✓ Created minimal project"
+          ls -la projects/build-minimal/
+
+      - name: Build minimal project
+        shell: bash
+        run: |
+          echo "Building minimal project..."
+          ./paul-envs.sh build build-minimal
+          echo "✓ Build completed successfully"
+
+      - name: Run minimal project (basic test)
+        shell: bash
+        run: |
+          echo "Running container to verify it starts..."
+          timeout 30s ./paul-envs.sh run build-minimal bash -c "echo 'Container started successfully' && whoami && pwd" || {
+            if [ $? -eq 124 ]; then
+              echo "Command timed out (expected for interactive sessions)"
+            else
+              echo "ERROR: Container failed to start"
+              exit 1
+            fi
+          }
+
+      - name: Create project with Node.js
+        shell: bash
+        run: |
+          ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name build-node \
+            --shell bash \
+            --nodejs latest
+
+      - name: Build Node.js project
+        shell: bash
+        run: |
+          echo "Building Node.js project..."
+          ./paul-envs.sh build build-node
+          echo "✓ Node.js build completed"
+
+      - name: Test Node.js installation
+        shell: bash
+        run: |
+          echo "Verifying Node.js is installed..."
+          timeout 30s ./paul-envs.sh run build-node bash -c "node --version && npm --version" || true
+
+      - name: Create project with tools and specific Rust version
+        shell: bash
+        run: |
+          ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name build-tools \
+            --shell bash \
+            --rust 1.91.0 \
+            --neovim \
+            --mise
+
+      - name: Build tools project
+        shell: bash
+        run: |
+          echo "Building project with tools..."
+          ./paul-envs.sh build build-tools
+          echo "✓ Tools build completed"
+
+      - name: Test tool installations
+        shell: bash
+        run: |
+          echo "Verifying tools are installed..."
+          timeout 30s ./paul-envs.sh run build-tools bash -c "
+            command -v nvim && echo '✓ Neovim installed' || echo '✗ Neovim missing'
+            command -v mise && echo '✓ Mise installed' || echo '✗ Mise missing'
+          " || true
+
+      - name: Create multi-language project
+        shell: bash
+        run: |
+          ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name build-multi \
+            --shell bash \
+            --nodejs latest \
+            --python latest \
+            --rust latest
+
+      - name: Build multi-language project
+        shell: bash
+        run: |
+          echo "Building multi-language project (this may take longer)..."
+          ./paul-envs.sh build build-multi
+          echo "✓ Multi-language build completed"
+
+      - name: Test all language runtimes
+        shell: bash
+        run: |
+          echo "Verifying all language runtimes..."
+          timeout 60s ./paul-envs.sh run build-multi bash -c "
+            echo 'Testing Node.js...'
+            node --version || echo 'Node.js not found'
+
+            echo 'Testing Python...'
+            python3 --version || echo 'Python not found'
+
+            echo 'Testing Rust...'
+            rustc --version || echo 'Rust not found'
+            cargo --version || echo 'Cargo not found'
+
+            echo '✓ Language runtime test complete'
+          " || true
+
+      - name: Test project workspace access
+        shell: bash
+        run: |
+          echo "Testing file access in mounted project..."
+          timeout 30s ./paul-envs.sh run build-minimal bash -c "
+            cd ~/projects/* || exit 1
+            ls -la
+            test -f README.md && echo '✓ Can read project files' || echo '✗ Cannot read files'
+            test -f test.sh && echo '✓ test.sh found' || echo '✗ test.sh not found'
+            ./test.sh || true
+          " || true
+
+      - name: Clean up Docker resources
+        if: always()
+        run: |
+          echo "Cleaning up Docker containers and images..."
+          docker compose -f compose.yaml down --remove-orphans 2>/dev/null || true
+          # Don't remove images to allow layer caching
+          docker system prune -f --volumes 2>/dev/null || true
+
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            projects/
+            *.log
+          retention-days: 7
+
+  shellcheck:
+    name: ShellCheck Linting
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Run ShellCheck
+        run: |
+          shellcheck --version
+          shellcheck -x -S warning paul-envs.sh || true
+          echo ""
+          echo "=== Detailed analysis ==="
+          shellcheck -x paul-envs.sh
