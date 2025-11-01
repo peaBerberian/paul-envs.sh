@@ -1121,7 +1121,14 @@ cmd_build() {
     local name=$1
 
     if [[ -z "$name" ]]; then
-        error "Usage: paul-envs.sh build <name>\nHint: Use 'paul-envs.sh list' to see available projects"
+        echo "No project name given, listing projects..."
+        echo ""
+        cmd_list
+        echo ""
+        read -r -p "Enter project name to build: " name
+        if [[ -z "$name" ]]; then
+            error "No project name provided"
+        fi
     fi
 
     validate_project_name "$name"
@@ -1150,10 +1157,17 @@ cmd_build() {
 cmd_run() {
     check_base_compose
     local name=$1
-    shift 1
+    shift 1 || true
 
     if [[ -z "$name" ]]; then
-        error "Usage: paul-envs.sh run <name>\nHint: Use 'paul-envs.sh list' to see available projects"
+        echo "No project name given, listing projects..."
+        echo ""
+        cmd_list
+        echo ""
+        read -r -p "Enter project name to build: " name
+        if [[ -z "$name" ]]; then
+            error "No project name provided"
+        fi
     fi
 
     validate_project_name "$name"
@@ -1174,7 +1188,14 @@ cmd_remove() {
     local name=$1
 
     if [[ -z "$name" ]]; then
-        error "Usage: paul-envs.sh remove <name>\nHint: Use 'paul-envs.sh list' to see available projects"
+        echo "No project name given, listing projects..."
+        echo ""
+        cmd_list
+        echo ""
+        read -r -p "Enter project name to build: " name
+        if [[ -z "$name" ]]; then
+            error "No project name provided"
+        fi
     fi
 
     validate_project_name "$name"
