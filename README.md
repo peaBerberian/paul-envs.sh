@@ -396,4 +396,6 @@ Along the mounted project, those are the only directories which are persisted.
 
 ## TODO:
 
+- arm64 support (Probably just a few Dockerfile tweaks away)
+- What's up with `mise` in config.fish on ci?
 - Add Kakoune and Helix as potential tools
