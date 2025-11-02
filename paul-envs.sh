@@ -338,6 +338,7 @@ config_init() {
     config_set "install_atuin" ""
     config_set "install_mise" ""
     config_set "install_zellij" ""
+    config_set "install_jujutsu" ""
     config_set "project_host_path" ""
 }
 
@@ -531,6 +532,7 @@ INSTALL_STARSHIP="$(config_get install_starship)"
 INSTALL_ATUIN="$(config_get install_atuin)"
 INSTALL_MISE="$(config_get install_mise)"
 INSTALL_ZELLIJ="$(config_get install_zellij)"
+INSTALL_JUJUTSU="$(config_get install_jujutsu)"
 
 # Git author and committer name used inside the container
 # Can also be empty to not set that in the container.
@@ -697,7 +699,8 @@ prompt_tools() {
        [[ -n "$(config_get install_starship)" ]] || \
        [[ -n "$(config_get install_atuin)" ]] || \
        [[ -n "$(config_get install_mise)" ]] || \
-       [[ -n "$(config_get install_zellij)" ]]; then
+       [[ -n "$(config_get install_zellij)" ]] || \
+       [[ -n "$(config_get install_jujutsu)" ]]; then
         tools_set=1
     fi
 
@@ -718,6 +721,9 @@ prompt_tools() {
         if [[ -z "$(config_get install_zellij)" ]]; then
             config_set "install_zellij" "false"
         fi
+        if [[ -z "$(config_get install_jujutsu)" ]]; then
+            config_set "install_jujutsu" "false"
+        fi
         return
     fi
 
@@ -730,6 +736,7 @@ prompt_tools() {
     echo "  3) Atuin (shell history)"
     echo "  4) Mise (version manager - required for specific language versions)"
     echo "  5) Zellij (terminal multiplexer)"
+    echo "  6) Jujutsu (Git-compatible VCS)"
     read -r -p "Choice [none]: " tool_choices
 
     # Set all to false first
@@ -738,6 +745,7 @@ prompt_tools() {
     config_set "install_atuin" "false"
     config_set "install_mise" "false"
     config_set "install_zellij" "false"
+    config_set "install_jujutsu" "false"
 
     for choice in $tool_choices; do
         case $choice in
@@ -746,6 +754,7 @@ prompt_tools() {
             3) config_set "install_atuin" "true" ;;
             4) config_set "install_mise" "true" ;;
             5) config_set "install_zellij" "true" ;;
+            6) config_set "install_jujutsu" "true" ;;
             *)
                 warn "Unknown choice: $choice (skipped)"
                 ;;
@@ -959,6 +968,10 @@ cmd_create() {
                 config_set "install_zellij" "true"
                 shift
                 ;;
+            --jujutsu)
+                config_set "install_jujutsu" "true"
+                shift
+                ;;
             --port)
                 validate_port "$2"
                 ports+=("$2")
@@ -1036,6 +1049,9 @@ cmd_create() {
         fi
         if [[ -z "$(config_get install_zellij)" ]]; then
             config_set "install_zellij" "false"
+        fi
+        if [[ -z "$(config_get install_jujutsu)" ]]; then
+            config_set "install_jujutsu" "false"
         fi
         mise_check $no_prompt
     else
@@ -1302,6 +1318,8 @@ Options for create (all optional):
                            (prompted if no tool specified)
   --zellij                 Install Zellij (terminal multiplexer)
                            (prompted if no tool specified)
+  --jujutsu                Install Jujutsu (Git-compatible VCS)
+                           (prompted if no tool specified)
   --packages "PKG1 PKG2"   Additional Ubuntu packages (prompted if not specified)
   --port PORT              Expose container port (prompted if not specified, can be repeated)
   --volume HOST:CONT[:ro]  Mount volume (prompted if not specified, can be repeated)
@@ -1334,6 +1352,7 @@ Full Configuration Example:
     --neovim \\
     --starship \\
     --zellij \\
+    --jujutsu \\
     --enable-sudo \\
     --git-name "John Doe" \\
     --git-email "john@example.com" \\

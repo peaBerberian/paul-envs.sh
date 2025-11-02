@@ -83,6 +83,7 @@ ARG INSTALL_STARSHIP=false
 ARG INSTALL_ATUIN=false
 ARG INSTALL_MISE=false
 ARG INSTALL_ZELLIJ=false
+ARG INSTALL_JUJUTSU=false
 ARG INSTALL_NODE=none
 ARG INSTALL_RUST=none
 ARG INSTALL_PYTHON=none
@@ -130,6 +131,24 @@ RUN if [ "$INSTALL_ZELLIJ" = "true" ]; then \
 # Install Starship (optional)
 RUN if [ "$INSTALL_STARSHIP" = "true" ]; then \
     curl -sS https://starship.rs/install.sh | sh -s -- -y; \
+  fi
+
+# Install Jujutsu (optional)
+RUN if [ "$INSTALL_JUJUTSU" = "true" ]; then \
+    ARCH=$(uname -m) && \
+    if [ "$ARCH" = "x86_64" ]; then \
+        JJ_ARCH="x86_64-unknown-linux-musl"; \
+    elif [ "$ARCH" = "aarch64" ]; then \
+        JJ_ARCH="aarch64-unknown-linux-musl"; \
+    else \
+        echo "Unsupported architecture: $ARCH" && exit 1; \
+    fi && \
+    JJ_VERSION=$(curl -s https://api.github.com/repos/jj-vcs/jj/releases/latest | grep -o '"tag_name": *"[^"]*"' | sed 's/"tag_name": *"//;s/"//') && \
+    curl -L "https://github.com/martinvonz/jj/releases/download/${JJ_VERSION}/jj-${JJ_VERSION}-${JJ_ARCH}.tar.gz" -o jj.tar.gz && \
+    tar -xzf jj.tar.gz && \
+    mv jj /usr/local/bin/ && \
+    chmod +x /usr/local/bin/jj && \
+    rm jj.tar.gz; \
   fi
 
 RUN if [ "$ENABLE_WASM" = "true" ]; then \
