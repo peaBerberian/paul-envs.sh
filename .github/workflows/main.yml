@@ -105,7 +105,8 @@ jobs:
             --starship \
             --atuin \
             --mise \
-            --zellij
+            --zellij \
+            --jujutsu
 
       - name: Test create with WASM and sudo
         shell: bash
@@ -195,6 +196,7 @@ jobs:
             --atuin \
             --mise \
             --zellij \
+            --jujutsu \
             --git-name "Full Test" \
             --git-email "full@test.com" \
             --packages "ripgrep fzf" \
@@ -458,6 +460,63 @@ jobs:
             test -f README.md && echo '✓ Can read project files' || echo '✗ Cannot read files'
             test -f test.sh && echo '✓ test.sh found' || echo '✗ test.sh not found'
             ./test.sh || true
+          " || true
+
+      - name: Create full build
+        shell: bash
+        run: |
+          ./paul-envs.sh create ./test-project \
+            --no-prompt \
+            --name full-build \
+            --uid 1500 \
+            --gid 1500 \
+            --username kitchen \
+            --shell fish \
+            --nodejs 20.10.0 \
+            --rust 1.75.0 \
+            --python 3.12.0 \
+            --go 1.21.5 \
+            --enable-wasm \
+            --enable-sudo \
+            --neovim \
+            --starship \
+            --atuin \
+            --mise \
+            --zellij \
+            --jujutsu \
+            --git-name "Kitchen Sink" \
+            --git-email "sink@kitchen.com" \
+            --packages "ripgrep fzf bat htop" \
+            --port 3000 \
+            --port 8080
+
+      - name: Build full build
+        shell: bash
+        run: |
+          echo "Building full build..."
+          ./paul-envs.sh build full-build
+          echo "✓ Full build completed"
+
+      - name: Test full build
+        shell: bash
+        run: |
+          echo "Verifying tools are installed..."
+          timeout 30s ./paul-envs.sh run full-build bash -c "
+            command -v git && echo '✓ Git installed' || echo '✗ Git missing'
+            command -v bash && echo '✓ Bash installed' || echo '✗ Bash missing'
+            command -v fish && echo '✓ Fish installed' || echo '✗ Fish missing'
+            command -v node && echo '✓ Node.js installed' || echo '✗ Node.js missing'
+            command -v cargo && echo '✓ Rust installed' || echo '✗ Rust missing'
+            command -v python && echo '✓ Python installed' || echo '✗ Python missing'
+            command -v go && echo '✓ Go installed' || echo '✗ Go missing'
+            command -v wasm-opt && echo '✓ Binaryen installed' || echo '✗ Binaryen missing'
+            command -v sudo && echo '✓ sudo installed' || echo '✗ sudo missing'
+            command -v nvim && echo '✓ Neovim installed' || echo '✗ Neovim missing'
+            command -v starship && echo '✓ Starship installed' || echo '✗ Starship missing'
+            command -v atuin && echo '✓ Atuin installed' || echo '✗ Atuin missing'
+            command -v mise && echo '✓ Mise installed' || echo '✗ Mise missing'
+            command -v zellij && echo '✓ Zellij installed' || echo '✗ Zellij missing'
+            command -v jujutsu && echo '✓ Jujutsu installed' || echo '✗ Jujutsu missing'
           " || true
 
       - name: Clean up Docker resources

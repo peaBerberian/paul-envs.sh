@@ -45,6 +45,7 @@ _paulenvs() {
                         '--atuin[Install latest Atuin]' \
                         '--mise[Install latest Mise]' \
                         '--zellij[Install latest Zellij]' \
+                        '--jujutsu[Install latest Jujutsu]' \
                         '*--port[Expose port]:port:' \
                         '*--volume[Add volume]:volume:_files'
                     ;;

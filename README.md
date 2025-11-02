@@ -275,7 +275,7 @@ and performs the operations it advertises.
 
 The `Dockerfile` sets a simple Ubuntu LTS environment with a shell of your
 preference (either `bash` as default or `zsh` or `fish`) and optional popular
-CLI tools (`neovim`, `starship`, `atuin`, `zellij` and `mise`).
+CLI tools (`neovim`, `starship`, `atuin`, `zellij`, `jujutsu` and `mise`).
 
 It also copies the content of the `configs` directory inside of that container
 and sets-up `$HOME/.container-cache` and `$HOME/.container-local` directories
@@ -396,5 +396,4 @@ Along the mounted project, those are the only directories which are persisted.
 
 ## TODO:
 
-- Add jujutsu
 - Add Kakoune and Helix as potential tools

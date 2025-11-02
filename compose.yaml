@@ -60,6 +60,7 @@ services:
         INSTALL_ATUIN: ${INSTALL_ATUIN:-false}
         INSTALL_MISE: ${INSTALL_MISE:-false}
         INSTALL_ZELLIJ: ${INSTALL_ZELLIJ:-false}
+        INSTALL_JUJUTSU: ${INSTALL_JUJUTSU:-false}
 
         # Whether to install Node.js, and the version wanted.
         # Note that a WebAssembly target is also automatically ready.

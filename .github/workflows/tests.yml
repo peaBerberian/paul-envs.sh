@@ -250,7 +250,8 @@ jobs:
             --starship \
             --atuin \
             --mise \
-            --zellij
+            --zellij \
+            --jujutsu
 
           # Verify all tools are enabled
           grep 'INSTALL_NEOVIM="true"' projects/test-all-tools/.env
@@ -258,6 +259,7 @@ jobs:
           grep 'INSTALL_ATUIN="true"' projects/test-all-tools/.env
           grep 'INSTALL_MISE="true"' projects/test-all-tools/.env
           grep 'INSTALL_ZELLIJ="true"' projects/test-all-tools/.env
+          grep 'INSTALL_JUJUTSU="true"' projects/test-all-tools/.env
 
       - name: Test multiple ports
         shell: bash
@@ -315,6 +317,7 @@ jobs:
             --atuin \
             --mise \
             --zellij \
+            --jujutsu \
             --git-name "Kitchen Sink" \
             --git-email "sink@kitchen.com" \
             --packages "ripgrep fzf bat htop" \
