@@ -3,8 +3,14 @@ name: Main
 on:
   push:
     branches: [ master ]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
   pull_request:
     branches: [ master ]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
 
 jobs:
   test:
@@ -304,10 +310,19 @@ jobs:
           path: projects/
           retention-days: 7
 
-  # Build and run tests (requires Docker and more time)
   build-and-run:
-    name: Build & Run Tests
-    runs-on: ubuntu-latest
+    name: Build & Run on ${{ matrix.os }} (${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: amd64
+            platform: linux/amd64
+          - os: ubuntu-latest
+            arch: arm64
+            platform: linux/arm64
 
     steps:
       - name: Checkout code
@@ -315,6 +330,27 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          platforms: ${{ matrix.platform }}
+
+      - name: Set up QEMU (for cross-platform builds)
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: ${{ matrix.platform }}
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-${{ matrix.arch }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.arch }}-buildx-
+
+      - name: Verify Docker installation
+        shell: bash
+        run: |
+          docker --version
+          docker compose version
 
       - name: Create test projects directory
         shell: bash
@@ -347,23 +383,38 @@ jobs:
 
       - name: Build minimal project
         shell: bash
+        env:
+          DOCKER_DEFAULT_PLATFORM: ${{ matrix.platform }}
         run: |
-          echo "Building minimal project..."
+          echo "Building minimal project for ${{ matrix.platform }}..."
           ./paul-envs.sh build build-minimal
           echo "✓ Build completed successfully"
+
+          echo "Verifying built image architecture..."
+          ACTUAL_ARCH=$(docker images -q | head -n 1 | xargs docker image inspect --format '{{.Architecture}}')
+          echo "Built architecture: $ACTUAL_ARCH"
+          EXPECTED_ARCH="${{ matrix.arch }}"
+          if [ "$ACTUAL_ARCH" != "$EXPECTED_ARCH" ]; then
+            echo "ERROR: Expected $EXPECTED_ARCH but got $ACTUAL_ARCH"
+            exit 1
+          fi
 
       - name: Run minimal project (basic test)
         shell: bash
         run: |
           echo "Running container to verify it starts..."
-          timeout 30s ./paul-envs.sh run build-minimal bash -c "echo 'Container started successfully' && whoami && pwd" || {
-            if [ $? -eq 124 ]; then
-              echo "Command timed out (expected for interactive sessions)"
-            else
-              echo "ERROR: Container failed to start"
-              exit 1
-            fi
-          }
+          set +e
+          timeout 30s ./paul-envs.sh run build-minimal bash -c "echo 'Container started successfully' && whoami && pwd && uname -m"
+          EXIT_CODE=$?
+          set -e
+
+          if [ $EXIT_CODE -eq 124 ]; then
+            echo "Command timed out (expected for interactive sessions)"
+          elif [ $EXIT_CODE -ne 0 ]; then
+            echo "ERROR: Container failed to start with exit code $EXIT_CODE"
+            exit 1
+          fi
+          echo "✓ Minimal container test passed"
 
       - name: Create project with Node.js
         shell: bash
@@ -376,6 +427,8 @@ jobs:
 
       - name: Build Node.js project
         shell: bash
+        env:
+          DOCKER_DEFAULT_PLATFORM: ${{ matrix.platform }}
         run: |
           echo "Building Node.js project..."
           ./paul-envs.sh build build-node
@@ -385,82 +438,103 @@ jobs:
         shell: bash
         run: |
           echo "Verifying Node.js is installed..."
-          timeout 30s ./paul-envs.sh run build-node bash -c "node --version && npm --version" || true
+          set +e
+          timeout 30s ./paul-envs.sh run build-node bash -c "node --version && npm --version"
+          EXIT_CODE=$?
+          set -e
 
-      - name: Create project with tools and specific Rust version
-        shell: bash
-        run: |
-          ./paul-envs.sh create ./test-project \
-            --no-prompt \
-            --name build-tools \
-            --shell bash \
-            --rust 1.91.0 \
-            --neovim \
-            --mise
-
-      - name: Build tools project
-        shell: bash
-        run: |
-          echo "Building project with tools..."
-          ./paul-envs.sh build build-tools
-          echo "✓ Tools build completed"
-
-      - name: Test tool installations
-        shell: bash
-        run: |
-          echo "Verifying tools are installed..."
-          timeout 30s ./paul-envs.sh run build-tools bash -c "
-            command -v nvim && echo '✓ Neovim installed' || echo '✗ Neovim missing'
-            command -v mise && echo '✓ Mise installed' || echo '✗ Mise missing'
-          " || true
-
-      - name: Create multi-language project
-        shell: bash
-        run: |
-          ./paul-envs.sh create ./test-project \
-            --no-prompt \
-            --name build-multi \
-            --shell bash \
-            --nodejs latest \
-            --python latest \
-            --rust latest
-
-      - name: Build multi-language project
-        shell: bash
-        run: |
-          echo "Building multi-language project (this may take longer)..."
-          ./paul-envs.sh build build-multi
-          echo "✓ Multi-language build completed"
-
-      - name: Test all language runtimes
-        shell: bash
-        run: |
-          echo "Verifying all language runtimes..."
-          timeout 60s ./paul-envs.sh run build-multi bash -c "
-            echo 'Testing Node.js...'
-            node --version || echo 'Node.js not found'
-
-            echo 'Testing Python...'
-            python3 --version || echo 'Python not found'
-
-            echo 'Testing Rust...'
-            rustc --version || echo 'Rust not found'
-            cargo --version || echo 'Cargo not found'
-
-            echo '✓ Language runtime test complete'
-          " || true
+          if [ $EXIT_CODE -eq 124 ]; then
+            echo "Command timed out"
+            exit 1
+          elif [ $EXIT_CODE -ne 0 ]; then
+            echo "ERROR: Node.js verification failed with exit code $EXIT_CODE"
+            exit 1
+          fi
+          echo "✓ Node.js verification passed"
 
       - name: Test project workspace access
         shell: bash
         run: |
           echo "Testing file access in mounted project..."
+          set +e
           timeout 30s ./paul-envs.sh run build-minimal bash -c "
             cd ~/projects/* || exit 1
             ls -la
-            test -f README.md && echo '✓ Can read project files' || echo '✗ Cannot read files'
-            test -f test.sh && echo '✓ test.sh found' || echo '✗ test.sh not found'
-            ./test.sh || true
-          " || true
+            test -f README.md && echo '✓ Can read project files' || { echo '✗ Cannot read files'; exit 1; }
+            test -f test.sh && echo '✓ test.sh found' || { echo '✗ test.sh not found'; exit 1; }
+            ./test.sh || exit 1
+          "
+          EXIT_CODE=$?
+          set -e
+
+          if [ $EXIT_CODE -eq 124 ]; then
+            echo "Command timed out"
+            exit 1
+          elif [ $EXIT_CODE -ne 0 ]; then
+            echo "ERROR: Workspace access test failed with exit code $EXIT_CODE"
+            exit 1
+          fi
+          echo "✓ Workspace access test passed"
+
+      - name: Clean up Docker resources
+        if: always()
+        run: |
+          echo "Cleaning up Docker containers and images..."
+          docker compose -f compose.yaml down --remove-orphans 2>/dev/null || true
+          docker system prune -f --volumes 2>/dev/null || true
+
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs-${{ matrix.os }}-${{ matrix.arch }}
+          path: |
+            projects/
+            *.log
+          retention-days: 7
+
+  full-build:
+    name: Full Build on ${{ matrix.os }} (${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: amd64
+            platform: linux/amd64
+          - os: ubuntu-latest
+            arch: arm64
+            platform: linux/arm64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          platforms: ${{ matrix.platform }}
+
+      - name: Set up QEMU (for cross-platform builds on Linux)
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: ${{ matrix.platform }}
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-${{ matrix.arch }}-buildx-full-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.arch }}-buildx-full-
+            ${{ runner.os }}-${{ matrix.arch }}-buildx-
+
+      - name: Create test project
+        shell: bash
+        run: |
+          mkdir -p test-project
+          echo "# Test Project" > test-project/README.md
 
       - name: Create full build
         shell: bash
@@ -492,46 +566,166 @@ jobs:
 
       - name: Build full build
         shell: bash
+        env:
+          DOCKER_DEFAULT_PLATFORM: ${{ matrix.platform }}
         run: |
-          echo "Building full build..."
+          echo "Building full build for ${{ matrix.platform }}..."
           ./paul-envs.sh build full-build
           echo "✓ Full build completed"
+
+          echo "Verifying built image architecture..."
+          ACTUAL_ARCH=$(docker images -q | head -n 1 | xargs docker image inspect --format '{{.Architecture}}')
+          echo "Built architecture: $ACTUAL_ARCH"
+          EXPECTED_ARCH="${{ matrix.arch }}"
+          if [ "$ACTUAL_ARCH" != "$EXPECTED_ARCH" ]; then
+            echo "ERROR: Expected $EXPECTED_ARCH but got $ACTUAL_ARCH"
+            exit 1
+          fi
 
       - name: Test full build
         shell: bash
         run: |
-          echo "Verifying tools are installed..."
-          timeout 30s ./paul-envs.sh run full-build bash -c "
-            command -v git && echo '✓ Git installed' || echo '✗ Git missing'
-            command -v bash && echo '✓ Bash installed' || echo '✗ Bash missing'
-            command -v fish && echo '✓ Fish installed' || echo '✗ Fish missing'
-            command -v node && echo '✓ Node.js installed' || echo '✗ Node.js missing'
-            command -v cargo && echo '✓ Rust installed' || echo '✗ Rust missing'
-            command -v python && echo '✓ Python installed' || echo '✗ Python missing'
-            command -v go && echo '✓ Go installed' || echo '✗ Go missing'
-            command -v wasm-opt && echo '✓ Binaryen installed' || echo '✗ Binaryen missing'
-            command -v sudo && echo '✓ sudo installed' || echo '✗ sudo missing'
-            command -v nvim && echo '✓ Neovim installed' || echo '✗ Neovim missing'
-            command -v starship && echo '✓ Starship installed' || echo '✗ Starship missing'
-            command -v atuin && echo '✓ Atuin installed' || echo '✗ Atuin missing'
-            command -v mise && echo '✓ Mise installed' || echo '✗ Mise missing'
-            command -v zellij && echo '✓ Zellij installed' || echo '✗ Zellij missing'
-            command -v jujutsu && echo '✓ Jujutsu installed' || echo '✗ Jujutsu missing'
-          " || true
+          echo "Verifying tools are installed on ${{ matrix.arch }}..."
+
+          # First, test that fish shell loads without errors by capturing stderr
+          echo "Testing fish shell initialization..."
+          set +e
+          FISH_OUTPUT=$(timeout 10s ./paul-envs.sh run full-build fish -c 'echo "Fish shell loaded successfully"' 2>&1)
+          FISH_EXIT=$?
+          set -e
+
+          echo "$FISH_OUTPUT"
+
+          # Check for fish errors in output
+          if echo "$FISH_OUTPUT" | grep -q "Unknown command"; then
+            echo "ERROR: Fish shell has unknown command errors during initialization"
+            exit 1
+          fi
+
+          if echo "$FISH_OUTPUT" | grep -qi "error"; then
+            echo "ERROR: Fish shell encountered errors during initialization"
+            exit 1
+          fi
+
+          if [ $FISH_EXIT -ne 0 ] && [ $FISH_EXIT -ne 124 ]; then
+            echo "ERROR: Fish shell failed to initialize (exit code: $FISH_EXIT)"
+            exit 1
+          fi
+
+          echo "Running tool verification tests..."
+          set +e
+          timeout 60s ./paul-envs.sh run full-build bash -c '
+            echo "Architecture: "
+            uname -m
+            echo ""
+            echo "Testing installations..."
+            FAILED=0
+            command -v git && echo "✓ Git installed" || { echo "✗ Git missing"; FAILED=1; }
+            command -v bash && echo "✓ Bash installed" || { echo "✗ Bash missing"; FAILED=1; }
+            command -v fish && echo "✓ Fish installed" || { echo "✗ Fish missing"; FAILED=1; }
+            command -v node && echo "✓ Node.js installed" || { echo "✗ Node.js missing"; FAILED=1; }
+            command -v cargo && echo "✓ Cargo installed" || { echo "✗ Cargo missing"; FAILED=1; }
+            command -v rustc && echo "✓ rustc installed" || { echo "✗ rustc missing"; FAILED=1; }
+            command -v python && echo "✓ Python installed" || { echo "✗ Python missing"; FAILED=1; }
+            command -v go && echo "✓ Go installed" || { echo "✗ Go missing"; FAILED=1; }
+            command -v wasm-opt && echo "✓ Binaryen installed" || { echo "✗ Binaryen missing"; FAILED=1; }
+            command -v sudo && echo "✓ sudo installed" || { echo "✗ sudo missing"; FAILED=1; }
+            command -v nvim && echo "✓ Neovim installed" || { echo "✗ Neovim missing"; FAILED=1; }
+            command -v starship && echo "✓ Starship installed" || { echo "✗ Starship missing"; FAILED=1; }
+            command -v atuin && echo "✓ Atuin installed" || { echo "✗ Atuin missing"; FAILED=1; }
+            command -v mise && echo "✓ Mise installed" || { echo "✗ Mise missing"; FAILED=1; }
+            command -v zellij && echo "✓ Zellij installed" || { echo "✗ Zellij missing"; FAILED=1; }
+            command -v jujutsu && echo "✓ Jujutsu installed" || { echo "✗ Jujutsu missing"; FAILED=1; }
+            echo ""
+            echo "Testing versions..."
+            node --version || { echo "Node version check failed"; FAILED=1; }
+            rustc --version || { echo "Rust version check failed"; FAILED=1; }
+            python --version || { echo "Python version check failed"; FAILED=1; }
+            go version || { echo "Go version check failed"; FAILED=1; }
+            echo ""
+            echo "Testing mise activation in shell..."
+            if command -v git >/dev/null 2>&1; then
+              git --version || { echo "Git version check failed"; FAILED=1; }
+            fi
+            if command -v bash >/dev/null 2>&1; then
+              bash --version || { echo "Bash version check failed"; FAILED=1; }
+            fi
+            if command -v fish >/dev/null 2>&1; then
+              fish --version || { echo "fish version check failed"; FAILED=1; }
+            fi
+            if command -v node >/dev/null 2>&1; then
+              node --version || { echo "Node.js version check failed"; FAILED=1; }
+            fi
+            if command -v cargo >/dev/null 2>&1; then
+              cargo --version || { echo "Cargo version check failed"; FAILED=1; }
+            fi
+            if command -v rustc >/dev/null 2>&1; then
+              rustc --version || { echo "rustc version check failed"; FAILED=1; }
+            fi
+            if command -v python >/dev/null 2>&1; then
+              python --version || { echo "Python version check failed"; FAILED=1; }
+            fi
+            if command -v go >/dev/null 2>&1; then
+              go version || { echo "Go version check failed"; FAILED=1; }
+            fi
+            if command -v wasm-opt >/dev/null 2>&1; then
+              wasm-opt --version || { echo "Binaryen version check failed"; FAILED=1; }
+            fi
+            if command -v sudo >/dev/null 2>&1; then
+              sudo --version || { echo "sudo version check failed"; FAILED=1; }
+            fi
+            if command -v nvim >/dev/null 2>&1; then
+              nvim --version || { echo "Neovim version check failed"; FAILED=1; }
+            fi
+            if command -v starship >/dev/null 2>&1; then
+              starship --version || { echo "Starship version check failed"; FAILED=1; }
+            fi
+            if command -v atuin >/dev/null 2>&1; then
+              atuin --version || { echo "Atuin version check failed"; FAILED=1; }
+            fi
+            if command -v mise >/dev/null 2>&1; then
+              mise version || { echo "Mise version check failed"; FAILED=1; }
+            fi
+            if command -v zellij >/dev/null 2>&1; then
+              zellij --version || { echo "Zellij version check failed"; FAILED=1; }
+            fi
+            if command -v jj >/dev/null 2>&1; then
+              jj --version || { echo "Jujutsu version check failed"; FAILED=1; }
+            fi
+            echo ""
+            if [ $FAILED -eq 1 ]; then
+              echo "❌ Some tools are missing or failed to run"
+              exit 1
+            else
+              echo "✅ All tools verified successfully"
+            fi
+          '
+          EXIT_CODE=$?
+          set -e
+
+          # Check if it was a timeout (exit code 124)
+          if [ $EXIT_CODE -eq 124 ]; then
+            echo "ERROR: Test timed out after 60 seconds"
+            exit 1
+          elif [ $EXIT_CODE -ne 0 ]; then
+            echo "ERROR: Container failed with exit code $EXIT_CODE"
+            exit 1
+          fi
+
+          echo "✓ Full build test passed"
 
       - name: Clean up Docker resources
         if: always()
         run: |
           echo "Cleaning up Docker containers and images..."
           docker compose -f compose.yaml down --remove-orphans 2>/dev/null || true
-          # Don't remove images to allow layer caching
           docker system prune -f --volumes 2>/dev/null || true
 
       - name: Upload build logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: build-logs
+          name: full-build-logs-${{ matrix.os }}-${{ matrix.arch }}
           path: |
             projects/
             *.log
