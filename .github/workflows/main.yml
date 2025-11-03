@@ -613,102 +613,104 @@ jobs:
           fi
 
           echo "Running tool verification tests..."
+
+          # Capture ALL output from container
           set +e
-          timeout 60s ./paul-envs.sh run full-build bash -c '
-            echo "Architecture: "
-            uname -m
+          CONTAINER_OUTPUT=$(timeout 60s ./paul-envs.sh run full-build bash -l -c '
+            set -e  # Exit immediately on any error
+            echo "Architecture: $(uname -m)"
             echo ""
             echo "Testing installations..."
+
+            # Function to test command existence and version
+            test_tool() {
+              local cmd=$1
+              local name=$2
+              local version_flag=${3:---version}
+
+              if ! command -v "$cmd" >/dev/null 2>&1; then
+                echo "✗ $name missing"
+                return 1
+              fi
+
+              echo "✓ $name installed"
+
+              # Test version flag
+              if ! OUTPUT=$("$cmd" $version_flag 2>&1); then
+                echo "  ⚠ $name version check FAILED with flag: $version_flag"
+                echo "  Output: $OUTPUT"
+                return 1
+              fi
+
+              return 0
+            }
+
+            # Track failures
             FAILED=0
-            command -v git && echo "✓ Git installed" || { echo "✗ Git missing"; FAILED=1; }
-            command -v bash && echo "✓ Bash installed" || { echo "✗ Bash missing"; FAILED=1; }
-            command -v fish && echo "✓ Fish installed" || { echo "✗ Fish missing"; FAILED=1; }
-            command -v node && echo "✓ Node.js installed" || { echo "✗ Node.js missing"; FAILED=1; }
-            command -v cargo && echo "✓ Cargo installed" || { echo "✗ Cargo missing"; FAILED=1; }
-            command -v rustc && echo "✓ rustc installed" || { echo "✗ rustc missing"; FAILED=1; }
-            command -v python && echo "✓ Python installed" || { echo "✗ Python missing"; FAILED=1; }
-            command -v go && echo "✓ Go installed" || { echo "✗ Go missing"; FAILED=1; }
-            command -v wasm-opt && echo "✓ Binaryen installed" || { echo "✗ Binaryen missing"; FAILED=1; }
-            command -v sudo && echo "✓ sudo installed" || { echo "✗ sudo missing"; FAILED=1; }
-            command -v nvim && echo "✓ Neovim installed" || { echo "✗ Neovim missing"; FAILED=1; }
-            command -v starship && echo "✓ Starship installed" || { echo "✗ Starship missing"; FAILED=1; }
-            command -v atuin && echo "✓ Atuin installed" || { echo "✗ Atuin missing"; FAILED=1; }
-            command -v mise && echo "✓ Mise installed" || { echo "✗ Mise missing"; FAILED=1; }
-            command -v zellij && echo "✓ Zellij installed" || { echo "✗ Zellij missing"; FAILED=1; }
-            command -v jujutsu && echo "✓ Jujutsu installed" || { echo "✗ Jujutsu missing"; FAILED=1; }
+
+            # Test each tool
+            test_tool git "Git" || FAILED=1
+            test_tool bash "Bash" || FAILED=1
+            test_tool fish "Fish" || FAILED=1
+            test_tool node "Node.js" || FAILED=1
+            test_tool cargo "Cargo" || FAILED=1
+            test_tool rustc "rustc" || FAILED=1
+            test_tool python "Python" || FAILED=1
+            test_tool go "Go" version || FAILED=1  # go uses "version" not "--version"
+            test_tool wasm-opt "Binaryen" || FAILED=1
+            test_tool sudo "sudo" || FAILED=1
+            test_tool nvim "Neovim" || FAILED=1
+            test_tool starship "Starship" || FAILED=1
+            test_tool atuin "Atuin" || FAILED=1
+            test_tool mise "Mise" version || FAILED=1  # mise uses "version" not "--version"
+            test_tool zellij "Zellij" || FAILED=1
+            test_tool jj "Jujutsu" || FAILED=1
+
             echo ""
-            echo "Testing versions..."
-            node --version || { echo "Node version check failed"; FAILED=1; }
-            rustc --version || { echo "Rust version check failed"; FAILED=1; }
-            python --version || { echo "Python version check failed"; FAILED=1; }
-            go version || { echo "Go version check failed"; FAILED=1; }
-            echo ""
-            echo "Testing mise activation in shell..."
-            if command -v git >/dev/null 2>&1; then
-              git --version || { echo "Git version check failed"; FAILED=1; }
-            fi
-            if command -v bash >/dev/null 2>&1; then
-              bash --version || { echo "Bash version check failed"; FAILED=1; }
-            fi
-            if command -v fish >/dev/null 2>&1; then
-              fish --version || { echo "fish version check failed"; FAILED=1; }
-            fi
-            if command -v node >/dev/null 2>&1; then
-              node --version || { echo "Node.js version check failed"; FAILED=1; }
-            fi
-            if command -v cargo >/dev/null 2>&1; then
-              cargo --version || { echo "Cargo version check failed"; FAILED=1; }
-            fi
-            if command -v rustc >/dev/null 2>&1; then
-              rustc --version || { echo "rustc version check failed"; FAILED=1; }
-            fi
-            if command -v python >/dev/null 2>&1; then
-              python --version || { echo "Python version check failed"; FAILED=1; }
-            fi
-            if command -v go >/dev/null 2>&1; then
-              go version || { echo "Go version check failed"; FAILED=1; }
-            fi
-            if command -v wasm-opt >/dev/null 2>&1; then
-              wasm-opt --version || { echo "Binaryen version check failed"; FAILED=1; }
-            fi
-            if command -v sudo >/dev/null 2>&1; then
-              sudo --version || { echo "sudo version check failed"; FAILED=1; }
-            fi
-            if command -v nvim >/dev/null 2>&1; then
-              nvim --version || { echo "Neovim version check failed"; FAILED=1; }
-            fi
-            if command -v starship >/dev/null 2>&1; then
-              starship --version || { echo "Starship version check failed"; FAILED=1; }
-            fi
-            if command -v atuin >/dev/null 2>&1; then
-              atuin --version || { echo "Atuin version check failed"; FAILED=1; }
-            fi
-            if command -v mise >/dev/null 2>&1; then
-              mise version || { echo "Mise version check failed"; FAILED=1; }
-            fi
-            if command -v zellij >/dev/null 2>&1; then
-              zellij --version || { echo "Zellij version check failed"; FAILED=1; }
-            fi
-            if command -v jj >/dev/null 2>&1; then
-              jj --version || { echo "Jujutsu version check failed"; FAILED=1; }
-            fi
+            echo "Testing version outputs (verbose)..."
+            node --version
+            rustc --version
+            python --version
+            go version
+
             echo ""
             if [ $FAILED -eq 1 ]; then
-              echo "❌ Some tools are missing or failed to run"
+              echo "TEST_RESULT:FAILED"
               exit 1
             else
-              echo "✅ All tools verified successfully"
+              echo "TEST_RESULT:PASSED"
+              exit 0
             fi
-          '
+          ' 2>&1)
           EXIT_CODE=$?
           set -e
+
+          echo "=== Container Output ==="
+          echo "$CONTAINER_OUTPUT"
+          echo "=== End Container Output ==="
+          echo ""
+          echo "Container exit code: $EXIT_CODE"
 
           # Check if it was a timeout (exit code 124)
           if [ $EXIT_CODE -eq 124 ]; then
             echo "ERROR: Test timed out after 60 seconds"
             exit 1
-          elif [ $EXIT_CODE -ne 0 ]; then
-            echo "ERROR: Container failed with exit code $EXIT_CODE"
+          fi
+
+          # Check the output for our test result marker
+          if echo "$CONTAINER_OUTPUT" | grep -q "TEST_RESULT:FAILED"; then
+            echo "ERROR: Container tests reported FAILURE"
+            exit 1
+          fi
+
+          if ! echo "$CONTAINER_OUTPUT" | grep -q "TEST_RESULT:PASSED"; then
+            echo "ERROR: Container tests did not complete successfully (no PASSED marker found)"
+            exit 1
+          fi
+
+          # Also check exit code as backup
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "ERROR: Container exited with non-zero code: $EXIT_CODE"
             exit 1
           fi
 

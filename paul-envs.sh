@@ -1180,7 +1180,7 @@ cmd_run() {
         echo ""
         cmd_list
         echo ""
-        read -r -p "Enter project name to build: " name
+        read -r -p "Enter project name to run: " name
         if [[ -z "$name" ]]; then
             error "No project name provided"
         fi
@@ -1197,7 +1197,14 @@ cmd_run() {
     fi
 
     export COMPOSE_PROJECT_NAME="paulenv-$name"
-    docker compose -f "$BASE_COMPOSE" -f "$compose_file" --env-file "$env_file" run --rm paulenv
+
+    # If additional arguments are provided, pass them to docker compose run
+    # Otherwise, start an interactive shell (default behavior)
+    if [[ $# -eq 0 ]]; then
+        docker compose -f "$BASE_COMPOSE" -f "$compose_file" --env-file "$env_file" run --rm paulenv
+    else
+        docker compose -f "$BASE_COMPOSE" -f "$compose_file" --env-file "$env_file" run --rm paulenv "$@"
+    fi
 }
 
 cmd_remove() {
