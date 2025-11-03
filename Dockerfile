@@ -220,13 +220,13 @@ RUN if [ "$INSTALL_ATUIN" = "true" ]; then \
 # Install `mise` + languages (optional)
 RUN if [ "$INSTALL_MISE" = "true" ]; then \
     curl https://mise.jdx.dev/install.sh | sh && \
-		printf "\nexport PATH=\"\$HOME/.local/bin:\$PATH\"\n" >> /home/${USERNAME}/.bashrc && \
+    printf "\nexport PATH=\"\$HOME/.local/bin:\$PATH\"\n" >> /home/${USERNAME}/.bashrc && \
     printf "\n# Initialize mise\neval \"\$(mise activate bash)\"\n" >> /home/${USERNAME}/.bashrc && \
     if [ "$USER_SHELL" = "fish" ]; then \
       printf "\nset -gx PATH \$HOME/.local/bin \$PATH\n" >> /home/${USERNAME}/.config/fish/config.fish; \
       printf "\n# Initialize mise\nmise activate fish | source\n" >> /home/${USERNAME}/.config/fish/config.fish; \
     elif [ "$USER_SHELL" = "zsh" ]; then \
-		  printf "\nexport PATH=\"\$HOME/.local/bin:\$PATH\"\n" >> /home/${USERNAME}/.zshrc; \
+      printf "\nexport PATH=\"\$HOME/.local/bin:\$PATH\"\n" >> /home/${USERNAME}/.zshrc; \
       printf "\n# Initialize mise\neval \"\$(mise activate zsh)\"\n" >> /home/${USERNAME}/.zshrc; \
     fi; \
     if [ -n "$INSTALL_NODE" ] && [ "$INSTALL_NODE" != "none" ]; then \
@@ -376,11 +376,17 @@ RUN if [ "$INSTALL_NEOVIM" = "true" ] && [ -d /home/${USERNAME}/.config/nvim ]; 
 # Set git name/e-mail according to what has been configured
 # **AFTER** the copy to ensure we overwrite what has potentially been copied
 RUN if [ -n "$GIT_AUTHOR_NAME" ]; then \
-    git config --global user.name "$GIT_AUTHOR_NAME"; \
+      git config --global user.name "$GIT_AUTHOR_NAME"; \
+      if [ "$INSTALL_JUJUTSU" = "true" ]; then \
+          jj config set --user user.name "$GIT_AUTHOR_NAME"; \
+      fi; \
   fi
 
 RUN if [ -n "$GIT_AUTHOR_EMAIL" ]; then \
-    git config --global user.email "$GIT_AUTHOR_EMAIL"; \
+      git config --global user.email "$GIT_AUTHOR_EMAIL"; \
+      if [ "$INSTALL_JUJUTSU" = "true" ]; then \
+          jj config set --user user.email "$GIT_AUTHOR_EMAIL"; \
+      fi; \
   fi
 
 #############################################

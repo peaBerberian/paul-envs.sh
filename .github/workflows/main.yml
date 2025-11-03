@@ -619,33 +619,31 @@ jobs:
           echo "Running tool verification tests with BASH"
           echo "=========================================="
 
-          # Capture ALL output from container
-          set +e
-          CONTAINER_OUTPUT=$(timeout 60s ./paul-envs.sh run full-build bash -c '
+          EXPECTED_ARCH="${{ matrix.arch }}"
+          CONTAINER_OUTPUT=$(timeout 60s ./paul-envs.sh run full-build bash -c "
             source ~/.bashrc
-            set -e
-            echo "Shell: bash"
-            echo "Architecture: $(uname -m)"
-            echo ""
-            echo "Testing installations..."
+            echo \"Shell: bash\"
+            echo \"Architecture: \$(uname -m)\"
+            echo \"\"
+            echo \"Testing installations...\"
 
             # Function to test command existence and version
             test_tool() {
-              local cmd=$1
-              local name=$2
-              local version_flag=${3:---version}
+              local cmd=\$1
+              local name=\$2
+              local version_flag=\${3:---version}
 
-              if ! command -v "$cmd" >/dev/null 2>&1; then
-                echo "✗ $name missing"
+              if ! command -v \"\$cmd\" >/dev/null 2>&1; then
+                echo \"✗ \$name missing\"
                 return 1
               fi
 
-              echo "✓ $name installed"
+              echo \"✓ \$name installed\"
 
               # Test version flag
-              if ! OUTPUT=$("$cmd" $version_flag 2>&1); then
-                echo "  ⚠ $name version check FAILED with flag: $version_flag"
-                echo "  Output: $OUTPUT"
+              if ! OUTPUT=\$(\"\$cmd\" \$version_flag 2>&1); then
+                echo \"  ⚠ \$name version check FAILED with flag: \$version_flag\"
+                echo \"  Output: \$OUTPUT\"
                 return 1
               fi
 
@@ -656,32 +654,79 @@ jobs:
             FAILED=0
 
             # Test each tool
-            test_tool git "Git" || FAILED=1
-            test_tool bash "Bash" || FAILED=1
-            test_tool fish "Fish" || FAILED=1
-            test_tool node "Node.js" || FAILED=1
-            test_tool cargo "Cargo" || FAILED=1
-            test_tool rustc "rustc" || FAILED=1
-            test_tool python "Python" || FAILED=1
-            test_tool go "Go" version || FAILED=1  # go uses "version" not "--version"
-            test_tool wasm-opt "Binaryen" || FAILED=1
-            test_tool sudo "sudo" || FAILED=1
-            test_tool nvim "Neovim" || FAILED=1
-            test_tool starship "Starship" || FAILED=1
-            test_tool atuin "Atuin" || FAILED=1
-            test_tool mise "Mise" version || FAILED=1  # mise uses "version" not "--version"
-            test_tool zellij "Zellij" || FAILED=1
-            test_tool jj "Jujutsu" || FAILED=1
+            test_tool git \"Git\" || FAILED=1
+            test_tool bash \"Bash\" || FAILED=1
+            test_tool fish \"Fish\" || FAILED=1
+            test_tool node \"Node.js\" || FAILED=1
+            test_tool cargo \"Cargo\" || FAILED=1
+            test_tool rustc \"rustc\" || FAILED=1
+            test_tool python \"Python\" || FAILED=1
+            test_tool go \"Go\" version || FAILED=1
+            test_tool wasm-opt \"Binaryen\" || FAILED=1
+            test_tool sudo \"sudo\" || FAILED=1
+            test_tool nvim \"Neovim\" || FAILED=1
+            test_tool starship \"Starship\" || FAILED=1
+            test_tool atuin \"Atuin\" || FAILED=1
+            test_tool mise \"Mise\" version || FAILED=1
+            test_tool zellij \"Zellij\" || FAILED=1
+            test_tool jj \"Jujutsu\" || FAILED=1
 
-            echo ""
-            if [ $FAILED -eq 1 ]; then
-              echo "TEST_RESULT:FAILED"
+            if [ \"$EXPECTED_ARCH\" == \"arm64\" ]; then
+              if [ \"\$(uname -m)\" != \"aarch64\" ]; then
+                echo \"⚠ Architecture check FAILED: Expected \\\"aarch64\\\", got \\\"\$(uname -m)\\\" \"
+                FAILED=1;
+              else
+                echo \"✓ Arm64 architecture test passed!\"
+              fi
+            elif [ \"$EXPECTED_ARCH\" == \"amd64\" ]; then
+              if [ \"\$(uname -m)\" != \"x86_64\" ]; then
+                echo \"⚠ Architecture check FAILED: Expected \\\"x86_64\\\", got \\\"\$(uname -m)\\\" \"
+                FAILED=1;
+              else
+                echo \"✓ x86_64 architecture test passed!\"
+              fi
+            else
+                echo \"⚠ Unknown architecture: \\\"$EXPECTED_ARCH\\\"\"
+                FAILED=1;
+            fi
+
+            if [ \"\$(git config user.name)\" != \"Kitchen Sink\" ]; then
+                echo \"⚠ Wrong git config user.name. Expected \\\"Kitchen Sink\\\", got \\\"\$(git config user.name)\\\"\"
+                FAILED=1;
+            else
+                echo \"✓ Git user name test passed!\"
+            fi
+
+            if [ \"\$(git config user.email)\" != \"sink@kitchen.com\" ]; then
+                echo \"⚠ Wrong git config user.email. Expected \\\"sink@kitchen.com\\\", got \\\"\$(git config user.email)\\\"\"
+                FAILED=1;
+            else
+                echo \"✓ Git user email test passed!\"
+            fi
+
+            if [ \"\$(jj config get user.name)\" != \"Kitchen Sink\" ]; then
+                echo \"⚠ Wrong Jujutsu config user.name. Expected \\\"Kitchen Sink\\\", got \\\"\$(jj config get user.name)\\\"\"
+                FAILED=1;
+            else
+                echo \"✓ Jujutsu user name test passed!\"
+            fi
+
+            if [ \"\$(jj config get user.email)\" != \"sink@kitchen.com\" ]; then
+                echo \"⚠ Wrong Jujutsu config user.email. Expected \\\"sink@kitchen.com\\\", got \\\"\$(jj config get user.email)\\\"\"
+                FAILED=1;
+            else
+                echo \"✓ Jujutsu user email test passed!\"
+            fi
+
+            echo \"\"
+            if [ \"\$FAILED\" -ne 0 ]; then
+              echo \"TEST_RESULT:FAILED\"
               exit 1
             else
-              echo "TEST_RESULT:PASSED"
+              echo \"TEST_RESULT:PASSED\"
               exit 0
             fi
-          ' 2>&1)
+          " 2>&1)
           EXIT_CODE=$?
           set -e
 
