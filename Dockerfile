@@ -114,17 +114,33 @@ RUN if [ -n "$SUPPLEMENTARY_PACKAGES" ]; then \
 
 # Install Neovim (optional)
 RUN if [ "$INSTALL_NEOVIM" = "true" ]; then \
-    curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.tar.gz && \
-    tar -C /opt -xzf nvim-linux-x86_64.tar.gz && \
-    rm nvim-linux-x86_64.tar.gz && \
-    ln -s /opt/nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim; \
+    ARCH=$(uname -m) && \
+    if [ "$ARCH" = "x86_64" ]; then \
+        NVIM_ARCH="linux-x86_64"; \
+    elif [ "$ARCH" = "aarch64" ]; then \
+        NVIM_ARCH="linux-arm64"; \
+    else \
+        echo "Unsupported architecture: $ARCH" && exit 1; \
+    fi; \
+    curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-${NVIM_ARCH}.tar.gz; \
+    tar -C /opt -xzf nvim-${NVIM_ARCH}.tar.gz; \
+    rm nvim-${NVIM_ARCH}.tar.gz; \
+    ln -s /opt/nvim-${NVIM_ARCH}/bin/nvim /usr/local/bin/nvim; \
   fi
 
 # Install Zellij (optional)
 RUN if [ "$INSTALL_ZELLIJ" = "true" ]; then \
-    curl -LO https://github.com/zellij-org/zellij/releases/latest/download/zellij-x86_64-unknown-linux-musl.tar.gz && \
-    tar -C /opt -xzf zellij-x86_64-unknown-linux-musl.tar.gz && \
-    rm zellij-x86_64-unknown-linux-musl.tar.gz && \
+    ARCH=$(uname -m) && \
+    if [ "$ARCH" = "x86_64" ]; then \
+        ZELLIJ_ARCH="x86_64-unknown-linux-musl"; \
+    elif [ "$ARCH" = "aarch64" ]; then \
+        ZELLIJ_ARCH="aarch64-unknown-linux-musl"; \
+    else \
+        echo "Unsupported architecture: $ARCH" && exit 1; \
+    fi && \
+    curl -LO https://github.com/zellij-org/zellij/releases/latest/download/zellij-${ZELLIJ_ARCH}.tar.gz && \
+    tar -C /opt -xzf zellij-${ZELLIJ_ARCH}.tar.gz && \
+    rm zellij-${ZELLIJ_ARCH}.tar.gz && \
     ln -s /opt/zellij /usr/local/bin/zellij; \
   fi
 
@@ -151,9 +167,18 @@ RUN if [ "$INSTALL_JUJUTSU" = "true" ]; then \
     rm jj.tar.gz; \
   fi
 
+# Install Binaryen (optional)
 RUN if [ "$ENABLE_WASM" = "true" ]; then \
+    ARCH=$(uname -m) && \
+    if [ "$ARCH" = "x86_64" ]; then \
+        BINARYEN_ARCH="x86_64-linux"; \
+    elif [ "$ARCH" = "aarch64" ]; then \
+        BINARYEN_ARCH="aarch64-linux"; \
+    else \
+        echo "Unsupported architecture: $ARCH" && exit 1; \
+    fi && \
     BINARYEN_VERSION=$(curl -s https://api.github.com/repos/WebAssembly/binaryen/releases/latest | grep -o '"tag_name": *"[^"]*"' | sed 's/"tag_name": *"//;s/"//') && \
-    curl -L "https://github.com/WebAssembly/binaryen/releases/download/${BINARYEN_VERSION}/binaryen-${BINARYEN_VERSION}-x86_64-linux.tar.gz" -o binaryen.tar.gz && \
+    curl -L "https://github.com/WebAssembly/binaryen/releases/download/${BINARYEN_VERSION}/binaryen-${BINARYEN_VERSION}-${BINARYEN_ARCH}.tar.gz" -o binaryen.tar.gz && \
     tar -xzf binaryen.tar.gz && \
     mv binaryen-${BINARYEN_VERSION} /opt/binaryen && \
     ln -s /opt/binaryen/bin/* /usr/local/bin/ && \
@@ -195,10 +220,13 @@ RUN if [ "$INSTALL_ATUIN" = "true" ]; then \
 # Install `mise` + languages (optional)
 RUN if [ "$INSTALL_MISE" = "true" ]; then \
     curl https://mise.jdx.dev/install.sh | sh && \
+		printf "\nexport PATH=\"\$HOME/.local/bin:\$PATH\"\n" >> /home/${USERNAME}/.bashrc && \
     printf "\n# Initialize mise\neval \"\$(mise activate bash)\"\n" >> /home/${USERNAME}/.bashrc && \
     if [ "$USER_SHELL" = "fish" ]; then \
+      printf "\nset -gx PATH \$HOME/.local/bin \$PATH\n" >> /home/${USERNAME}/.config/fish/config.fish; \
       printf "\n# Initialize mise\nmise activate fish | source\n" >> /home/${USERNAME}/.config/fish/config.fish; \
     elif [ "$USER_SHELL" = "zsh" ]; then \
+		  printf "\nexport PATH=\"\$HOME/.local/bin:\$PATH\"\n" >> /home/${USERNAME}/.zshrc; \
       printf "\n# Initialize mise\neval \"\$(mise activate zsh)\"\n" >> /home/${USERNAME}/.zshrc; \
     fi; \
     if [ -n "$INSTALL_NODE" ] && [ "$INSTALL_NODE" != "none" ]; then \
