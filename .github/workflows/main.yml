@@ -612,12 +612,19 @@ jobs:
             exit 1
           fi
 
-          echo "Running tool verification tests..."
+          echo "✓ Fish shell initialization passed"
+          echo ""
+
+          echo "=========================================="
+          echo "Running tool verification tests with BASH"
+          echo "=========================================="
 
           # Capture ALL output from container
           set +e
-          CONTAINER_OUTPUT=$(timeout 60s ./paul-envs.sh run full-build bash -l -c '
-            set -e  # Exit immediately on any error
+          CONTAINER_OUTPUT=$(timeout 60s ./paul-envs.sh run full-build bash -c '
+            source ~/.bashrc
+            set -e
+            echo "Shell: bash"
             echo "Architecture: $(uname -m)"
             echo ""
             echo "Testing installations..."
@@ -667,13 +674,6 @@ jobs:
             test_tool jj "Jujutsu" || FAILED=1
 
             echo ""
-            echo "Testing version outputs (verbose)..."
-            node --version
-            rustc --version
-            python --version
-            go version
-
-            echo ""
             if [ $FAILED -eq 1 ]; then
               echo "TEST_RESULT:FAILED"
               exit 1
@@ -685,36 +685,143 @@ jobs:
           EXIT_CODE=$?
           set -e
 
-          echo "=== Container Output ==="
+          # Always print the container output
+          echo "=== Bash Container Output ==="
           echo "$CONTAINER_OUTPUT"
-          echo "=== End Container Output ==="
+          echo "=== End Bash Container Output ==="
           echo ""
-          echo "Container exit code: $EXIT_CODE"
+          echo "Bash container exit code: $EXIT_CODE"
 
           # Check if it was a timeout (exit code 124)
           if [ $EXIT_CODE -eq 124 ]; then
-            echo "ERROR: Test timed out after 60 seconds"
+            echo "ERROR: Bash test timed out after 60 seconds"
             exit 1
           fi
 
           # Check the output for our test result marker
           if echo "$CONTAINER_OUTPUT" | grep -q "TEST_RESULT:FAILED"; then
-            echo "ERROR: Container tests reported FAILURE"
+            echo "ERROR: Bash container tests reported FAILURE"
             exit 1
           fi
 
           if ! echo "$CONTAINER_OUTPUT" | grep -q "TEST_RESULT:PASSED"; then
-            echo "ERROR: Container tests did not complete successfully (no PASSED marker found)"
+            echo "ERROR: Bash container tests did not complete successfully (no PASSED marker found)"
             exit 1
           fi
 
           # Also check exit code as backup
           if [ $EXIT_CODE -ne 0 ]; then
-            echo "ERROR: Container exited with non-zero code: $EXIT_CODE"
+            echo "ERROR: Bash container exited with non-zero code: $EXIT_CODE"
             exit 1
           fi
 
-          echo "✓ Full build test passed"
+          echo "✓ Bash full build test passed"
+          echo ""
+
+          echo "=========================================="
+          echo "Running tool verification tests with FISH"
+          echo "=========================================="
+
+          set +e
+          FISH_CONTAINER_OUTPUT=$(timeout 60s ./paul-envs.sh run full-build fish -l -c '
+            echo "Shell: fish"
+            echo "Architecture: "(uname -m)
+            echo ""
+            echo "Testing installations..."
+
+            # Track failures
+            set FAILED 0
+
+            # Function to test command existence and version
+            function test_tool
+              set cmd $argv[1]
+              set name $argv[2]
+              set version_flag $argv[3]
+
+              if test -z "$version_flag"
+                set version_flag "--version"
+              end
+
+              if not command -v $cmd >/dev/null 2>&1
+                echo "✗ $name missing"
+                return 1
+              end
+
+              echo "✓ $name installed"
+
+              # Test version flag
+              if not eval $cmd $version_flag >/dev/null 2>&1
+                echo "  ⚠ $name version check FAILED with flag: $version_flag"
+                return 1
+              end
+
+              return 0
+            end
+
+            # Test each tool
+            test_tool git "Git"; or set FAILED 1
+            test_tool bash "Bash"; or set FAILED 1
+            test_tool fish "Fish"; or set FAILED 1
+            test_tool node "Node.js"; or set FAILED 1
+            test_tool cargo "Cargo"; or set FAILED 1
+            test_tool rustc "rustc"; or set FAILED 1
+            test_tool python "Python"; or set FAILED 1
+            test_tool go "Go" version; or set FAILED 1
+            test_tool wasm-opt "Binaryen"; or set FAILED 1
+            test_tool sudo "sudo"; or set FAILED 1
+            test_tool nvim "Neovim"; or set FAILED 1
+            test_tool starship "Starship"; or set FAILED 1
+            test_tool atuin "Atuin"; or set FAILED 1
+            test_tool mise "Mise" version; or set FAILED 1
+            test_tool zellij "Zellij"; or set FAILED 1
+            test_tool jj "Jujutsu"; or set FAILED 1
+
+            echo ""
+            if test $FAILED -eq 1
+              echo "TEST_RESULT:FAILED"
+              exit 1
+            else
+              echo "TEST_RESULT:PASSED"
+              exit 0
+            end
+          ' 2>&1)
+          FISH_EXIT_CODE=$?
+          set -e
+
+          echo "=== Fish Container Output ==="
+          echo "$FISH_CONTAINER_OUTPUT"
+          echo "=== End Fish Container Output ==="
+          echo ""
+          echo "Fish container exit code: $FISH_EXIT_CODE"
+
+          # Check if it was a timeout (exit code 124)
+          if [ $FISH_EXIT_CODE -eq 124 ]; then
+            echo "ERROR: Fish test timed out after 60 seconds"
+            exit 1
+          fi
+
+          # Check the output for our test result marker
+          if echo "$FISH_CONTAINER_OUTPUT" | grep -q "TEST_RESULT:FAILED"; then
+            echo "ERROR: Fish container tests reported FAILURE"
+            exit 1
+          fi
+
+          if ! echo "$FISH_CONTAINER_OUTPUT" | grep -q "TEST_RESULT:PASSED"; then
+            echo "ERROR: Fish container tests did not complete successfully (no PASSED marker found)"
+            exit 1
+          fi
+
+          # Also check exit code as backup
+          if [ $FISH_EXIT_CODE -ne 0 ]; then
+            echo "ERROR: Fish container exited with non-zero code: $FISH_EXIT_CODE"
+            exit 1
+          fi
+
+          echo "✓ Fish full build test passed"
+          echo ""
+          echo "=========================================="
+          echo "✓ All tests passed for both bash and fish!"
+          echo "=========================================="
 
       - name: Clean up Docker resources
         if: always()
