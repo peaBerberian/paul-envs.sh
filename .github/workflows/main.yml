@@ -196,6 +196,7 @@ jobs:
             --python 3.12.0 \
             --go latest \
             --enable-wasm \
+            --enable-ssh \
             --enable-sudo \
             --neovim \
             --starship \
@@ -551,6 +552,7 @@ jobs:
             --python 3.12.0 \
             --go 1.21.5 \
             --enable-wasm \
+            --enable-ssh \
             --enable-sudo \
             --neovim \
             --starship \
@@ -560,7 +562,7 @@ jobs:
             --jujutsu \
             --git-name "Kitchen Sink" \
             --git-email "sink@kitchen.com" \
-            --packages "ripgrep fzf bat htop" \
+            --packages "ripgrep fzf bat htop iproute2" \
             --port 3000 \
             --port 8080
 
@@ -663,6 +665,8 @@ jobs:
             test_tool python \"Python\" || FAILED=1
             test_tool go \"Go\" version || FAILED=1
             test_tool wasm-opt \"Binaryen\" || FAILED=1
+            test_tool ssh \"ssh\" \"-V\" || FAILED=1
+            test_tool sshd \"sshd\" \"-V\" || FAILED=1
             test_tool sudo \"sudo\" || FAILED=1
             test_tool nvim \"Neovim\" || FAILED=1
             test_tool starship \"Starship\" || FAILED=1
@@ -670,6 +674,16 @@ jobs:
             test_tool mise \"Mise\" version || FAILED=1
             test_tool zellij \"Zellij\" || FAILED=1
             test_tool jj \"Jujutsu\" || FAILED=1
+            test_tool rg \"RipGrep\" || FAILED=1
+            test_tool fzf \"fzf\" || FAILED=1
+            test_tool bat \"bat\" || FAILED=1
+            test_tool htop \"htop\" || FAILED=1
+            test_tool ss \"ss\" || FAILED=1
+
+            ss -lnt '( sport = :22 )' | grep -q LISTEN || {
+              FAILED=1
+              echo \"⚠ ssh check FAILED: Port 22 is not listened to.\"
+            }
 
             if [ \"$EXPECTED_ARCH\" == \"arm64\" ]; then
               if [ \"\$(uname -m)\" != \"aarch64\" ]; then
@@ -813,6 +827,8 @@ jobs:
             test_tool python "Python"; or set FAILED 1
             test_tool go "Go" version; or set FAILED 1
             test_tool wasm-opt "Binaryen"; or set FAILED 1
+            test_tool ssh "ssh" "-V"; or set FAILED 1
+            test_tool sshd "sshd" "-V"; or set FAILED 1
             test_tool sudo "sudo"; or set FAILED 1
             test_tool nvim "Neovim"; or set FAILED 1
             test_tool starship "Starship"; or set FAILED 1
@@ -820,6 +836,17 @@ jobs:
             test_tool mise "Mise" version; or set FAILED 1
             test_tool zellij "Zellij"; or set FAILED 1
             test_tool jj "Jujutsu"; or set FAILED 1
+            test_tool rg "RipGrep"; or set FAILED 1
+            test_tool fzf "fzf"; or set FAILED 1
+            test_tool bat "bat"; or set FAILED 1
+            test_tool htop "htop"; or set FAILED 1
+            test_tool ss "ss"; or set FAILED 1
+
+            ss -lnt '( sport = :22 )' | grep -q LISTEN
+              or begin
+                set -g FAILED 1
+                echo "⚠ ssh check FAILED: Port 22 is not listened to."
+              end
 
             echo ""
             if test $FAILED -eq 1
