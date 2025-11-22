@@ -27,8 +27,8 @@ _paulenvs() {
             case ${words[2]} in
                 create)
                     _arguments \
-                        '2:project name:' \
-                        '3:project path:_directories' \
+                        '2:project path:_directories' \
+                        '--name[Specify container name]:name:' \
                         '--uid[Host UID]:uid:($(id -u))' \
                         '--gid[Host GID]:gid:($(id -g))' \
                         '--username[Container username]:username:' \

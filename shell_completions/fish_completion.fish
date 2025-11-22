@@ -13,6 +13,7 @@ complete -c paul-envs.sh -f -n __fish_use_subcommand -a run -d 'Start a containe
 complete -c paul-envs.sh -f -n __fish_use_subcommand -a remove -d 'Remove a container'
 
 # Create command options
+complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l name -d "Specific a container name" -x
 complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l uid -d 'Host UID' -x
 complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l gid -d 'Host GID' -x
 complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l username -d 'Container username' -x

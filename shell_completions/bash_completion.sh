@@ -9,7 +9,7 @@ _paulenvs()
     local commands="create list build run remove"
 
     # Options for create command
-    local create_flags="--uid --gid --username --shell --nodejs --rust --python --go --git-name --git-email --packages --neovim --starship --atuin --mise --zellij --jujutsu --port --volume"
+    local create_flags="--name --uid --gid --username --shell --nodejs --rust --python --go --git-name --git-email --packages --neovim --starship --atuin --mise --zellij --jujutsu --port --volume"
 
     # Get list of existing containers from paul-envs.sh ls
     _get_containers() {
