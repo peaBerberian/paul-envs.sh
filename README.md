@@ -411,4 +411,9 @@ Along the mounted project, those are the only directories which are persisted.
 
 ## TODO:
 
+- When ssh is enabled, ask for which public key to share
+- neovim permission issue on ssh branch
+- new ssh integration tests failing
+- when ssh is enabled: message on run to indicate how to access?
+- something like `up` / `down` commands make now much more sense with ssh
 - Add Kakoune and Helix as potential tools
