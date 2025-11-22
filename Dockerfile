@@ -424,9 +424,13 @@ RUN if [ "$ENABLE_SSH" = "true" ]; then \
 # Create entrypoint script that conditionally starts SSH
 RUN echo '#!/bin/bash' > /usr/local/bin/docker-entrypoint.sh && \
     echo 'if [ -d /var/run/sshd ]; then' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo '  /usr/sbin/sshd -D &' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo '    /usr/sbin/sshd -D &' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'fi' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo "exec su $USERNAME -s /usr/bin/$USER_SHELL" >> /usr/local/bin/docker-entrypoint.sh && \
+    echo 'if [ $# -eq 0 ]; then' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo "    exec su $USERNAME -s /usr/bin/$USER_SHELL" >> /usr/local/bin/docker-entrypoint.sh && \
+    echo 'else' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo "    exec runuser -u $USERNAME -- \"\$@\"" >> /usr/local/bin/docker-entrypoint.sh && \
+    echo 'fi' >> /usr/local/bin/docker-entrypoint.sh && \
     chmod +x /usr/local/bin/docker-entrypoint.sh
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
