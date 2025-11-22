@@ -394,7 +394,7 @@ FROM ubuntu-tools AS ubuntu-projects
 
 ARG USERNAME=dev
 ARG USER_SHELL=bash
-ARG SSH_PORT=""
+ARG ENABLE_SSH=false
 
 USER ${USERNAME}
 
@@ -405,7 +405,7 @@ WORKDIR /home/${USERNAME}/projects
 USER root
 
 # Install openssh if ssh is wanted and set it up
-RUN if [ -n "$SSH_PORT" ]; then \
+RUN if [ "$ENABLE_SSH" = "true" ]; then \
     apt-get update && \
     apt-get install -y openssh-server && \
     mkdir -p /var/run/sshd && \

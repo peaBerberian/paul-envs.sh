@@ -106,9 +106,9 @@ services:
         # WebAssembly target for Rust if it is installed.
         ENABLE_WASM: ${ENABLE_WASM:-false}
 
-        # If set, `openssh` will be installed, and the container will listen for ssh
-        # connections at this port.
-        SSH_PORT: ${SSH_PORT:-}
+        # If `true`, `openssh` will be installed, and the container will listen for ssh
+        # connections at port 22.
+        ENABLE_SSH: ${ENABLE_SSH:-false}
 
         # If `true`, `sudo` will be installed, (password set to `dev`).
         ENABLE_SUDO: ${ENABLE_SUDO:-false}

@@ -103,7 +103,7 @@ isolation (same issue than with `devbox`).
    It will build the container through the right `docker compose build`
    invokation and initialize persistent volumes.
 
-5. Then run the container each time you want to work on the project:
+5. Then launch the container each time you want to work on the project:
    `./paul-envs.sh run myApp`.
 
    The mounted project is available in that container at `~/projects/myApp`.
@@ -127,7 +127,7 @@ each other, which is sadly not close to mine, so I encounter a lot of issues
 that they never encounter. As those are huge projects and not my main focus, the
 right action which would be to just fix those issues is very time-consuming.
 
-I thus decided to rely on a container for developing on those projects to
+I thus decided to rely on containers for developing on those projects to
 protect my own system from unwanted changes and to provide a more "barebone"
 and popular environment (ubuntu LTS, adding only my current developing tools to
 it).
@@ -168,7 +168,7 @@ and corresponding flags:
 ### 1. Create a new container's config
 
 The idea is to create a separate container for each project (that will rely on a
-same base container with variations).
+same base with variations).
 
 This container first need to be configured to point to your project and have the
 right arguments (e.g. the right tools and git configuration). This is done
