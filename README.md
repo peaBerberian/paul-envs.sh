@@ -411,4 +411,6 @@ Along the mounted project, those are the only directories which are persisted.
 
 ## TODO:
 
+- something like `up` / `down` commands make now much more sense with ssh
 - Add Kakoune and Helix as potential tools
+- Only max a single instance of each project-container?
