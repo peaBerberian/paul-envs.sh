@@ -153,7 +153,7 @@ services:
   # installed npm/yarn packages.
   # It can be shared through multiple containers simultaneously relatively safely.
   reset-cache:
-    image: paulenv:latest
+    image: paulenv:${PROJECT_ID:-latest}
     pull_policy: never
     user: root
     command: >
@@ -174,7 +174,7 @@ services:
   # This volume is more concurrency-sensible and is thus mounted as separate
   # distinct volumes on multiple simultaneous containers (one per project).
   reset-local:
-    image: paulenv:latest
+    image: paulenv:${PROJECT_ID:-latest}
     pull_policy: never
     user: root
     command: >

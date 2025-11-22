@@ -124,10 +124,46 @@ get_absolute_path() {
 # Security validation functions
 validate_project_name() {
     local name=$1
-    # Alphanumeric + `-` + _ only
-    if [[ ! "$name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-        error "Invalid project name '$name'. Only alphanumeric characters, hyphens, and underscores are allowed."
+    if [[ -z "$name" ]] || [[ ! "$name" =~ ^[a-zA-Z0-9_][a-zA-Z0-9_-]{0,127}$ ]]; then
+        error "Invalid project name '$name'. Must be 1-128 characters, start with alphanumeric or underscore, and contain only alphanumeric, hyphens, and underscores."
     fi
+}
+
+# Sanitize project name for Docker image tag
+sanitize_project_name() {
+    local input="$1"
+    local sanitized
+
+    # Convert to lowercase (portable)
+    sanitized="$(echo "$input" | tr '[:upper:]' '[:lower:]')"
+
+    # Replace invalid characters with hyphens
+    sanitized="${sanitized//[^a-z0-9_-]/-}"
+
+    # Remove leading non-alphanumeric characters
+    while [[ "$sanitized" =~ ^[^a-z0-9] ]]; do
+        sanitized="${sanitized:1}"
+    done
+
+    # Collapse multiple consecutive hyphens
+    while [[ "$sanitized" == *"--"* ]]; do
+        sanitized="${sanitized//--/-}"
+    done
+
+    # Truncate to 128 characters
+    sanitized="${sanitized:0:128}"
+
+    # Remove trailing hyphens
+    while [[ "$sanitized" == *"-" ]]; do
+        sanitized="${sanitized%-}"
+    done
+
+    # Ensure not empty
+    if [[ -z "$sanitized" ]]; then
+        sanitized="project"
+    fi
+
+    echo "$sanitized"
 }
 
 # Check that the choosen shell is one supported by paul-envs.sh
@@ -442,16 +478,19 @@ generate_project_compose() {
 # "Env file" for your project, which will be fed to \`docker compose\`
 # alongside "compose.yaml" in the same directory.
 #
-# Can be freely updated, with the condition of not removing a few
-# mandatory env values:
-# - PROJECT_DIRNAME
-# - PROJECT_PATH
+# Can be freely updated.
+
+# Uniquely identify this container.
+# *SHOULD NOT BE UPDATED*
+PROJECT_ID="$name"
 
 # Name of the project directory inside the container.
+# A \`PROJECT_DIRNAME\` should always be set
 PROJECT_DIRNAME="$(config_get project_dest_path)"
 
 # Path to the project you want to mount in this container
 # Will be mounted in "\$HOME/projects/<PROJECT_DIRNAME>" inside that container.
+# A \`PROJECT_PATH\` should always be set
 PROJECT_PATH="$(config_get project_host_path)"
 
 # To align with your current uid.
@@ -552,6 +591,7 @@ EOF
 services:
   paulenv:
     build:
+    image: paulenv:$name
 EOF
 
     # Add ports if specified
@@ -1000,15 +1040,9 @@ cmd_create() {
         name="$(basename "$(config_get project_host_path)")"
     fi
 
-    if [[ ! "$name" =~ ^[a-zA-Z0-9._-]+$ ]]; then
-        error "\"Risky\" project directory name '$name'. Only alphanumeric characters, dots, hyphens, and underscores are allowed.\nUse the \`--name\` flag to set a safer directory name"
-    fi
+    name="$(sanitize_project_name "$name")"
 
     config_set "project_dest_path" "$name"
-
-    # Normalize the name: lowercase and strip invalid characters
-    name=$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_-]//g')
-
     check_inexistent_name "$name"
 
     # If --no-prompt, validate we have everything needed
