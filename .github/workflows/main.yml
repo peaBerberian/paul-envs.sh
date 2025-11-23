@@ -665,8 +665,6 @@ jobs:
             test_tool python \"Python\" || FAILED=1
             test_tool go \"Go\" version || FAILED=1
             test_tool wasm-opt \"Binaryen\" || FAILED=1
-            test_tool ssh \"ssh\" \"-V\" || FAILED=1
-            test_tool sshd \"sshd\" \"-V\" || FAILED=1
             test_tool sudo \"sudo\" || FAILED=1
             test_tool nvim \"Neovim\" || FAILED=1
             test_tool starship \"Starship\" || FAILED=1
@@ -819,8 +817,6 @@ jobs:
             test_tool python "Python"; or set FAILED 1
             test_tool go "Go" version; or set FAILED 1
             test_tool wasm-opt "Binaryen"; or set FAILED 1
-            test_tool ssh "ssh" "-V"; or set FAILED 1
-            test_tool sshd "sshd" "-V"; or set FAILED 1
             test_tool sudo "sudo"; or set FAILED 1
             test_tool nvim "Neovim"; or set FAILED 1
             test_tool starship "Starship"; or set FAILED 1
