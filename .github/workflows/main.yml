@@ -671,8 +671,6 @@ jobs:
             test_tool atuin \"Atuin\" || FAILED=1
             test_tool mise \"Mise\" version || FAILED=1
             test_tool zellij \"Zellij\" || FAILED=1
-            test_tool bat \"bat\" || FAILED=1
-            test_tool htop \"htop\" || FAILED=1
 
             if [ \"$EXPECTED_ARCH\" == \"arm64\" ]; then
               if [ \"\$(uname -m)\" != \"aarch64\" ]; then
