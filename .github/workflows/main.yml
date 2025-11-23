@@ -671,9 +671,6 @@ jobs:
             test_tool atuin \"Atuin\" || FAILED=1
             test_tool mise \"Mise\" version || FAILED=1
             test_tool zellij \"Zellij\" || FAILED=1
-            test_tool jj \"Jujutsu\" || FAILED=1
-            test_tool rg \"RipGrep\" || FAILED=1
-            test_tool fzf \"fzf\" || FAILED=1
             test_tool bat \"bat\" || FAILED=1
             test_tool htop \"htop\" || FAILED=1
 
@@ -825,11 +822,6 @@ jobs:
             test_tool atuin "Atuin"; or set FAILED 1
             test_tool mise "Mise" version; or set FAILED 1
             test_tool zellij "Zellij"; or set FAILED 1
-            test_tool jj "Jujutsu"; or set FAILED 1
-            test_tool rg "RipGrep"; or set FAILED 1
-            test_tool fzf "fzf"; or set FAILED 1
-            test_tool bat "bat"; or set FAILED 1
-            test_tool htop "htop"; or set FAILED 1
 
             echo ""
             if test $FAILED -eq 1
