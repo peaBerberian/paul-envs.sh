@@ -129,19 +129,21 @@ func normalizePath(path string) string {
 	// Convert backslashes to forward slashes
 	path = strings.ReplaceAll(path, "\\", "/")
 
-	// Handle Windows drive letters (C:\ -> /c/)
-	driveRe := regexp.MustCompile(`^([A-Za-z]):[\\/](.*)$`)
+	// Handle Windows drive letters (C:\foo → /c/foo)
+	driveRe := regexp.MustCompile(`^([A-Za-z]):/(.*)$`)
 	if matches := driveRe.FindStringSubmatch(path); matches != nil {
 		drive := strings.ToLower(matches[1])
 		rest := matches[2]
 		return "/" + drive + "/" + rest
 	}
 
-	// Handle Git Bash paths (/c/Users/...)
-	if strings.HasPrefix(path, "/") {
-		return path
+	// Handle Git Bash (/c/foo or /C/foo)
+	gitBashRe := regexp.MustCompile(`^/([A-Za-z])/(.*)$`)
+	if matches := gitBashRe.FindStringSubmatch(path); matches != nil {
+		return "/" + strings.ToLower(matches[1]) + "/" + matches[2]
 	}
 
+	// Relative paths (foo/bar)
 	return path
 }
 
@@ -334,10 +336,10 @@ func checkInexistentName(name string) {
 	envFile := getProjectEnv(name)
 
 	if _, err := os.Stat(composeFile); err == nil {
-		fatal("Project '%s' already exists. You can have multiple configurations for the same project by calling 'create' with the '--name' flag. Hint: Use 'paul-envs.sh list' to see all projects or 'paul-envs.sh remove %s' to delete it", name, name)
+		fatal("Project '%s' already exists. You can have multiple configurations for the same project by calling 'create' with the '--name' flag. Hint: Use 'paul-envs list' to see all projects or 'paul-envs remove %s' to delete it", name, name)
 	}
 	if _, err := os.Stat(envFile); err == nil {
-		fatal("Project '%s' already exists. You can have multiple configurations for the same project by calling 'create' with the '--name' flag. Hint: Use 'paul-envs.sh list' to see all projects or 'paul-envs.sh remove %s' to delete it", name, name)
+		fatal("Project '%s' already exists. You can have multiple configurations for the same project by calling 'create' with the '--name' flag. Hint: Use 'paul-envs list' to see all projects or 'paul-envs remove %s' to delete it", name, name)
 	}
 }
 
@@ -979,7 +981,7 @@ func cmdCreate(args []string) {
 
 	// Get project path
 	if len(args) == 0 {
-		fatal("Usage: paul-envs.sh create <project-path> [options]")
+		fatal("Usage: paul-envs create <project-path> [options]")
 	}
 
 	projectPath, err := getAbsolutePath(args[0])
@@ -1150,9 +1152,9 @@ func cmdCreate(args []string) {
 	fmt.Printf("  2. Put the $HOME dotfiles you want to port in:\n")
 	fmt.Printf("     - %s/configs/\n", scriptDir)
 	fmt.Printf("  3. Build the environment:\n")
-	fmt.Printf("     paul-envs.sh build %s\n", name)
+	fmt.Printf("     paul-envs build %s\n", name)
 	fmt.Printf("  4. Run the environment:\n")
-	fmt.Printf("     paul-envs.sh run %s\n", name)
+	fmt.Printf("     paul-envs run %s\n", name)
 }
 
 func cmdList() {
@@ -1163,7 +1165,7 @@ func cmdList() {
 
 	if _, err := os.Stat(projectsDir); os.IsNotExist(err) {
 		fmt.Println("No project created yet")
-		fmt.Println("Hint: Create one with 'paul-envs.sh create <path>'")
+		fmt.Println("Hint: Create one with 'paul-envs create <path>'")
 		return
 	}
 
@@ -1191,7 +1193,7 @@ func cmdList() {
 
 	if !found {
 		fmt.Println("  (no project found)")
-		fmt.Println("Hint: Create one with 'paul-envs.sh create <path>'")
+		fmt.Println("Hint: Create one with 'paul-envs create <path>'")
 	}
 }
 
@@ -1222,10 +1224,10 @@ func cmdBuild(args []string) {
 	composeFile := getProjectCompose(name)
 	envFile := getProjectEnv(name)
 	if _, err := os.Stat(composeFile); os.IsNotExist(err) {
-		fatal("Project '%s' not found. Hint: Use 'paul-envs.sh list' to see available projects or 'paul-envs.sh create' to make a new one", name)
+		fatal("Project '%s' not found. Hint: Use 'paul-envs.sh list' to see available projects or 'paul-envs create' to make a new one", name)
 	}
 	if _, err := os.Stat(envFile); os.IsNotExist(err) {
-		fatal("Project '%s' not found. Hint: Use 'paul-envs.sh list' to see available projects or 'paul-envs.sh create' to make a new one", name)
+		fatal("Project '%s' not found. Hint: Use 'paul-envs list' to see available projects or 'paul-envs create' to make a new one", name)
 	}
 
 	// Create shared cache volume
@@ -1282,10 +1284,10 @@ func cmdRun(args []string) {
 	composeFile := getProjectCompose(name)
 	envFile := getProjectEnv(name)
 	if _, err := os.Stat(composeFile); os.IsNotExist(err) {
-		fatal("Project '%s' not found\nHint: Use 'paul-envs.sh list' to see available projects", name)
+		fatal("Project '%s' not found\nHint: Use 'paul-envs list' to see available projects", name)
 	}
 	if _, err := os.Stat(envFile); os.IsNotExist(err) {
-		fatal("Project '%s' not found\nHint: Use 'paul-envs.sh list' to see available projects", name)
+		fatal("Project '%s' not found\nHint: Use 'paul-envs list' to see available projects", name)
 	}
 
 	os.Setenv("COMPOSE_PROJECT_NAME", "paulenv-"+name)
@@ -1321,7 +1323,7 @@ func cmdRemove(args []string) {
 
 	projectDir := getProjectDir(name)
 	if _, err := os.Stat(projectDir); os.IsNotExist(err) {
-		fatal("Project '%s' not found\nHint: Use 'paul-envs.sh list' to see available projects", name)
+		fatal("Project '%s' not found\nHint: Use 'paul-envs list' to see available projects", name)
 	}
 
 	if !promptYN(fmt.Sprintf("Remove project '%s'?", name), "N") {
@@ -1337,7 +1339,7 @@ func cmdRemove(args []string) {
 }
 
 func cmdVersion() {
-	fmt.Printf("paul-envs.sh version %s\n", version)
+	fmt.Printf("paul-envs version %s\n", version)
 	fmt.Printf("Go version: %s\n", runtime.Version())
 	cmd := exec.Command("docker", "--version")
 	output, err := cmd.Output()
@@ -1349,14 +1351,14 @@ func cmdVersion() {
 }
 
 func printUsage() {
-	fmt.Println(`paul-envs.sh - Development Environment Manager
+	fmt.Println(`paul-envs - Development Environment Manager
 
 Usage:
-  paul-envs.sh create <path> [options]
-  paul-envs.sh list
-  paul-envs.sh build <name>
-  paul-envs.sh run <name> [command]
-  paul-envs.sh remove <name>
+  paul-envs create <path> [options]
+  paul-envs list
+  paul-envs build <name>
+  paul-envs run <name> [commands]
+  paul-envs remove <name>
 
 Options for create (all optional):
   --no-prompt              Non-interactive mode (uses defaults)
@@ -1365,24 +1367,87 @@ Options for create (all optional):
   --gid GID                Container GID (default: current group - or 1000 on windows)
   --username NAME          Container username (default: dev)
   --shell SHELL            User shell: bash|zsh|fish (prompted if not specified)
-  --nodejs VERSION         Node.js installation
-  --rust VERSION           Rust installation
-  --python VERSION         Python installation
-  --go VERSION             Go installation
-  --enable-wasm            Add WASM-specialized tools
-  --enable-ssh             Enable ssh access on port 22
-  --enable-sudo            Enable sudo access in container
+  --nodejs VERSION         Node.js installation:
+                             'none' - skip installation of Node.js
+                             'latest' - use Ubuntu default package
+                             '20.10.0' - specific version (requires mise)
+                           (prompted if no language specified)
+  --rust VERSION           Rust installation:
+                             'none' - skip installation of Rust
+                             'latest' - latest stable via rustup
+                             '1.75.0' - specific version (requires mise)
+                           (prompted if no language specified)
+  --python VERSION         Python installation:
+                             'none' - skip installation of Python
+                             'latest' - use Ubuntu default package
+                             '3.12.0' - specific version (requires mise)
+                           (prompted if no language specified)
+  --go VERSION             Go installation:
+                             'none' - skip installation of Go
+                             'latest' - use Ubuntu default package
+                             '1.21.5' - specific version (requires mise)
+                           (prompted if no language specified)
+  --enable-wasm            Add WASM-specialized tools (binaryen, Rust wasm target if enabled)
+                           (prompted if no language specified)
+  --enable-ssh             Enable ssh access on port 22 (E.g. to access files from your host)
+                           (prompted if not specified)
+  --enable-sudo            Enable sudo access in container with a "dev" password
+                           (prompted if not specified)
   --git-name NAME          Git user.name (optional)
   --git-email EMAIL        Git user.email (optional)
-  --neovim                 Install Neovim
-  --starship               Install Starship
-  --atuin                  Install Atuin
-  --mise                   Install Mise
-  --zellij                 Install Zellij
-  --jujutsu                Install Jujutsu
-  --packages "PKG1 PKG2"   Additional Ubuntu packages
-  --port PORT              Expose container port (can be repeated)
-  --volume HOST:CONT[:ro]  Mount volume (can be repeated)
+  --neovim                 Install Neovim (text editor)
+                           (prompted if no tool specified)
+  --starship               Install Starship (prompt)
+                           (prompted if no tool specified)
+  --atuin                  Install Atuin (shell history)
+                           (prompted if no tool specified)
+  --mise                   Install Mise (version manager - required for specific language versions)
+                           (prompted if no tool specified)
+  --zellij                 Install Zellij (terminal multiplexer)
+                           (prompted if no tool specified)
+  --jujutsu                Install Jujutsu (Git-compatible VCS)
+                           (prompted if no tool specified)
+  --packages "PKG1 PKG2"   Additional Ubuntu packages (prompted if not specified)
+  --port PORT              Expose container port (prompted if not specified, can be repeated)
+  --volume HOST:CONT[:ro]  Mount volume (prompted if not specified, can be repeated)
+
+Windows/Git Bash Notes:
+  - Paths are automatically converted (C:\Users\... -> /c/Users/...)
+  - UID/GID default to 1000 on Windows (Docker Desktop requirement)
+  - Use forward slashes or let the script normalize paths for you
+
+Interactive Mode (default):
+  paul-envs create ~/projects/myapp
+  # Will prompt for all unspecified options
+
+Non-Interactive Mode:
+  paul-envs create ~/projects/myapp --no-prompt --shell bash --nodejs latest
+
+Mixed Mode (some flags + prompts):
+  paul-envs create ~/projects/myapp --nodejs 20.10.0 --rust latest --mise
+  # Will prompt for shell, sudo, packages, ports, and volumes
+
+Full Configuration Example:
+  paul-envs create ~/work/api \
+    --name myApp \
+    --shell zsh \
+    --nodejs 20.10.0 \
+    --rust latest \
+    --python 3.12.0 \
+    --go latest \
+    --mise \
+    --neovim \
+    --starship \
+    --zellij \
+    --jujutsu \
+    --enable-ssh \
+    --enable-sudo \
+    --git-name "John Doe" \
+    --git-email "john@example.com" \
+    --packages "ripgrep fzf" \
+    --port 3000 \
+    --port 5432 \
+    --volume ~/.git-credentials:/home/dev/.git-credentials:ro
 
 Configuration:
   Base compose: ` + filepath.Join(scriptDir, "compose.yaml") + `

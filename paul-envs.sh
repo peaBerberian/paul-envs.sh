@@ -1412,7 +1412,7 @@ Usage:
   paul-envs.sh create <path> [options]
   paul-envs.sh list
   paul-envs.sh build <name>
-  paul-envs.sh run <name> [command]
+  paul-envs.sh run <name> [commands]
   paul-envs.sh remove <name>
 
 Options for create (all optional):
