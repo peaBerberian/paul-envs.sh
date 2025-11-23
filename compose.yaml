@@ -26,7 +26,6 @@
 services:
 
   paulenv:
-    entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
     image: paulenv:latest
     pull_policy: never
     stdin_open: true
@@ -160,9 +159,10 @@ services:
   reset-cache:
     image: paulenv:${PROJECT_ID:-latest}
     pull_policy: never
-    user: root
+    user: "0:0"
     command: >
-      sh -c "cp -a /home/${USERNAME}/.container-cache/. /mnt/cache/ &&
+      mkdir -p /mnt/cache &&
+             sh -c "cp -a /home/${USERNAME}/.container-cache/. /mnt/cache/ &&
              chown -R ${HOST_UID}:${HOST_GID} /mnt/cache"
     volumes:
       - shared-cache:/mnt/cache
@@ -181,9 +181,10 @@ services:
   reset-local:
     image: paulenv:${PROJECT_ID:-latest}
     pull_policy: never
-    user: root
+    user: "0:0"
     command: >
-      sh -c "cp -a /home/${USERNAME}/.container-local/. /mnt/local/ &&
+      mkdir -p /mnt/local &&
+             sh -c "cp -a /home/${USERNAME}/.container-local/. /mnt/local/ &&
              chown -R ${HOST_UID}:${HOST_GID} /mnt/local"
     volumes:
       - local-state:/mnt/local
