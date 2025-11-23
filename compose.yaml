@@ -14,7 +14,7 @@
 # ```sh
 # docker volume create paulenv-shared-cache 2>/dev/null || true
 # ``
-# And after a `build`, to initialize those "volumes":
+# And after a `build`, to initialize persisted volumes:
 # ```sh
 # `docker compose --profile reset up reset-cache reset-local`
 # ```
@@ -150,6 +150,10 @@ services:
 
       # Add your own:
       # - /host/path:/container/path:ro
+
+      # NOTE: If `ENABLE_SSH` is set to `true`, you also want to link your host's
+      # public key like so:
+      # - ~/.ssh/PATH_TO_YOUR_KEY.pub:/etc/ssh/authorized_keys/${USERNAME}:ro
     working_dir: /home/${USERNAME:-dev}/projects/${PROJECT_DIRNAME}
 
   # Reset cache directory to its state at build-time.
