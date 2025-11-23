@@ -6,13 +6,7 @@ minimal containers.
 
 ## What's this
 
-`paul-envs` is built for me and other developers with similar needs: working on
-multiple projects simultaneously, relying mainly on terminal-based workflows
-(vim/neovim/kakoune/helix..., shell and CLI tools), and wanting protection from
-projects that might modify system state or require conflicting dependencies.
-This is done by providing a sane, mostly-ephemeral and minimal environment.
-
-It is both a wrapper over the `docker compose` tool and a configuration
+`paul-envs` is both a wrapper over the `docker compose` tool and a configuration
 generator for it.
 Each of the created containers is similar in a way to [dev
 containers](https://containers.dev/) in that they are targeted for development
