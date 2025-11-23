@@ -751,7 +751,7 @@ prompt_packages() {
     echo "curl git build-essential"
     echo ""
     echo "Enter additional Ubuntu packages (space-separated, or Enter to skip):"
-    echo "Examples: ripgrep fzf bat htop"
+    echo "Examples: ripgrep fzf htop"
     read -r -p "Packages: " packages
 
     if [[ -n "$packages" ]]; then
@@ -1499,7 +1499,7 @@ Full Configuration Example:
     --enable-sudo \\
     --git-name "John Doe" \\
     --git-email "john@example.com" \\
-    --packages "ripgrep fzf bat" \\
+    --packages "ripgrep fzf" \\
     --port 3000 \\
     --port 5432 \\
     --volume ~/.git-credentials:/home/dev/.git-credentials:ro
