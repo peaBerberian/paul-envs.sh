@@ -396,12 +396,6 @@ ARG USERNAME=dev
 ARG USER_SHELL=bash
 ARG ENABLE_SSH=false
 
-USER ${USERNAME}
-
-# Set-up projects directory
-RUN mkdir -p /home/${USERNAME}/projects
-WORKDIR /home/${USERNAME}/projects
-
 USER root
 
 # Install openssh if ssh is wanted and set it up
@@ -432,3 +426,9 @@ RUN echo '#!/bin/bash' > /usr/local/bin/docker-entrypoint.sh && \
     echo "    exec runuser -u $USERNAME -- \"\$@\"" >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'fi' >> /usr/local/bin/docker-entrypoint.sh && \
     chmod +x /usr/local/bin/docker-entrypoint.sh
+
+USER ${USERNAME}
+
+# Set-up projects directory
+RUN mkdir -p /home/${USERNAME}/projects
+WORKDIR /home/${USERNAME}/projects
