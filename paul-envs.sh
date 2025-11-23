@@ -365,6 +365,7 @@ config_init() {
     config_set "install_python" ""
     config_set "install_go" ""
     config_set "enable_wasm" ""
+    config_set "enable_ssh" ""
     config_set "enable_sudo" ""
     config_set "git_name" ""
     config_set "git_email" ""
@@ -555,6 +556,10 @@ INSTALL_GO="$(config_get install_go)"
 # WebAssembly target for Rust if it is installed.
 ENABLE_WASM="$(config_get enable_wasm)"
 
+# If \`true\`, \`openssh\` will be installed, and the container will listen for ssh
+# connections at port 22.
+ENABLE_SSH="$(config_get enable_ssh)"
+
 # If \`true\`, \`sudo\` will be installed, with a password set to "dev".
 ENABLE_SUDO="$(config_get enable_sudo)"
 
@@ -600,6 +605,16 @@ EOF
         for port in "${ports[@]}"; do
             echo "      - \"$port:$port\"" >> "$compose_file"
         done
+        if [[ "$(config_get enable_ssh)" = "true" ]]; then
+          echo "      # to listen for ssh connections" >> "$compose_file"
+          echo "      - \"22:22\"" >> "$compose_file"
+        fi
+    elif [[ "$(config_get enable_ssh)" = "true" ]]; then
+        cat >> "$compose_file" <<EOF
+    ports:
+      # to listen for ssh connections
+      - "22:22"
+EOF
     fi
 
     # Add volumes if wanted
@@ -611,6 +626,21 @@ EOF
         echo "      - $vol" >> "$compose_file"
     done
 
+    if [[ "$(config_get enable_ssh)" = "true" ]]; then
+        local ssh_key_path
+        ssh_key_path="$(config_get ssh_key_path)"
+
+        if [[ -n "$ssh_key_path" && -f "$ssh_key_path" ]]; then
+            ssh_key_path=$(normalize_path "$ssh_key_path")
+            echo "      # Your local public key for ssh:" >> "$compose_file"
+            echo "      - $ssh_key_path:/etc/ssh/authorized_keys/\${USERNAME}:ro" >> "$compose_file"
+        else
+            warn "No SSH key configured"
+            warn "Adding a note to your compose file: $compose_file"
+            echo "      # Add your SSH public key here, for example:" >> "$compose_file"
+            echo "      # - ~/.ssh/id_ed25519.pub:/etc/ssh/authorized_keys/\${USERNAME}:ro" >> "$compose_file"
+        fi
+    fi
     echo "" >> "$compose_file"
 }
 
@@ -721,7 +751,7 @@ prompt_packages() {
     echo "curl git build-essential"
     echo ""
     echo "Enter additional Ubuntu packages (space-separated, or Enter to skip):"
-    echo "Examples: ripgrep fzf bat htop"
+    echo "Examples: ripgrep fzf htop"
     read -r -p "Packages: " packages
 
     if [[ -n "$packages" ]]; then
@@ -818,13 +848,74 @@ prompt_sudo() {
     fi
 }
 
+# Prompt ssh access if not set
+prompt_ssh() {
+    if [[ -n "$(config_get enable_ssh)" ]]; then
+        return
+    fi
+
+    echo ""
+    info "=== SSH Access ==="
+    read -r -p "Enable ssh access to container? (y/N): " ssh_choice
+    if [[ $ssh_choice =~ ^[Yy]$ ]]; then
+        config_set "enable_ssh" "true"
+        prompt_ssh_key
+    else
+        config_set "enable_ssh" "false"
+    fi
+}
+
+prompt_ssh_key() {
+    local ssh_dir="$HOME/.ssh"
+    local pub_keys=()
+    
+    # Find all public keys
+    if [[ -d "$ssh_dir" ]]; then
+        while IFS= read -r key; do
+            [[ -n "$key" ]] && pub_keys+=("$key")
+        done < <(find "$ssh_dir" -maxdepth 1 -name "*.pub" -type f 2>/dev/null)
+    fi
+
+    
+    if [[ ${#pub_keys[@]} -eq 0 ]]; then
+        warn "No SSH public keys found in ~/.ssh/"
+        config_set "ssh_key_path" ""
+        return
+    fi
+    
+    echo ""
+    echo "Select SSH public key to mount:"
+    for i in "${!pub_keys[@]}"; do
+        echo "  $((i+1))) $(basename "${pub_keys[$i]}")"
+    done
+    echo "  $((${#pub_keys[@]}+1))) Custom path"
+    echo "  $((${#pub_keys[@]}+2))) Skip (add manually later)"
+    
+    read -r -p "Choice [1]: " key_choice
+    key_choice=${key_choice:-1}
+    
+    if [[ $key_choice -ge 1 && $key_choice -le ${#pub_keys[@]} ]]; then
+        config_set "ssh_key_path" "${pub_keys[$((key_choice-1))]}"
+    elif [[ $key_choice -eq $((${#pub_keys[@]}+1)) ]]; then
+        read -r -p "Enter path to public key: " custom_key
+        if [[ -f "$custom_key" ]]; then
+            config_set "ssh_key_path" "$custom_key"
+        else
+            warn "File not found: $custom_key"
+            config_set "ssh_key_path" ""
+        fi
+    else
+        config_set "ssh_key_path" ""
+    fi
+}
+
 # Prompt for ports if not set
 prompt_ports() {
     local ports_var="$1"
 
     echo ""
     info "=== Port Forwarding ==="
-    echo "Enter ports to expose (space-separated, or Enter to skip):"
+    echo "Enter supplementary container ports to expose (space-separated, or Enter to skip):"
     echo "Examples: 3000 5432 8080"
     read -r -p "Ports: " port_input
 
@@ -969,6 +1060,10 @@ cmd_create() {
               config_set "enable_wasm" "true"
               shift
               ;;
+            --enable-ssh|--ssh)
+              config_set "enable_ssh" "true"
+              shift
+              ;;
             --enable-sudo|--sudo)
               config_set "enable_sudo" "true"
               shift
@@ -1066,6 +1161,9 @@ cmd_create() {
         if [[ -z "$(config_get enable_wasm)" ]]; then
             config_set "enable_wasm" "false"
         fi
+        if [[ -z "$(config_get enable_ssh)" ]]; then
+            config_set "enable_ssh" "false"
+        fi
         if [[ -z "$(config_get enable_sudo)" ]]; then
             config_set "enable_sudo" "false"
         fi
@@ -1095,6 +1193,7 @@ cmd_create() {
         prompt_tools
         mise_check $no_prompt
         prompt_sudo
+        prompt_ssh
         prompt_packages
 
         # Only prompt for ports if none were specified
@@ -1345,6 +1444,8 @@ Options for create (all optional):
                            (prompted if no language specified)
   --enable-wasm            Add WASM-specialized tools (binaryen, Rust wasm target if enabled)
                            (prompted if no language specified)
+  --enable-ssh             Enable ssh access on port 22 (E.g. to access files from your host)
+                           (prompted if not specified)
   --enable-sudo            Enable sudo access in container with a "dev" password
                            (prompted if not specified)
   --git-name NAME          Git user.name (optional)
@@ -1394,10 +1495,11 @@ Full Configuration Example:
     --starship \\
     --zellij \\
     --jujutsu \\
+    --enable-ssh \\
     --enable-sudo \\
     --git-name "John Doe" \\
     --git-email "john@example.com" \\
-    --packages "ripgrep fzf bat" \\
+    --packages "ripgrep fzf" \\
     --port 3000 \\
     --port 5432 \\
     --volume ~/.git-credentials:/home/dev/.git-credentials:ro

@@ -40,6 +40,8 @@ _paulenvs() {
                         '--git-name[Git author name]:name:' \
                         '--git-email[Git author email]:email:' \
                         '--packages[Additional packages]:packages:' \
+                        '--enable-ssh[Enable ssh access]' \
+                        '--enable-sudo[Enable sudo access (password: \"dev\")]' \
                         '--neovim[Install latest Neovim]' \
                         '--starship[Install latest Starship]' \
                         '--atuin[Install latest Atuin]' \

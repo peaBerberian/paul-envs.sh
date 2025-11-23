@@ -393,6 +393,8 @@ RUN if [ -n "$GIT_AUTHOR_EMAIL" ]; then \
 FROM ubuntu-tools AS ubuntu-projects
 
 ARG USERNAME=dev
+ARG USER_SHELL=bash
+ARG ENABLE_SSH=false
 
 USER ${USERNAME}
 
@@ -401,4 +403,40 @@ RUN mkdir -p /home/${USERNAME}/projects
 
 WORKDIR /home/${USERNAME}/projects
 
-CMD $SHELL
+USER root
+
+# Install openssh if ssh is wanted and set it up
+RUN if [ "$ENABLE_SSH" = "true" ]; then \
+    apt-get update && \
+    apt-get install -y openssh-server && \
+    mkdir -p /var/run/sshd && \
+    rm -rf /var/lib/apt/lists/* && \
+    ssh-keygen -A && \
+    echo "PasswordAuthentication no" >> /etc/ssh/sshd_config && \
+    echo "PubkeyAuthentication yes" >> /etc/ssh/sshd_config && \
+    echo "ChallengeResponseAuthentication no" >> /etc/ssh/sshd_config && \
+    echo "AuthorizedKeysFile /etc/ssh/authorized_keys/%u" >> /etc/ssh/sshd_config && \
+    echo "ListenAddress 0.0.0.0" >> /etc/ssh/sshd_config && \
+    echo "Port 22" >> /etc/ssh/sshd_config && \
+    mkdir -p /home/${USERNAME}/.ssh && \
+    chmod 700 /home/${USERNAME}/.ssh && \
+    chown ${USERNAME}:${USERNAME} /home/${USERNAME}/.ssh; \
+  fi
+
+# Create entrypoint script that conditionally starts SSH
+RUN echo '#!/usr/bin/env bash' > /usr/local/bin/docker-entrypoint.sh && \
+    echo 'if [[ -d /var/run/sshd ]] && ! pgrep -x sshd >/dev/null; then' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo '    /usr/sbin/sshd -D &' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo '    if [[ -t 0 ]] && [[ $# -eq 0 ]]; then' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo '        IP=$(hostname -I | awk "{print \$1}")' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo '        echo "NOTE: Listening for ssh connections at '"${USERNAME}"'@${IP}:22"' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo '    fi' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo 'fi' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo 'if [[ $# -eq 0 ]]; then' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo '    exec su '"${USERNAME}"' -s /usr/bin/'"${USER_SHELL}" >> /usr/local/bin/docker-entrypoint.sh && \
+    echo 'else' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo '    exec runuser -u '"${USERNAME}"' -- "$@"' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo 'fi' >> /usr/local/bin/docker-entrypoint.sh && \
+    chmod +x /usr/local/bin/docker-entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

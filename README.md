@@ -7,7 +7,7 @@ minimal containers.
 ## What's this
 
 `paul-envs` is built for me and other developers with similar needs: working on
-multiple projects simultaneously, relying on only terminal-based workflows
+multiple projects simultaneously, relying mainly on terminal-based workflows
 (vim/neovim/kakoune/helix..., shell and CLI tools), and wanting protection from
 projects that might modify system state or require conflicting dependencies.
 This is done by providing a sane, mostly-ephemeral and minimal environment.
@@ -16,7 +16,7 @@ It is both a wrapper over the `docker compose` tool and a configuration
 generator for it.
 Each of the created containers is similar in a way to [dev
 containers](https://containers.dev/) in that they are targeted for development
-usages but mine is optimized for CLI-only, multi-projects workflows.
+usages but mine is optimized for multi-projects workflows and CLI-heavy usage.
 
 Key features:
 
@@ -24,14 +24,31 @@ Key features:
    terminal history, installed tools' stored data, editor plugins...) are
    persisted. Everything else resets on exit, keeping the environment clean.
 
--  **Shared caches**: npm/yarn caches are shared across all projects to avoid
-   redundant downloads.
+-  **Multi-projects**: Multiple images can be handled, each being linked to a
+   project directory on your host.
 
 -  **Minimal base**: The containers are just Ubuntu LTS and your chosen CLI
-   tools. There's no GUI, no unnecessary packages.
+   tools. This means no unnecessary package and a very common - thus tested -
+   base.
+
+-  **Dev-oriented**: Possibility to opt-in to the installation of many popular
+   CLI tools (`neovim`, `atuin`, `mise`, `jujutsu`, `zellij`...) as well as
+   many language toolkits (Node.js + npm, Rust + cargo, go, python + pip + venv
+   and WebAssembly tools like binaryen).
+
+-  **optional SSH**: You can opt-in to ssh access from the host (e.g. for
+   relying on your host's GUI editor), just like "devcontainers".
+
+-  **Shared caches**: cache directories are shared across all projects to avoid
+   redundant downloads.
 
 -  **Fast setup**: Single shared `Dockerfile` means new project containers
    build quickly.
+
+-  **Easy to use**: I made it compatible with MacOS, Linux and Windows, with
+   automatic x86_64 or arm64 container creation depending on the host.
+
+   The script also guides you when you call any command without argument.
 
 
 ## Comparison with other similar tools
@@ -39,11 +56,9 @@ Key features:
 Regarding **alternatives**, `paul-envs` fit in a sweet spot for me:
 
 **vs. dev containers:**
-Dev containers include IDE integration and a rich ecosystem. `paul-envs` is
-editor-agnostic, CLI-specialized, handle multiple projects directly and is much
-simpler conceptually (it's just a minimal Ubuntu LTS image with only CLI tools
-wanted and configured on top) if all that is needed is a terminal-based
-workflow.
+Dev containers include IDE integration, is generally plug-and-play, and has a
+rich ecosystem. `paul-envs` is editor-agnostic, CLI-specialized, handle multiple
+projects directly and is simpler conceptually.
 
 **vs. Devbox:**
 Devbox has deterministic and reproducible environments thanks to `nix`, yet
@@ -88,7 +103,7 @@ isolation (same issue than with `devbox`).
    It will build the container through the right `docker compose build`
    invokation and initialize persistent volumes.
 
-5. Then run the container each time you want to work on the project:
+5. Then launch the container each time you want to work on the project:
    `./paul-envs.sh run myApp`.
 
    The mounted project is available in that container at `~/projects/myApp`.
@@ -112,7 +127,7 @@ each other, which is sadly not close to mine, so I encounter a lot of issues
 that they never encounter. As those are huge projects and not my main focus, the
 right action which would be to just fix those issues is very time-consuming.
 
-I thus decided to rely on a container for developing on those projects to
+I thus decided to rely on containers for developing on those projects to
 protect my own system from unwanted changes and to provide a more "barebone"
 and popular environment (ubuntu LTS, adding only my current developing tools to
 it).
@@ -153,7 +168,7 @@ and corresponding flags:
 ### 1. Create a new container's config
 
 The idea is to create a separate container for each project (that will rely on a
-same base container with variations).
+same base with variations).
 
 This container first need to be configured to point to your project and have the
 right arguments (e.g. the right tools and git configuration). This is done
@@ -396,4 +411,6 @@ Along the mounted project, those are the only directories which are persisted.
 
 ## TODO:
 
+- something like `up` / `down` commands make now much more sense with ssh
 - Add Kakoune and Helix as potential tools
+- Only max a single instance of each project-container?

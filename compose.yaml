@@ -106,6 +106,10 @@ services:
         # WebAssembly target for Rust if it is installed.
         ENABLE_WASM: ${ENABLE_WASM:-false}
 
+        # If `true`, `openssh` will be installed, and the container will listen for ssh
+        # connections at port 22.
+        ENABLE_SSH: ${ENABLE_SSH:-false}
+
         # If `true`, `sudo` will be installed, (password set to `dev`).
         ENABLE_SUDO: ${ENABLE_SUDO:-false}
 
@@ -157,7 +161,8 @@ services:
     pull_policy: never
     user: root
     command: >
-      sh -c "cp -a /home/${USERNAME}/.container-cache/. /mnt/cache/ &&
+      mkdir -p /mnt/cache &&
+             sh -c "cp -a /home/${USERNAME}/.container-cache/. /mnt/cache/ &&
              chown -R ${HOST_UID}:${HOST_GID} /mnt/cache"
     volumes:
       - shared-cache:/mnt/cache
@@ -178,7 +183,8 @@ services:
     pull_policy: never
     user: root
     command: >
-      sh -c "cp -a /home/${USERNAME}/.container-local/. /mnt/local/ &&
+      mkdir -p /mnt/local &&
+             sh -c "cp -a /home/${USERNAME}/.container-local/. /mnt/local/ &&
              chown -R ${HOST_UID}:${HOST_GID} /mnt/local"
     volumes:
       - local-state:/mnt/local
