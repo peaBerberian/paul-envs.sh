@@ -2,28 +2,50 @@ package main
 
 import (
 	"bufio"
+	"context"
+	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
+	"syscall"
 )
 
 const version = "0.1.0"
 
-// ANSI color codes
 const (
+	// ANSI color codes
 	colorRed    = "\033[0;31m"
 	colorGreen  = "\033[0;32m"
 	colorYellow = "\033[1;33m"
 	colorBlue   = "\033[0;34m"
 	colorReset  = "\033[0m"
+
+	shellBash = "bash"
+	shellZsh  = "zsh"
+	shellFish = "fish"
+
+	versionNone   = "none"
+	versionLatest = "latest"
+
+	baseComposeFilename    = "compose.yaml"
+	projectComposeFilename = "compose.yaml"
+	projectEnvFilename     = ".env"
 )
 
-type Config struct {
+var (
+	projectNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_][a-zA-Z0-9_-]{0,127}$`)
+	versionRegex     = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
+)
+
+type ContainerConfig struct {
 	hostUID         string
 	hostGID         string
 	username        string
@@ -49,122 +71,110 @@ type Config struct {
 	sshKeyPath      string
 }
 
-var (
-	isWindows   bool
+type App struct {
 	scriptDir   string
 	projectsDir string
-	reader      *bufio.Reader
-)
+	io          *IoCtrl
+}
 
-func init() {
-	reader = bufio.NewReader(os.Stdin)
-	isWindows = runtime.GOOS == "windows"
+type IoCtrl struct {
+	reader *bufio.Reader
+	writer io.Writer
+}
 
+func NewIoCtrl(rd io.Reader, w io.Writer) *IoCtrl {
+	return &IoCtrl{
+		reader: bufio.NewReader(rd),
+		writer: w,
+	}
+}
+
+func NewApp() (*App, error) {
 	// Get script directory
+	// TODO: Rely on something like XDG_DATA_HOME, XDG_CONFIG_HOME etc.
 	ex, err := os.Executable()
 	if err != nil {
-		fatal("Failed to get executable path: %v", err)
-	}
-	scriptDir = filepath.Dir(ex)
-
-	// Normalize for Windows
-	if isWindows {
-		scriptDir = normalizePath(scriptDir)
+		return nil, fmt.Errorf("failed to get executable path: %w", err)
 	}
 
-	projectsDir = filepath.Join(scriptDir, "projects")
+	return &App{
+		scriptDir:   filepath.Dir(ex),
+		projectsDir: filepath.Join(filepath.Dir(ex), "projects"),
+		io:          NewIoCtrl(os.Stdin, os.Stdout),
+	}, nil
 }
 
 func main() {
+	ctx, cancel := signal.NotifyContext(context.Background(),
+		os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	app, err := NewApp()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
 	if len(os.Args) < 2 {
-		printUsage()
+		printUsage(app)
 		os.Exit(0)
 	}
 
 	cmd := os.Args[1]
 	args := os.Args[2:]
 
+	var cmdErr error
 	switch cmd {
 	case "create":
-		cmdCreate(args)
+		app.Create(args)
 	case "list", "ls":
-		cmdList()
+		cmdErr = app.List()
 	case "build":
-		cmdBuild(args)
+		cmdErr = app.Build(ctx, args)
 	case "run":
-		cmdRun(args)
+		cmdErr = app.Run(ctx, args)
 	case "remove", "rm":
-		cmdRemove(args)
+		cmdErr = app.Remove(args)
 	case "version", "--version", "-v":
-		cmdVersion()
+		cmdErr = app.Version(ctx)
 	default:
-		printUsage()
+		printUsage(app)
+	}
+
+	if cmdErr != nil {
+		if errors.Is(cmdErr, context.Canceled) {
+			fmt.Fprintln(os.Stderr, "Operation cancelled")
+			os.Exit(130)
+		}
+		fmt.Fprintf(os.Stderr, "Error: %v\n", cmdErr)
+		os.Exit(1)
 	}
 }
 
 // Output functions
-func fatal(format string, args ...interface{}) {
+func fatal(format string, args ...any) {
 	fmt.Fprintf(os.Stderr, colorRed+"Error: "+format+colorReset+"\n", args...)
 	os.Exit(1)
 }
 
-func success(format string, args ...interface{}) {
-	fmt.Printf(colorGreen+format+colorReset+"\n", args...)
+func (io *IoCtrl) success(format string, args ...any) {
+	fmt.Fprintf(io.writer, colorGreen+format+colorReset+"\n", args...)
 }
 
-func warn(format string, args ...interface{}) {
-	fmt.Printf(colorYellow+format+colorReset+"\n", args...)
+func (io *IoCtrl) warn(format string, args ...any) {
+	fmt.Fprintf(io.writer, colorYellow+format+colorReset+"\n", args...)
 }
 
-func info(format string, args ...interface{}) {
-	fmt.Printf(colorBlue+format+colorReset+"\n", args...)
-}
-
-// Path normalization for Windows
-func normalizePath(path string) string {
-	if !isWindows {
-		return path
-	}
-
-	// Convert backslashes to forward slashes
-	path = strings.ReplaceAll(path, "\\", "/")
-
-	// Handle Windows drive letters (C:\foo → /c/foo)
-	driveRe := regexp.MustCompile(`^([A-Za-z]):/(.*)$`)
-	if matches := driveRe.FindStringSubmatch(path); matches != nil {
-		drive := strings.ToLower(matches[1])
-		rest := matches[2]
-		return "/" + drive + "/" + rest
-	}
-
-	// Handle Git Bash (/c/foo or /C/foo)
-	gitBashRe := regexp.MustCompile(`^/([A-Za-z])/(.*)$`)
-	if matches := gitBashRe.FindStringSubmatch(path); matches != nil {
-		return "/" + strings.ToLower(matches[1]) + "/" + matches[2]
-	}
-
-	// Relative paths (foo/bar)
-	return path
-}
-
-func getAbsolutePath(path string) (string, error) {
-	path = strings.ReplaceAll(path, "\\", "/")
-
-	absPath, err := filepath.Abs(path)
-	if err != nil {
-		return "", err
-	}
-
-	return normalizePath(absPath), nil
+func (io *IoCtrl) info(format string, args ...any) {
+	fmt.Fprintf(io.writer, colorBlue+format+colorReset+"\n", args...)
 }
 
 // Validation functions
 func validateProjectName(name string) error {
 	if name == "" {
-		return fmt.Errorf("project name cannot be empty")
+		return errors.New("project name cannot be empty")
 	}
-	re := regexp.MustCompile(`^[a-zA-Z0-9_][a-zA-Z0-9_-]{0,127}$`)
-	if !re.MatchString(name) {
+	if !projectNameRegex.MatchString(name) {
 		return fmt.Errorf("invalid project name '%s'. Must be 1-128 characters, start with alphanumeric or underscore, and contain only alphanumeric, hyphens, and underscores", name)
 	}
 	return nil
@@ -209,11 +219,10 @@ func validateShell(shell string) error {
 }
 
 func validateVersionArg(version string) error {
-	if version == "" || version == "latest" || version == "none" {
+	if version == "" || version == versionLatest || version == versionNone {
 		return nil
 	}
-	re := regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
-	if !re.MatchString(version) {
+	if !versionRegex.MatchString(version) {
 		return fmt.Errorf("invalid version argument: '%s'. Must be either \"none\", \"latest\" or semantic versioning (e.g., 20.10.0)", version)
 	}
 	return nil
@@ -221,7 +230,7 @@ func validateVersionArg(version string) error {
 
 func validateAptPackageNames(packages string) error {
 	re := regexp.MustCompile(`^[a-z0-9+._-]+$`)
-	for _, pkg := range strings.Fields(packages) {
+	for pkg := range strings.FieldsSeq(packages) {
 		if !re.MatchString(pkg) {
 			return fmt.Errorf("invalid package name '%s'. Package names must contain only lowercase letters, digits, hyphens, periods, and plus signs", pkg)
 		}
@@ -231,10 +240,10 @@ func validateAptPackageNames(packages string) error {
 
 func validateGitName(name string) error {
 	if strings.ContainsAny(name, "\"\n\r") {
-		return fmt.Errorf("invalid git name. Cannot contain quotes or newlines")
+		return errors.New("invalid git name. Cannot contain quotes or newlines")
 	}
 	if len(name) > 100 {
-		return fmt.Errorf("git name too long (max 100 characters)")
+		return errors.New("git name too long (max 100 characters)")
 	}
 	return nil
 }
@@ -253,14 +262,13 @@ func validateUsername(username string) error {
 		return fmt.Errorf("invalid username '%s'. Must start with lowercase letter or underscore, followed by lowercase letters, digits, underscores, or hyphens", username)
 	}
 	if len(username) > 32 {
-		return fmt.Errorf("username too long (max 32 characters)")
+		return errors.New("username too long (max 32 characters)")
 	}
 	return nil
 }
 
 func validatePort(port string) error {
-	var p int
-	_, err := fmt.Sscanf(port, "%d", &p)
+	p, err := strconv.Atoi(port)
 	if err != nil || p < 1 || p > 65535 {
 		return fmt.Errorf("invalid port '%s'. Must be a number between 1 and 65535", port)
 	}
@@ -268,17 +276,16 @@ func validatePort(port string) error {
 }
 
 func validateUIDGID(id, idType string) error {
-	var i int
-	_, err := fmt.Sscanf(id, "%d", &i)
+	i, err := strconv.Atoi(id)
 	if err != nil || i < 0 || i > 65535 {
 		return fmt.Errorf("invalid %s '%s'. Must be a number between 0 and 65535", idType, id)
 	}
 	return nil
 }
 
-// Config functions
-func newConfig() *Config {
-	cfg := &Config{
+// ContainerConfig functions
+func newConfig() *ContainerConfig {
+	cfg := &ContainerConfig{
 		username:        "dev",
 		shell:           "",
 		installNode:     "",
@@ -300,7 +307,8 @@ func newConfig() *Config {
 	}
 
 	// Set UID/GID
-	if isWindows {
+	// TODO: special platform file?
+	if runtime.GOOS == "windows" {
 		cfg.hostUID = "1000"
 		cfg.hostGID = "1000"
 	} else {
@@ -319,21 +327,25 @@ func lightSanitize(str string) string {
 }
 
 // File path helpers
-func getProjectDir(name string) string {
-	return filepath.Join(projectsDir, name)
+func (app *App) getBaseCompose() string {
+	return filepath.Join(app.scriptDir, baseComposeFilename)
 }
 
-func getProjectCompose(name string) string {
-	return filepath.Join(projectsDir, name, "compose.yaml")
+func (app *App) getProjectDir(name string) string {
+	return filepath.Join(app.projectsDir, name)
 }
 
-func getProjectEnv(name string) string {
-	return filepath.Join(projectsDir, name, ".env")
+func (app *App) getProjectCompose(name string) string {
+	return filepath.Join(app.projectsDir, name, projectComposeFilename)
 }
 
-func checkInexistentName(name string) {
-	composeFile := getProjectCompose(name)
-	envFile := getProjectEnv(name)
+func (app *App) getProjectEnv(name string) string {
+	return filepath.Join(app.projectsDir, name, projectEnvFilename)
+}
+
+func (app *App) assertInexistantProject(name string) {
+	composeFile := app.getProjectCompose(name)
+	envFile := app.getProjectEnv(name)
 
 	if _, err := os.Stat(composeFile); err == nil {
 		fatal("Project '%s' already exists. You can have multiple configurations for the same project by calling 'create' with the '--name' flag. Hint: Use 'paul-envs list' to see all projects or 'paul-envs remove %s' to delete it", name, name)
@@ -344,10 +356,10 @@ func checkInexistentName(name string) {
 }
 
 func doesLangVersionNeedsMise(version string) bool {
-	return version != "none" && version != "latest" && version != ""
+	return version != versionNone && version != versionLatest && version != ""
 }
 
-func miseCheck(cfg *Config, noPrompt bool) {
+func miseCheck(cfg *ContainerConfig, noPrompt bool, io *IoCtrl) {
 	needsMiseWarning := false
 	if doesLangVersionNeedsMise(cfg.installNode) ||
 		doesLangVersionNeedsMise(cfg.installRust) ||
@@ -360,21 +372,24 @@ func miseCheck(cfg *Config, noPrompt bool) {
 
 	if needsMiseWarning {
 		fmt.Println()
-		warn("WARNING: You specified exact version(s) for language runtimes, but Mise is not enabled.")
-		warn("Exact versions require Mise to be installed. Without Mise, Ubuntu's default packages will be used instead.")
+		io.warn("WARNING: You specified exact version(s) for language runtimes, but Mise is not enabled.")
+		io.warn("Exact versions require Mise to be installed. Without Mise, Ubuntu's default packages will be used instead.")
 		if !noPrompt {
-			choice := promptYN("Would you like to enable Mise now?", "Y")
+			choice := io.askYesNo("Would you like to enable Mise now?", "Y")
 			if choice {
 				cfg.installMise = "true"
-				success("Mise enabled")
+				io.success("Mise enabled")
 			}
 		}
 	}
 }
 
-func promptYN(prompt, defaultVal string) bool {
+func (io *IoCtrl) askYesNo(prompt, defaultVal string) bool {
 	fmt.Printf("%s (%s/n): ", prompt, defaultVal)
-	input, _ := reader.ReadString('\n')
+	input, err := io.reader.ReadString('\n')
+	if err != nil {
+		fatal("Failed to read user input: %v", err)
+	}
 	input = strings.TrimSpace(input)
 	if input == "" {
 		input = defaultVal
@@ -382,13 +397,16 @@ func promptYN(prompt, defaultVal string) bool {
 	return strings.ToUpper(input) == "Y"
 }
 
-func promptString(prompt, defaultVal string) string {
+func (io *IoCtrl) askString(prompt, defaultVal string) string {
 	if defaultVal != "" {
 		fmt.Printf("%s [%s]: ", prompt, defaultVal)
 	} else {
 		fmt.Printf("%s: ", prompt)
 	}
-	input, _ := reader.ReadString('\n')
+	input, err := io.reader.ReadString('\n')
+	if err != nil {
+		fatal("Failed to read user input: %v", err)
+	}
 	input = strings.TrimSpace(input)
 	if input == "" {
 		return defaultVal
@@ -396,101 +414,77 @@ func promptString(prompt, defaultVal string) string {
 	return input
 }
 
-func promptShell(cfg *Config) {
-	if cfg.shell != "" {
-		return
-	}
-
-	fmt.Println()
-	info("=== Shell Selection ===")
+func promptShellConfig(io *IoCtrl, cfg *ContainerConfig) {
+	io.info("=== Shell Selection ===")
 	fmt.Println("Select shell:")
 	fmt.Println("  1) bash (default)")
 	fmt.Println("  2) zsh")
 	fmt.Println("  3) fish")
-	choice := promptString("Choice", "1")
+	choice := io.askString("Choice", "1")
 
 	switch choice {
 	case "1":
-		cfg.shell = "bash"
+		cfg.shell = shellBash
 	case "2":
-		cfg.shell = "zsh"
+		cfg.shell = shellZsh
 	case "3":
-		cfg.shell = "fish"
+		cfg.shell = shellFish
 	default:
-		cfg.shell = "bash"
+		cfg.shell = shellBash
 	}
 }
 
-func promptLanguages(cfg *Config) {
-	hasAnyLang := cfg.installNode != "" || cfg.installRust != "" ||
-		cfg.installPython != "" || cfg.installGo != ""
-
-	if hasAnyLang {
-		if cfg.installNode == "" {
-			cfg.installNode = "none"
-		}
-		if cfg.installRust == "" {
-			cfg.installRust = "none"
-		}
-		if cfg.installPython == "" {
-			cfg.installPython = "none"
-		}
-		if cfg.installGo == "" {
-			cfg.installGo = "none"
-		}
-		return
-	}
-
-	fmt.Println()
-	info("=== Language Runtimes ===")
+func promptLanguagesConfig(io *IoCtrl, cfg *ContainerConfig) {
+	io.info("=== Language Runtimes ===")
 	fmt.Println("Which language runtimes do you need? (space-separated numbers, or Enter to skip)")
 	fmt.Println("  1) Node.js")
 	fmt.Println("  2) Rust")
 	fmt.Println("  3) Python")
 	fmt.Println("  4) Go")
 	fmt.Println("  5) WebAssembly tools (Binaryen, Rust WASM target if Rust is enabled)")
-	langChoices := promptString("Choice", "none")
+	langChoices := io.askString("Choice", "none")
 
-	cfg.installNode = "none"
-	cfg.installRust = "none"
-	cfg.installPython = "none"
-	cfg.installGo = "none"
+	cfg.installNode = versionNone
+	cfg.installRust = versionNone
+	cfg.installPython = versionNone
+	cfg.installGo = versionNone
 
-	for _, choice := range strings.Fields(langChoices) {
+	for choice := range strings.FieldsSeq(langChoices) {
 		switch choice {
 		case "1":
-			nodeVer := promptString("Node.js version (latest/none/X.Y.Z)", "latest")
+			nodeVer := io.askString("Node.js version (latest/none/X.Y.Z)", versionLatest)
 			cfg.installNode = nodeVer
 		case "2":
-			rustVer := promptString("Rust version (latest/none/X.Y.Z)", "latest")
+			rustVer := io.askString("Rust version (latest/none/X.Y.Z)", versionLatest)
 			cfg.installRust = rustVer
 		case "3":
-			pythonVer := promptString("Python version (latest/none/X.Y.Z)", "latest")
+			pythonVer := io.askString("Python version (latest/none/X.Y.Z)", versionLatest)
 			cfg.installPython = pythonVer
 		case "4":
-			goVer := promptString("Go version (latest/none/X.Y.Z)", "latest")
+			goVer := io.askString("Go version (latest/none/X.Y.Z)", versionLatest)
 			cfg.installGo = goVer
 		case "5":
 			cfg.enableWasm = "true"
+		case "none":
+			cfg.installNode = versionNone
+			cfg.installRust = versionNone
+			cfg.installPython = versionNone
+			cfg.installGo = versionNone
+			return
 		default:
-			warn("Unknown choice: %s (skipped)", choice)
+			io.warn("Unknown choice: %s (skipped)", choice)
 		}
 	}
 }
 
-func promptPackages(cfg *Config) {
-	if cfg.packages != "" {
-		return
-	}
-
-	fmt.Println()
-	info("=== Additional Packages ===")
+func promptPackagesConfig(io *IoCtrl, cfg *ContainerConfig) {
+	io.info("=== Additional Packages ===")
 	fmt.Println("The following packages are already installed on top of an Ubuntu:24.04 image:")
 	fmt.Println("curl git build-essential")
 	fmt.Println()
 	fmt.Println("Enter additional Ubuntu packages (space-separated, or Enter to skip):")
 	fmt.Println("Examples: ripgrep fzf htop")
-	packages := promptString("Packages", "")
+	packages := io.askString("Packages", "")
 
 	if packages != "" {
 		if err := validateAptPackageNames(packages); err != nil {
@@ -500,35 +494,8 @@ func promptPackages(cfg *Config) {
 	}
 }
 
-func promptTools(cfg *Config) {
-	toolsSet := cfg.installNeovim != "" || cfg.installStarship != "" ||
-		cfg.installAtuin != "" || cfg.installMise != "" ||
-		cfg.installZellij != "" || cfg.installJujutsu != ""
-
-	if toolsSet {
-		if cfg.installNeovim == "" {
-			cfg.installNeovim = "false"
-		}
-		if cfg.installStarship == "" {
-			cfg.installStarship = "false"
-		}
-		if cfg.installAtuin == "" {
-			cfg.installAtuin = "false"
-		}
-		if cfg.installMise == "" {
-			cfg.installMise = "false"
-		}
-		if cfg.installZellij == "" {
-			cfg.installZellij = "false"
-		}
-		if cfg.installJujutsu == "" {
-			cfg.installJujutsu = "false"
-		}
-		return
-	}
-
-	fmt.Println()
-	info("=== Development Tools ===")
+func promptToolsConfig(io *IoCtrl, cfg *ContainerConfig) {
+	io.info("=== Development Tools ===")
 	fmt.Println("Some dev tools are not pulled from Ubuntu's repositories to get their latest version instead.")
 	fmt.Println("Which of those tools do you want to install? (space-separated numbers, or Enter to skip all)")
 	fmt.Println("  1) Neovim (text editor)")
@@ -537,7 +504,7 @@ func promptTools(cfg *Config) {
 	fmt.Println("  4) Mise (version manager - required for specific language versions)")
 	fmt.Println("  5) Zellij (terminal multiplexer)")
 	fmt.Println("  6) Jujutsu (Git-compatible VCS)")
-	toolChoices := promptString("Choice", "none")
+	toolChoices := io.askString("Choice", "none")
 
 	cfg.installNeovim = "false"
 	cfg.installStarship = "false"
@@ -546,7 +513,7 @@ func promptTools(cfg *Config) {
 	cfg.installZellij = "false"
 	cfg.installJujutsu = "false"
 
-	for _, choice := range strings.Fields(toolChoices) {
+	for choice := range strings.FieldsSeq(toolChoices) {
 		switch choice {
 		case "1":
 			cfg.installNeovim = "true"
@@ -560,53 +527,61 @@ func promptTools(cfg *Config) {
 			cfg.installZellij = "true"
 		case "6":
 			cfg.installJujutsu = "true"
+		case "none":
+			cfg.installNeovim = "false"
+			cfg.installStarship = "false"
+			cfg.installAtuin = "false"
+			cfg.installMise = "false"
+			cfg.installZellij = "false"
+			cfg.installJujutsu = "false"
+			return
 		default:
-			warn("Unknown choice: %s (skipped)", choice)
+			io.warn("Unknown choice: %s (skipped)", choice)
 		}
 	}
 }
 
-func promptSudo(cfg *Config) {
-	if cfg.enableSudo != "" {
-		return
-	}
-
-	fmt.Println()
-	info("=== Sudo Access ===")
-	if promptYN("Enable sudo access in container (password:\"dev\")?", "N") {
+func promptSudoConfig(io *IoCtrl, cfg *ContainerConfig) {
+	io.info("=== Sudo Access ===")
+	if io.askYesNo("Enable sudo access in container (password:\"dev\")?", "N") {
 		cfg.enableSudo = "true"
 	} else {
 		cfg.enableSudo = "false"
 	}
 }
 
-func promptSSH(cfg *Config) {
-	if cfg.enableSSH != "" {
-		return
-	}
-
-	fmt.Println()
-	info("=== SSH Access ===")
-	if promptYN("Enable ssh access to container?", "N") {
+func promptSshConfig(io *IoCtrl, cfg *ContainerConfig) {
+	io.info("=== SSH Access ===")
+	if io.askYesNo("Enable ssh access to container?", "N") {
 		cfg.enableSSH = "true"
-		promptSSHKey(cfg)
+		promptSshKeysConfig(io, cfg)
 	} else {
 		cfg.enableSSH = "false"
 	}
 }
 
-func promptSSHKey(cfg *Config) {
-	homeDir, _ := os.UserHomeDir()
+func promptSshKeysConfig(io *IoCtrl, cfg *ContainerConfig) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		io.warn("Unable to obtain home dir for ssh prompt: %v", err)
+		cfg.sshKeyPath = ""
+		return
+	}
 	sshDir := filepath.Join(homeDir, ".ssh")
 
 	var pubKeys []string
 	if info, err := os.Stat(sshDir); err == nil && info.IsDir() {
-		files, _ := filepath.Glob(filepath.Join(sshDir, "*.pub"))
+		files, err := filepath.Glob(filepath.Join(sshDir, "*.pub"))
+		if err != nil {
+			io.warn("Unable to list ssh public keys, skipping ssh keys prompt: %v", err)
+			cfg.sshKeyPath = ""
+			return
+		}
 		pubKeys = files
 	}
 
 	if len(pubKeys) == 0 {
-		warn("No SSH public keys found in ~/.ssh/")
+		io.warn("No SSH public keys found in ~/.ssh/")
 		cfg.sshKeyPath = ""
 		return
 	}
@@ -619,18 +594,19 @@ func promptSSHKey(cfg *Config) {
 	fmt.Printf("  %d) Custom path\n", len(pubKeys)+1)
 	fmt.Printf("  %d) Skip (add manually later)\n", len(pubKeys)+2)
 
-	choice := promptString("Choice", "1")
-	var choiceNum int
-	fmt.Sscanf(choice, "%d", &choiceNum)
-
-	if choiceNum >= 1 && choiceNum <= len(pubKeys) {
+	choice := io.askString("Choice", "1")
+	choiceNum, err := strconv.Atoi(choice)
+	if err != nil {
+		io.warn("Invalid value: %s. Skipping...", choice)
+		cfg.sshKeyPath = ""
+	} else if choiceNum >= 1 && choiceNum <= len(pubKeys) {
 		cfg.sshKeyPath = pubKeys[choiceNum-1]
 	} else if choiceNum == len(pubKeys)+1 {
-		customKey := promptString("Enter path to public key", "")
+		customKey := io.askString("Enter path to public key", "")
 		if _, err := os.Stat(customKey); err == nil {
 			cfg.sshKeyPath = customKey
 		} else {
-			warn("File not found: %s", customKey)
+			io.warn("File not found: %s", customKey)
 			cfg.sshKeyPath = ""
 		}
 	} else {
@@ -638,15 +614,14 @@ func promptSSHKey(cfg *Config) {
 	}
 }
 
-func promptPorts() []string {
-	fmt.Println()
-	info("=== Port Forwarding ===")
+func promptPortsWanted(io *IoCtrl) []string {
+	io.info("=== Port Forwarding ===")
 	fmt.Println("Enter supplementary container ports to expose (space-separated, or Enter to skip):")
 	fmt.Println("Examples: 3000 5432 8080")
-	portInput := promptString("Ports", "")
+	portInput := io.askString("Ports", "")
 
 	var ports []string
-	for _, port := range strings.Fields(portInput) {
+	for port := range strings.FieldsSeq(portInput) {
 		if err := validatePort(port); err != nil {
 			fatal(err.Error())
 		}
@@ -655,23 +630,23 @@ func promptPorts() []string {
 	return ports
 }
 
-func promptVolumes() []string {
-	fmt.Println()
-	info("=== Credentials & Volumes ===")
+func promptVolumesWanted(io *IoCtrl) []string {
+	io.info("=== Credentials & Volumes ===")
 	fmt.Println("Mount common credentials/configs? (space-separated numbers, or Enter to skip)")
 	fmt.Println("  1) SSH keys (~/.ssh)")
 	fmt.Println("  2) Git credentials (~/.git-credentials)")
 	fmt.Println("  3) AWS credentials (~/.aws)")
 	fmt.Println("  4) Custom CA certificates (/etc/ssl/certs/custom-ca.crt)")
-	choices := promptString("Choice", "none")
-
-	homeDir, _ := os.UserHomeDir()
-	if isWindows {
-		homeDir = normalizePath(homeDir)
-	}
+	choices := io.askString("Choice", "none")
 
 	var volumes []string
-	for _, choice := range strings.Fields(choices) {
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		io.warn("Unable to obtain home dir for volume prompt: %v", err)
+		return volumes
+	}
+	for choice := range strings.FieldsSeq(choices) {
 		switch choice {
 		case "1":
 			volumes = append(volumes, fmt.Sprintf("%s/.ssh:/home/${USERNAME}/.ssh:ro", homeDir))
@@ -681,8 +656,11 @@ func promptVolumes() []string {
 			volumes = append(volumes, fmt.Sprintf("%s/.aws:/home/${USERNAME}/.aws:ro", homeDir))
 		case "4":
 			volumes = append(volumes, "/etc/ssl/certs/custom-ca.crt:/usr/local/share/ca-certificates/custom-ca.crt:ro")
+		case "none":
+			volumes = volumes[:0]
+			return volumes
 		default:
-			warn("Unknown choice: %s (skipped)", choice)
+			io.warn("Unknown choice: %s (skipped)", choice)
 		}
 	}
 
@@ -690,7 +668,7 @@ func promptVolumes() []string {
 	fmt.Println("Add custom volumes? (one per line, Enter on empty line to finish)")
 	fmt.Println("Format: /host/path:/container/path[:ro]")
 	for {
-		vol := promptString("Volume", "")
+		vol := io.askString("Volume", "")
 		if vol == "" {
 			break
 		}
@@ -698,7 +676,6 @@ func promptVolumes() []string {
 		if idx := strings.Index(vol, ":"); idx != -1 {
 			hostPart := vol[:idx]
 			containerPart := vol[idx:]
-			hostPart = normalizePath(hostPart)
 			vol = hostPart + containerPart
 		}
 		volumes = append(volumes, vol)
@@ -707,11 +684,11 @@ func promptVolumes() []string {
 	return volumes
 }
 
-func generateProjectCompose(name string, cfg *Config, ports, volumes []string) {
-	composeFile := getProjectCompose(name)
-	envFile := getProjectEnv(name)
+func generateProjectCompose(app *App, name string, cfg *ContainerConfig, ports, volumes []string) {
+	composeFile := app.getProjectCompose(name)
+	envFile := app.getProjectEnv(name)
 
-	checkInexistentName(name)
+	app.assertInexistantProject(name)
 
 	safeGitName := lightSanitize(cfg.gitName)
 	safeGitEmail := lightSanitize(cfg.gitEmail)
@@ -721,7 +698,7 @@ func generateProjectCompose(name string, cfg *Config, ports, volumes []string) {
 
 	// Generate .env file
 	envContent := fmt.Sprintf(`# "Env file" for your project, which will be fed to docker compose
-# alongside "compose.yaml" in the same directory.
+# alongside %s in the same directory.
 #
 # Can be freely updated.
 
@@ -829,7 +806,7 @@ GIT_AUTHOR_NAME="%s"
 # Git author and committer e-mail used inside the container
 # Can also be empty to not set that in the container.
 GIT_AUTHOR_EMAIL="%s"
-`, name, cfg.projectDestPath, cfg.projectHostPath,
+`, projectComposeFilename, name, cfg.projectDestPath, cfg.projectHostPath,
 		cfg.hostUID, cfg.hostGID, cfg.username, cfg.shell,
 		cfg.installNode, cfg.installRust, cfg.installPython, cfg.installGo,
 		cfg.enableWasm, cfg.enableSSH, cfg.enableSudo, safePackages,
@@ -843,6 +820,7 @@ GIT_AUTHOR_EMAIL="%s"
 
 	// Generate compose.yaml
 	var composeBuilder strings.Builder
+	// TODO: rely on projectEnvFilename
 	composeBuilder.WriteString(`# Compose file for your project, which will be fed to docker compose alongside
 # ".env" in the same directory.
 #
@@ -871,12 +849,12 @@ services:
 	}
 
 	if cfg.enableSSH == "true" && cfg.sshKeyPath != "" {
-		sshKeyPath := normalizePath(cfg.sshKeyPath)
+		sshKeyPath := cfg.sshKeyPath
 		composeBuilder.WriteString("      # Your local public key for ssh:\n")
 		composeBuilder.WriteString(fmt.Sprintf("      - %s:/etc/ssh/authorized_keys/${USERNAME}:ro\n", sshKeyPath))
 	} else if cfg.enableSSH == "true" {
-		warn("No SSH key configured")
-		warn("Adding a note to your compose file: %s", composeFile)
+		app.io.warn("No SSH key configured")
+		app.io.warn("Adding a note to your compose file: %s", composeFile)
 		composeBuilder.WriteString("      # Add your SSH public key here, for example:\n")
 		composeBuilder.WriteString("      # - ~/.ssh/id_ed25519.pub:/etc/ssh/authorized_keys/${USERNAME}:ro\n")
 	}
@@ -888,7 +866,7 @@ services:
 }
 
 // Command implementations
-func cmdCreate(args []string) {
+func (app *App) Create(args []string) {
 	cfg := newConfig()
 	var name string
 	var ports, volumes []string
@@ -960,7 +938,7 @@ func cmdCreate(args []string) {
 
 	// Custom parsing for repeatable flags
 	var i int
-	for i = 0; i < len(args); i++ {
+	for i = 1; i < len(args); i++ {
 		if args[i] == "--port" && i+1 < len(args) {
 			ports = append(ports, args[i+1])
 			i++
@@ -969,7 +947,6 @@ func cmdCreate(args []string) {
 			if idx := strings.Index(vol, ":"); idx != -1 {
 				hostPart := vol[:idx]
 				containerPart := vol[idx:]
-				hostPart = normalizePath(hostPart)
 				vol = hostPart + containerPart
 			}
 			volumes = append(volumes, vol)
@@ -984,7 +961,7 @@ func cmdCreate(args []string) {
 		fatal("Usage: paul-envs create <project-path> [options]")
 	}
 
-	projectPath, err := getAbsolutePath(args[0])
+	projectPath, err := filepath.Abs(args[0])
 	if err != nil {
 		fatal("Invalid project path: %v", err)
 	}
@@ -1066,24 +1043,24 @@ func cmdCreate(args []string) {
 	}
 
 	cfg.projectDestPath = name
-	checkInexistentName(name)
+	app.assertInexistantProject(name)
 
 	// Set defaults or prompt
 	if noPrompt {
 		if cfg.shell == "" {
-			cfg.shell = "bash"
+			cfg.shell = shellBash
 		}
 		if cfg.installNode == "" {
-			cfg.installNode = "none"
+			cfg.installNode = versionNone
 		}
 		if cfg.installRust == "" {
-			cfg.installRust = "none"
+			cfg.installRust = versionNone
 		}
 		if cfg.installPython == "" {
-			cfg.installPython = "none"
+			cfg.installPython = versionNone
 		}
 		if cfg.installGo == "" {
-			cfg.installGo = "none"
+			cfg.installGo = versionNone
 		}
 		if cfg.enableWasm == "" {
 			cfg.enableWasm = "false"
@@ -1112,72 +1089,139 @@ func cmdCreate(args []string) {
 		if cfg.installJujutsu == "" {
 			cfg.installJujutsu = "false"
 		}
-		miseCheck(cfg, noPrompt)
+		miseCheck(cfg, noPrompt, app.io)
 	} else {
-		promptShell(cfg)
-		promptLanguages(cfg)
-		promptTools(cfg)
-		miseCheck(cfg, noPrompt)
-		promptSudo(cfg)
-		promptSSH(cfg)
-		promptPackages(cfg)
+		if cfg.shell == "" {
+			fmt.Println()
+			promptShellConfig(app.io, cfg)
+		}
+
+		hasAnyLang := cfg.installNode != "" || cfg.installRust != "" ||
+			cfg.installPython != "" || cfg.installGo != ""
+
+		if hasAnyLang {
+			if cfg.installNode == "" {
+				cfg.installNode = versionNone
+			}
+			if cfg.installRust == "" {
+				cfg.installRust = versionNone
+			}
+			if cfg.installPython == "" {
+				cfg.installPython = versionNone
+			}
+			if cfg.installGo == "" {
+				cfg.installGo = versionNone
+			}
+		} else {
+			fmt.Println()
+			promptLanguagesConfig(app.io, cfg)
+		}
+
+		toolsSet := cfg.installNeovim != "" || cfg.installStarship != "" ||
+			cfg.installAtuin != "" || cfg.installMise != "" ||
+			cfg.installZellij != "" || cfg.installJujutsu != ""
+
+		if toolsSet {
+			if cfg.installNeovim == "" {
+				cfg.installNeovim = "false"
+			}
+			if cfg.installStarship == "" {
+				cfg.installStarship = "false"
+			}
+			if cfg.installAtuin == "" {
+				cfg.installAtuin = "false"
+			}
+			if cfg.installMise == "" {
+				cfg.installMise = "false"
+			}
+			if cfg.installZellij == "" {
+				cfg.installZellij = "false"
+			}
+			if cfg.installJujutsu == "" {
+				cfg.installJujutsu = "false"
+			}
+		} else {
+			fmt.Println()
+			promptToolsConfig(app.io, cfg)
+		}
+
+		miseCheck(cfg, noPrompt, app.io)
+
+		if cfg.enableSudo == "" {
+			fmt.Println()
+			promptSudoConfig(app.io, cfg)
+		}
+		if cfg.enableSSH == "" {
+			fmt.Println()
+			promptSshConfig(app.io, cfg)
+		}
+		if cfg.packages == "" {
+			fmt.Println()
+			promptPackagesConfig(app.io, cfg)
+		}
 
 		if len(ports) == 0 {
-			ports = promptPorts()
+			fmt.Println()
+			ports = promptPortsWanted(app.io)
 		}
 		if len(volumes) == 0 {
-			volumes = promptVolumes()
+			fmt.Println()
+			volumes = promptVolumesWanted(app.io)
 		}
 	}
 
 	// Validate path exists or warn
-	os.MkdirAll(projectsDir, 0755)
+	os.MkdirAll(app.projectsDir, 0755)
 
 	if _, err := os.Stat(cfg.projectHostPath); os.IsNotExist(err) && !noPrompt {
-		warn("Warning: Path %s does not exist", cfg.projectHostPath)
-		if !promptYN("Create config anyway?", "N") {
+		app.io.warn("Warning: Path %s does not exist", cfg.projectHostPath)
+		if !app.io.askYesNo("Create config anyway?", "N") {
 			os.Exit(1)
 		}
 	}
 
 	// Generate config
-	generateProjectCompose(name, cfg, ports, volumes)
+	generateProjectCompose(app, name, cfg, ports, volumes)
 
-	success("Created project '%s'", name)
+	app.io.success("Created project '%s'", name)
 	fmt.Println()
 	fmt.Println("Next steps:")
 	fmt.Printf("  1. Review/edit configuration:\n")
-	fmt.Printf("     - %s\n", getProjectEnv(name))
-	fmt.Printf("     - %s\n", getProjectCompose(name))
+	fmt.Printf("     - %s\n", app.getProjectEnv(name))
+	fmt.Printf("     - %s\n", app.getProjectCompose(name))
 	fmt.Printf("  2. Put the $HOME dotfiles you want to port in:\n")
-	fmt.Printf("     - %s/configs/\n", scriptDir)
+	fmt.Printf("     - %s/configs/\n", app.scriptDir)
 	fmt.Printf("  3. Build the environment:\n")
 	fmt.Printf("     paul-envs build %s\n", name)
 	fmt.Printf("  4. Run the environment:\n")
 	fmt.Printf("     paul-envs run %s\n", name)
 }
 
-func cmdList() {
-	baseCompose := filepath.Join(scriptDir, "compose.yaml")
+func (app *App) List() error {
+	baseCompose := app.getBaseCompose()
 	if _, err := os.Stat(baseCompose); os.IsNotExist(err) {
-		fatal("Base compose.yaml not found at %s", baseCompose)
+		return fmt.Errorf("Base compose.yaml not found at %s", baseCompose)
 	}
 
-	if _, err := os.Stat(projectsDir); os.IsNotExist(err) {
+	if _, err := os.Stat(app.projectsDir); os.IsNotExist(err) {
 		fmt.Println("No project created yet")
 		fmt.Println("Hint: Create one with 'paul-envs create <path>'")
-		return
+		return nil
+	}
+
+	entries, err := os.ReadDir(app.projectsDir)
+	if err != nil {
+		return fmt.Errorf("Failed to read project directory: %w", err)
 	}
 
 	fmt.Println("Projects created:")
 	found := false
-	entries, _ := os.ReadDir(projectsDir)
 	for _, entry := range entries {
 		if entry.IsDir() {
-			composeFile := filepath.Join(projectsDir, entry.Name(), "compose.yaml")
+			composeFile := app.getProjectCompose(entry.Name())
 			if _, err := os.Stat(composeFile); err == nil {
 				found = true
-				envFile := filepath.Join(projectsDir, entry.Name(), ".env")
+				envFile := app.getProjectEnv(entry.Name())
 				envData, _ := os.ReadFile(envFile)
 				pathRe := regexp.MustCompile(`PROJECT_PATH="([^"]*)"`)
 				matches := pathRe.FindStringSubmatch(string(envData))
@@ -1195,67 +1239,74 @@ func cmdList() {
 		fmt.Println("  (no project found)")
 		fmt.Println("Hint: Create one with 'paul-envs create <path>'")
 	}
+	return nil
 }
 
-func cmdBuild(args []string) {
-	baseCompose := filepath.Join(scriptDir, "compose.yaml")
+func (app *App) Build(ctx context.Context, args []string) error {
+	baseCompose := app.getBaseCompose()
 	if _, err := os.Stat(baseCompose); os.IsNotExist(err) {
-		fatal("Base compose.yaml not found at %s", baseCompose)
+		return fmt.Errorf("Base compose.yaml not found at %s", baseCompose)
 	}
 
 	var name string
 	if len(args) == 0 {
 		fmt.Println("No project name given, listing projects...")
 		fmt.Println()
-		cmdList()
+		app.List()
 		fmt.Println()
-		name = promptString("Enter project name to build", "")
+		name = app.io.askString("Enter project name to build", "")
 		if name == "" {
-			fatal("No project name provided")
+			return errors.New("No project name provided")
 		}
 	} else {
 		name = args[0]
 	}
 
 	if err := validateProjectName(name); err != nil {
-		fatal(err.Error())
+		return err
 	}
 
-	composeFile := getProjectCompose(name)
-	envFile := getProjectEnv(name)
+	composeFile := app.getProjectCompose(name)
+	envFile := app.getProjectEnv(name)
 	if _, err := os.Stat(composeFile); os.IsNotExist(err) {
-		fatal("Project '%s' not found. Hint: Use 'paul-envs.sh list' to see available projects or 'paul-envs create' to make a new one", name)
+		return fmt.Errorf("Project '%s' not found. Hint: Use 'paul-envs.sh list' to see available projects or 'paul-envs create' to make a new one", name)
 	}
 	if _, err := os.Stat(envFile); os.IsNotExist(err) {
-		fatal("Project '%s' not found. Hint: Use 'paul-envs list' to see available projects or 'paul-envs create' to make a new one", name)
+		return fmt.Errorf("Project '%s' not found. Hint: Use 'paul-envs list' to see available projects or 'paul-envs create' to make a new one", name)
 	}
 
 	// Create shared cache volume
-	exec.Command("docker", "volume", "create", "paulenv-shared-cache").Run()
+	if err := exec.CommandContext(ctx, "docker", "volume", "create", "paulenv-shared-cache").Run(); err != nil {
+		return fmt.Errorf("Failed to create shared cache volume: %w", err)
+	}
 
 	// Build
-	os.Setenv("COMPOSE_PROJECT_NAME", "paulenv-"+name)
-	cmd := exec.Command("docker", "compose", "-f", baseCompose, "-f", composeFile, "--env-file", envFile, "build")
+	cmd := exec.CommandContext(ctx, "docker", "compose", "-f", baseCompose, "-f", composeFile, "--env-file", envFile, "build")
+	cmd.Env = append(os.Environ(), "COMPOSE_PROJECT_NAME=paulenv-"+name)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		fatal("Build failed: %v", err)
+		return fmt.Errorf("Build failed: %w", err)
 	}
-	success("Built project '%s'", name)
+	app.io.success("Built project '%s'", name)
 
 	fmt.Println()
-	warn("Resetting persistent volumes...")
-	cmd = exec.Command("docker", "compose", "-f", baseCompose, "-f", composeFile, "--env-file", envFile, "--profile", "reset", "up", "reset-cache", "reset-local")
+	app.io.warn("Resetting persistent volumes...")
+	cmd = exec.CommandContext(ctx, "docker", "compose", "-f", baseCompose, "-f", composeFile, "--env-file", envFile, "--profile", "reset", "up", "reset-cache", "reset-local")
+	cmd.Env = append(os.Environ(), "COMPOSE_PROJECT_NAME=paulenv-"+name)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Run()
-	success("Volumes reset complete")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("Failed to setup volumes: %w", err)
+	}
+	app.io.success("Volumes reset complete")
+	return nil
 }
 
-func cmdRun(args []string) {
-	baseCompose := filepath.Join(scriptDir, "compose.yaml")
+func (app *App) Run(ctx context.Context, args []string) error {
+	baseCompose := app.getBaseCompose()
 	if _, err := os.Stat(baseCompose); os.IsNotExist(err) {
-		fatal("Base compose.yaml not found at %s", baseCompose)
+		return fmt.Errorf("Base compose.yaml not found at %s", baseCompose)
 	}
 
 	var name string
@@ -1264,11 +1315,11 @@ func cmdRun(args []string) {
 	if len(args) == 0 {
 		fmt.Println("No project name given, listing projects...")
 		fmt.Println()
-		cmdList()
+		app.List()
 		fmt.Println()
-		name = promptString("Enter project name to run", "")
+		name = app.io.askString("Enter project name to run", "")
 		if name == "" {
-			fatal("No project name provided")
+			return fmt.Errorf("No project name provided")
 		}
 	} else {
 		name = args[0]
@@ -1278,79 +1329,83 @@ func cmdRun(args []string) {
 	}
 
 	if err := validateProjectName(name); err != nil {
-		fatal(err.Error())
+		return err
 	}
 
-	composeFile := getProjectCompose(name)
-	envFile := getProjectEnv(name)
+	composeFile := app.getProjectCompose(name)
+	envFile := app.getProjectEnv(name)
 	if _, err := os.Stat(composeFile); os.IsNotExist(err) {
-		fatal("Project '%s' not found\nHint: Use 'paul-envs list' to see available projects", name)
+		return fmt.Errorf("Project '%s' not found\nHint: Use 'paul-envs list' to see available projects", name)
 	}
 	if _, err := os.Stat(envFile); os.IsNotExist(err) {
-		fatal("Project '%s' not found\nHint: Use 'paul-envs list' to see available projects", name)
+		return fmt.Errorf("Project '%s' not found\nHint: Use 'paul-envs list' to see available projects", name)
 	}
-
-	os.Setenv("COMPOSE_PROJECT_NAME", "paulenv-"+name)
 
 	args = []string{"compose", "-f", baseCompose, "-f", composeFile, "--env-file", envFile, "run", "--rm", "paulenv"}
 	args = append(args, cmdArgs...)
 
-	cmd := exec.Command("docker", args...)
+	cmd := exec.CommandContext(ctx, "docker", args...)
+	cmd.Env = append(os.Environ(), "COMPOSE_PROJECT_NAME=paulenv-"+name)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Run()
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("Run failed: %w", err)
+	}
+
+	return nil
 }
 
-func cmdRemove(args []string) {
+func (app *App) Remove(args []string) error {
 	var name string
 	if len(args) == 0 {
 		fmt.Println("No project name given, listing projects...")
 		fmt.Println()
-		cmdList()
+		app.List()
 		fmt.Println()
-		name = promptString("Enter project name to remove", "")
+		name = app.io.askString("Enter project name to remove", "")
 		if name == "" {
-			fatal("No project name provided")
+			return fmt.Errorf("No project name provided")
 		}
 	} else {
 		name = args[0]
 	}
 
 	if err := validateProjectName(name); err != nil {
-		fatal(err.Error())
+		return err
 	}
 
-	projectDir := getProjectDir(name)
+	projectDir := app.getProjectDir(name)
 	if _, err := os.Stat(projectDir); os.IsNotExist(err) {
-		fatal("Project '%s' not found\nHint: Use 'paul-envs list' to see available projects", name)
+		return fmt.Errorf("Project '%s' not found\nHint: Use 'paul-envs list' to see available projects", name)
 	}
 
-	if !promptYN(fmt.Sprintf("Remove project '%s'?", name), "N") {
-		return
+	if !app.io.askYesNo(fmt.Sprintf("Remove project '%s'?", name), "N") {
+		return nil
 	}
 
 	if err := os.RemoveAll(projectDir); err != nil {
-		fatal("Failed to remove project: %v", err)
+		return fmt.Errorf("Failed to remove project: %w", err)
 	}
-	success("Removed project '%s'", name)
+	app.io.success("Removed project '%s'", name)
 	fmt.Println("Note: Docker volumes are preserved. To remove them, run:")
 	fmt.Printf("  docker volume rm paulenv-%s-local\n", name)
+	return nil
 }
 
-func cmdVersion() {
+func (app *App) Version(ctx context.Context) error {
 	fmt.Printf("paul-envs version %s\n", version)
 	fmt.Printf("Go version: %s\n", runtime.Version())
-	cmd := exec.Command("docker", "--version")
+	cmd := exec.CommandContext(ctx, "docker", "--version")
 	output, err := cmd.Output()
 	if err != nil {
-		fmt.Println("Docker version: not installed")
-	} else {
-		fmt.Printf("Docker version: %s", output)
+		return fmt.Errorf("Failed to obtain version: %w", err)
 	}
+	fmt.Printf("Docker version: %s", output)
+	return nil
 }
 
-func printUsage() {
+func printUsage(app *App) {
 	fmt.Println(`paul-envs - Development Environment Manager
 
 Usage:
@@ -1450,6 +1505,6 @@ Full Configuration Example:
     --volume ~/.git-credentials:/home/dev/.git-credentials:ro
 
 Configuration:
-  Base compose: ` + filepath.Join(scriptDir, "compose.yaml") + `
-  Projects directory: ` + projectsDir)
+  Base compose: ` + app.getBaseCompose() + `
+  Projects directory: ` + app.projectsDir)
 }
