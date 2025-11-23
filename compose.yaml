@@ -26,6 +26,7 @@
 services:
 
   paulenv:
+    entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
     image: paulenv:latest
     pull_policy: never
     stdin_open: true
