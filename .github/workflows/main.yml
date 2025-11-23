@@ -679,10 +679,18 @@ jobs:
             test_tool htop \"htop\" || FAILED=1
             test_tool ss \"ss\" || FAILED=1
 
-            ss -lnt '( sport = :22 )' | grep -q LISTEN || {
-              FAILED=1
-              echo \"⚠ ssh check FAILED: Port 22 is not listened to.\"
-            }
+            # Wait for SSH to be ready (max 30 seconds)
+            for i in \$(seq 1 30); do
+              if ss -lnt '( sport = :22 )' | grep -q LISTEN; then
+                echo \"✓ ssh check PASSED: Port 22 listened to!\"
+                break
+              fi
+              if [ \"\$i\" -eq 30 ]; then
+                FAILED=1
+                echo \"⚠ ssh check FAILED: Port 22 is not listened to after 30s\"
+              fi
+              sleep 1
+            done
 
             if [ \"$EXPECTED_ARCH\" == \"arm64\" ]; then
               if [ \"\$(uname -m)\" != \"aarch64\" ]; then
@@ -840,7 +848,8 @@ jobs:
             test_tool htop "htop"; or set FAILED 1
             test_tool ss "ss"; or set FAILED 1
 
-            ss -lnt '( sport = :22 )' | grep -q LISTEN
+            ss -lnt "( sport = :22 )" | grep -q LISTEN
+              and echo "✓ ssh check PASSED: Port 22 listened to!"
               or begin
                 set -g FAILED 1
                 echo "⚠ ssh check FAILED: Port 22 is not listened to."
