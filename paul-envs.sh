@@ -1061,7 +1061,7 @@ cmd_create() {
               shift
               ;;
             --enable-ssh|--ssh)
-              config_set "enable_ssh" "$2"
+              config_set "enable_ssh" "true"
               shift
               ;;
             --enable-sudo|--sudo)
