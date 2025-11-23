@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"flag"
@@ -16,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"text/template"
 )
 
 const version = "0.1.0"
@@ -684,54 +686,41 @@ func promptVolumesWanted(io *IoCtrl) []string {
 	return volumes
 }
 
-func generateProjectCompose(app *App, name string, cfg *ContainerConfig, ports, volumes []string) {
-	composeFile := app.getProjectCompose(name)
-	envFile := app.getProjectEnv(name)
-
-	app.assertInexistantProject(name)
-
-	safeGitName := lightSanitize(cfg.gitName)
-	safeGitEmail := lightSanitize(cfg.gitEmail)
-	safePackages := lightSanitize(cfg.packages)
-
-	os.MkdirAll(filepath.Dir(composeFile), 0755)
-
-	// Generate .env file
-	envContent := fmt.Sprintf(`# "Env file" for your project, which will be fed to docker compose
-# alongside %s in the same directory.
+const envFileTpl = `# "Env file" for your project, which will be fed to docker compose
+# alongside {{.ProjectComposeFilename}} in the same directory.
 #
 # Can be freely updated.
 
 # Uniquely identify this container.
 # *SHOULD NOT BE UPDATED*
-PROJECT_ID="%s"
+PROJECT_ID="{{.ProjectID}}"
 
 # Name of the project directory inside the container.
 # A PROJECT_DIRNAME should always be set
-PROJECT_DIRNAME="%s"
+PROJECT_DIRNAME="{{.ProjectDestPath}}"
 
 # Path to the project you want to mount in this container
 # Will be mounted in "$HOME/projects/<PROJECT_DIRNAME>" inside that container.
 # A PROJECT_PATH should always be set
-PROJECT_PATH="%s"
+PROJECT_PATH="{{.ProjectHostPath}}"
 
 # To align with your current uid.
 # This is to ensure the mounted volume from your host has compatible
 # permissions.
 # On POSIX-like systems, just run 'id -u' with the wanted user to know it.
-HOST_UID="%s"
+HOST_UID="{{.HostUID}}"
 
 # To align with your current gid (same reason than for "uid").
 # On POSIX-like systems, just run 'id -g' with the wanted user to know it.
-HOST_GID="%s"
+HOST_GID="{{.HostGID}}"
 
 # Username created in the container.
 # Not really important, just set it if you want something other than "dev".
-USERNAME="%s"
+USERNAME="{{.Username}}"
 
 # The default shell wanted.
 # Only "bash", "zsh" or "fish" are supported for now.
-USER_SHELL="%s"
+USER_SHELL="{{.Shell}}"
 
 # Whether to install Node.js, and the version wanted.
 # Note that a WebAssembly target is also automatically ready.
@@ -741,7 +730,7 @@ USER_SHELL="%s"
 # - if 'latest': Install Ubuntu's default package for Node.js
 # - If anything else: The exact version to install (e.g. "1.90.0").
 #   That last type of value will only work if INSTALL_MISE is 'true'.
-INSTALL_NODE="%s"
+INSTALL_NODE="{{.InstallNode}}"
 
 # Whether to install Rust and Cargo, and the version wanted.
 # Note that a WebAssembly target is also automatically ready.
@@ -752,7 +741,7 @@ INSTALL_NODE="%s"
 #   Ubuntu base's repositories
 # - If anything else: The exact version to install (e.g. "1.90.0").
 #   That last type of value will only work if INSTALL_MISE is 'true'.
-INSTALL_RUST="%s"
+INSTALL_RUST="{{.InstallRust}}"
 
 # Whether to install Python, and the version wanted.
 #
@@ -761,7 +750,7 @@ INSTALL_RUST="%s"
 # - if 'latest': Install Ubuntu's default package for Python
 # - If anything else: The exact version to install (e.g. "3.12.0").
 #   That last type of value will only work if INSTALL_MISE is 'true'.
-INSTALL_PYTHON="%s"
+INSTALL_PYTHON="{{.InstallPython}}"
 
 # Whether to install Go, and the version wanted.
 # Note that GOPATH is automatically set to ~/go
@@ -771,50 +760,112 @@ INSTALL_PYTHON="%s"
 # - if 'latest': Install Ubuntu's default package for Go
 # - If anything else: The exact version to install (e.g. "1.21.5").
 #   That last type of value will only work if INSTALL_MISE is 'true'.
-INSTALL_GO="%s"
+INSTALL_GO="{{.InstallGo}}"
 
 # If 'true', add WebAssembly-specialized tools such as binaryen and a
 # WebAssembly target for Rust if it is installed.
-ENABLE_WASM="%s"
+ENABLE_WASM="{{.EnableWasm}}"
 
 # If 'true', openssh will be installed, and the container will listen for ssh
 # connections at port 22.
-ENABLE_SSH="%s"
+ENABLE_SSH="{{.EnableSSH}}"
 
 # If 'true', sudo will be installed, with a password set to "dev".
-ENABLE_SUDO="%s"
+ENABLE_SUDO="{{.EnableSudo}}"
 
 # Additional packages outside the core base, separated by a space.
 # Have to be in Ubuntu's default repository
 # (e.g. "ripgrep fzf". Can be left empty for no supplementary packages)
-SUPPLEMENTARY_PACKAGES="%s"
+SUPPLEMENTARY_PACKAGES="{{.Packages}}"
 
 # Tools toggle.
 # "true" == install it
 # anything else == don't.
-INSTALL_NEOVIM="%s"
-INSTALL_STARSHIP="%s"
-INSTALL_ATUIN="%s"
-INSTALL_MISE="%s"
-INSTALL_ZELLIJ="%s"
-INSTALL_JUJUTSU="%s"
+INSTALL_NEOVIM="{{.InstallNeovim}}"
+INSTALL_STARSHIP="{{.InstallStarship}}"
+INSTALL_ATUIN="{{.InstallAtuin}}"
+INSTALL_MISE="{{.InstallMise}}"
+INSTALL_ZELLIJ="{{.InstallZellij}}"
+INSTALL_JUJUTSU="{{.InstallJujutsu}}"
 
 # Git author and committer name used inside the container
 # Can also be empty to not set that in the container.
-GIT_AUTHOR_NAME="%s"
+GIT_AUTHOR_NAME="{{.GitName}}"
 
 # Git author and committer e-mail used inside the container
 # Can also be empty to not set that in the container.
-GIT_AUTHOR_EMAIL="%s"
-`, projectComposeFilename, name, cfg.projectDestPath, cfg.projectHostPath,
-		cfg.hostUID, cfg.hostGID, cfg.username, cfg.shell,
-		cfg.installNode, cfg.installRust, cfg.installPython, cfg.installGo,
-		cfg.enableWasm, cfg.enableSSH, cfg.enableSudo, safePackages,
-		cfg.installNeovim, cfg.installStarship, cfg.installAtuin,
-		cfg.installMise, cfg.installZellij, cfg.installJujutsu,
-		safeGitName, safeGitEmail)
+GIT_AUTHOR_EMAIL="{{.GitEmail}}"
+`
 
-	if err := os.WriteFile(envFile, []byte(envContent), 0644); err != nil {
+func generateProjectCompose(app *App, name string, cfg *ContainerConfig, ports, volumes []string) {
+	composeFile := app.getProjectCompose(name)
+	envFile := app.getProjectEnv(name)
+
+	app.assertInexistantProject(name)
+
+	os.MkdirAll(filepath.Dir(composeFile), 0755)
+
+	// Generate .env file using template
+	tmpl := template.Must(template.New("env").Parse(envFileTpl))
+
+	data := struct {
+		ProjectComposeFilename string
+		ProjectID              string
+		ProjectDestPath        string
+		ProjectHostPath        string
+		HostUID                string
+		HostGID                string
+		Username               string
+		Shell                  string
+		InstallNode            string
+		InstallRust            string
+		InstallPython          string
+		InstallGo              string
+		EnableWasm             string
+		EnableSSH              string
+		EnableSudo             string
+		Packages               string
+		InstallNeovim          string
+		InstallStarship        string
+		InstallAtuin           string
+		InstallMise            string
+		InstallZellij          string
+		InstallJujutsu         string
+		GitName                string
+		GitEmail               string
+	}{
+		ProjectComposeFilename: projectComposeFilename,
+		ProjectID:              name,
+		ProjectDestPath:        cfg.projectDestPath,
+		ProjectHostPath:        cfg.projectHostPath,
+		HostUID:                cfg.hostUID,
+		HostGID:                cfg.hostGID,
+		Username:               cfg.username,
+		Shell:                  cfg.shell,
+		InstallNode:            cfg.installNode,
+		InstallRust:            cfg.installRust,
+		InstallPython:          cfg.installPython,
+		InstallGo:              cfg.installGo,
+		EnableWasm:             cfg.enableWasm,
+		EnableSSH:              cfg.enableSSH,
+		EnableSudo:             cfg.enableSudo,
+		Packages:               lightSanitize(cfg.packages),
+		InstallNeovim:          cfg.installNeovim,
+		InstallStarship:        cfg.installStarship,
+		InstallAtuin:           cfg.installAtuin,
+		InstallMise:            cfg.installMise,
+		InstallZellij:          cfg.installZellij,
+		InstallJujutsu:         cfg.installJujutsu,
+		GitName:                lightSanitize(cfg.gitName),
+		GitEmail:               lightSanitize(cfg.gitEmail),
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		fatal("Failed to generate env file: %v", err)
+	}
+
+	if err := os.WriteFile(envFile, buf.Bytes(), 0644); err != nil {
 		fatal("Failed to write env file: %v", err)
 	}
 
