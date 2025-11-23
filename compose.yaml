@@ -159,7 +159,7 @@ services:
   reset-cache:
     image: paulenv:${PROJECT_ID:-latest}
     pull_policy: never
-    user: "0:0"
+    user: root
     command: >
       mkdir -p /mnt/cache &&
              sh -c "cp -a /home/${USERNAME}/.container-cache/. /mnt/cache/ &&
@@ -181,7 +181,7 @@ services:
   reset-local:
     image: paulenv:${PROJECT_ID:-latest}
     pull_policy: never
-    user: "0:0"
+    user: root
     command: >
       mkdir -p /mnt/local &&
              sh -c "cp -a /home/${USERNAME}/.container-local/. /mnt/local/ &&
