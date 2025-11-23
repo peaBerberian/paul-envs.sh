@@ -606,11 +606,15 @@ EOF
             echo "      - \"$port:$port\"" >> "$compose_file"
         done
         if [[ "$(config_get enable_ssh)" = "true" ]]; then
+          echo "      # to listen for ssh connections" >> "$compose_file"
           echo "      - \"22:22\"" >> "$compose_file"
         fi
     elif [[ "$(config_get enable_ssh)" = "true" ]]; then
-        echo "    ports:" >> "$compose_file"
-        echo "      - \"22:22\"" >> "$compose_file"
+        cat >> "$compose_file" <<EOF
+    ports:
+      # to listen for ssh connections
+      - "22:22"
+EOF
     fi
 
     # Add volumes if wanted
@@ -623,14 +627,18 @@ EOF
     done
 
     if [[ "$(config_get enable_ssh)" = "true" ]]; then
-        # Add SSH key volume mount if host key exists
-        if [[ -f "$HOME/.ssh/id_rsa.pub" ]]; then
-            echo "      - $HOME/.ssh/id_rsa.pub:/home/\${USERNAME}/.ssh/authorized_keys:ro" >> "$compose_file"
+        local ssh_key_path
+        ssh_key_path="$(config_get ssh_key_path)"
+
+        if [[ -n "$ssh_key_path" && -f "$ssh_key_path" ]]; then
+            ssh_key_path=$(normalize_path "$ssh_key_path")
+            echo "      # Your local public key for ssh:" >> "$compose_file"
+            echo "      - $ssh_key_path:/home/\${USERNAME}/.ssh/authorized_keys:ro" >> "$compose_file"
         else
-            warn "No SSH public key found at ~/.ssh/id_rsa.pub"
+            warn "No SSH key configured"
             warn "Adding a note to your compose file: $compose_file"
-            echo "      # Note: Mount your SSH public key to /home/\${USERNAME}/.ssh/authorized_keys, for example:" >> "$compose_file"
-            echo "      # - $HOME/.ssh/id_rsa.pub:/home/\${USERNAME}/.ssh/authorized_keys:ro" >> "$compose_file"
+            echo "      # Add your SSH public key here, for example:" >> "$compose_file"
+            echo "      # - ~/.ssh/id_ed25519.pub:/home/\${USERNAME}/.ssh/authorized_keys:ro" >> "$compose_file"
         fi
     fi
     echo "" >> "$compose_file"
@@ -848,11 +856,56 @@ prompt_ssh() {
 
     echo ""
     info "=== SSH Access ==="
-    read -r -p "Enable ssh access in container? (y/N): " ssh_choice
+    read -r -p "Enable ssh access to container? (y/N): " ssh_choice
     if [[ $ssh_choice =~ ^[Yy]$ ]]; then
         config_set "enable_ssh" "true"
+        prompt_ssh_key
     else
         config_set "enable_ssh" "false"
+    fi
+}
+
+prompt_ssh_key() {
+    local ssh_dir="$HOME/.ssh"
+    local pub_keys=()
+    
+    # Find all public keys
+    if [[ -d "$ssh_dir" ]]; then
+        while IFS= read -r key; do
+            [[ -n "$key" ]] && pub_keys+=("$key")
+        done < <(find "$ssh_dir" -maxdepth 1 -name "*.pub" -type f 2>/dev/null)
+    fi
+
+    
+    if [[ ${#pub_keys[@]} -eq 0 ]]; then
+        warn "No SSH public keys found in ~/.ssh/"
+        config_set "ssh_key_path" ""
+        return
+    fi
+    
+    echo ""
+    echo "Select SSH public key to mount:"
+    for i in "${!pub_keys[@]}"; do
+        echo "  $((i+1))) $(basename "${pub_keys[$i]}")"
+    done
+    echo "  $((${#pub_keys[@]}+1))) Custom path"
+    echo "  $((${#pub_keys[@]}+2))) Skip (add manually later)"
+    
+    read -r -p "Choice [1]: " key_choice
+    key_choice=${key_choice:-1}
+    
+    if [[ $key_choice -ge 1 && $key_choice -le ${#pub_keys[@]} ]]; then
+        config_set "ssh_key_path" "${pub_keys[$((key_choice-1))]}"
+    elif [[ $key_choice -eq $((${#pub_keys[@]}+1)) ]]; then
+        read -r -p "Enter path to public key: " custom_key
+        if [[ -f "$custom_key" ]]; then
+            config_set "ssh_key_path" "$custom_key"
+        else
+            warn "File not found: $custom_key"
+            config_set "ssh_key_path" ""
+        fi
+    else
+        config_set "ssh_key_path" ""
     fi
 }
 
