@@ -365,6 +365,7 @@ config_init() {
     config_set "install_python" ""
     config_set "install_go" ""
     config_set "enable_wasm" ""
+    config_set "enable_ssh" ""
     config_set "enable_sudo" ""
     config_set "git_name" ""
     config_set "git_email" ""
@@ -555,6 +556,10 @@ INSTALL_GO="$(config_get install_go)"
 # WebAssembly target for Rust if it is installed.
 ENABLE_WASM="$(config_get enable_wasm)"
 
+# If \`true\`, \`openssh\` will be installed, and the container will listen for ssh
+# connections at port 22.
+ENABLE_SSH="$(config_get enable_ssh)"
+
 # If \`true\`, \`sudo\` will be installed, with a password set to "dev".
 ENABLE_SUDO="$(config_get enable_sudo)"
 
@@ -600,6 +605,12 @@ EOF
         for port in "${ports[@]}"; do
             echo "      - \"$port:$port\"" >> "$compose_file"
         done
+        if [[ "$(config_get enable_ssh)" = "true" ]]; then
+          echo "      - \"22:22\"" >> "$compose_file"
+        fi
+    elif [[ "$(config_get enable_ssh)" = "true" ]]; then
+        echo "    ports:" >> "$compose_file"
+        echo "      - \"22:22\"" >> "$compose_file"
     fi
 
     # Add volumes if wanted
@@ -611,6 +622,17 @@ EOF
         echo "      - $vol" >> "$compose_file"
     done
 
+    if [[ "$(config_get enable_ssh)" = "true" ]]; then
+        # Add SSH key volume mount if host key exists
+        if [[ -f "$HOME/.ssh/id_rsa.pub" ]]; then
+            echo "      - $HOME/.ssh/id_rsa.pub:/home/\${USERNAME}/.ssh/authorized_keys:ro" >> "$compose_file"
+        else
+            warn "No SSH public key found at ~/.ssh/id_rsa.pub"
+            warn "Adding a note to your compose file: $compose_file"
+            echo "      # Note: Mount your SSH public key to /home/\${USERNAME}/.ssh/authorized_keys, for example:" >> "$compose_file"
+            echo "      # - $HOME/.ssh/id_rsa.pub:/home/\${USERNAME}/.ssh/authorized_keys:ro" >> "$compose_file"
+        fi
+    fi
     echo "" >> "$compose_file"
 }
 
@@ -818,13 +840,29 @@ prompt_sudo() {
     fi
 }
 
+# Prompt ssh access if not set
+prompt_ssh() {
+    if [[ -n "$(config_get enable_ssh)" ]]; then
+        return
+    fi
+
+    echo ""
+    info "=== SSH Access ==="
+    read -r -p "Enable ssh access in container? (y/N): " ssh_choice
+    if [[ $ssh_choice =~ ^[Yy]$ ]]; then
+        config_set "enable_ssh" "true"
+    else
+        config_set "enable_ssh" "false"
+    fi
+}
+
 # Prompt for ports if not set
 prompt_ports() {
     local ports_var="$1"
 
     echo ""
     info "=== Port Forwarding ==="
-    echo "Enter ports to expose (space-separated, or Enter to skip):"
+    echo "Enter supplementary container ports to expose (space-separated, or Enter to skip):"
     echo "Examples: 3000 5432 8080"
     read -r -p "Ports: " port_input
 
@@ -969,6 +1007,10 @@ cmd_create() {
               config_set "enable_wasm" "true"
               shift
               ;;
+            --enable-ssh|--ssh)
+              config_set "enable_ssh" "$2"
+              shift
+              ;;
             --enable-sudo|--sudo)
               config_set "enable_sudo" "true"
               shift
@@ -1066,6 +1108,9 @@ cmd_create() {
         if [[ -z "$(config_get enable_wasm)" ]]; then
             config_set "enable_wasm" "false"
         fi
+        if [[ -z "$(config_get enable_ssh)" ]]; then
+            config_set "enable_ssh" "false"
+        fi
         if [[ -z "$(config_get enable_sudo)" ]]; then
             config_set "enable_sudo" "false"
         fi
@@ -1095,6 +1140,7 @@ cmd_create() {
         prompt_tools
         mise_check $no_prompt
         prompt_sudo
+        prompt_ssh
         prompt_packages
 
         # Only prompt for ports if none were specified
@@ -1345,6 +1391,8 @@ Options for create (all optional):
                            (prompted if no language specified)
   --enable-wasm            Add WASM-specialized tools (binaryen, Rust wasm target if enabled)
                            (prompted if no language specified)
+  --enable-ssh             Enable ssh access on port 22 (E.g. to access files from your host)
+                           (prompted if not specified)
   --enable-sudo            Enable sudo access in container with a "dev" password
                            (prompted if not specified)
   --git-name NAME          Git user.name (optional)
@@ -1394,6 +1442,7 @@ Full Configuration Example:
     --starship \\
     --zellij \\
     --jujutsu \\
+    --enable-ssh \\
     --enable-sudo \\
     --git-name "John Doe" \\
     --git-email "john@example.com" \\

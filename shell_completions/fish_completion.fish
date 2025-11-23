@@ -25,6 +25,8 @@ complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l go -d 'Go in
 complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l git-name -d 'Git author name' -x
 complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l git-email -d 'Git author email' -x
 complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l packages -d 'Additional Ubuntu packages' -x
+complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l enable-ssh -d "Enable ssh access" -f
+complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l enable-sudo -d "Enable sudo access (password: \"dev\")" -f
 complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l neovim -d "Install Neovim" -f
 complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l starship -d "Install Starship" -f
 complete -c paul-envs.sh -n "__fish_seen_subcommand_from create" -l atuin -d "Install Atuin" -f
