@@ -633,12 +633,12 @@ EOF
         if [[ -n "$ssh_key_path" && -f "$ssh_key_path" ]]; then
             ssh_key_path=$(normalize_path "$ssh_key_path")
             echo "      # Your local public key for ssh:" >> "$compose_file"
-            echo "      - $ssh_key_path:/home/\${USERNAME}/.ssh/authorized_keys:ro" >> "$compose_file"
+            echo "      - $ssh_key_path:/etc/ssh/authorized_keys/\${USERNAME}:ro" >> "$compose_file"
         else
             warn "No SSH key configured"
             warn "Adding a note to your compose file: $compose_file"
             echo "      # Add your SSH public key here, for example:" >> "$compose_file"
-            echo "      # - ~/.ssh/id_ed25519.pub:/home/\${USERNAME}/.ssh/authorized_keys:ro" >> "$compose_file"
+            echo "      # - ~/.ssh/id_ed25519.pub:/etc/ssh/authorized_keys/\${USERNAME}:ro" >> "$compose_file"
         fi
     fi
     echo "" >> "$compose_file"

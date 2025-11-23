@@ -415,6 +415,7 @@ RUN if [ "$ENABLE_SSH" = "true" ]; then \
     echo "PasswordAuthentication no" >> /etc/ssh/sshd_config && \
     echo "PubkeyAuthentication yes" >> /etc/ssh/sshd_config && \
     echo "ChallengeResponseAuthentication no" >> /etc/ssh/sshd_config && \
+    echo "AuthorizedKeysFile /etc/ssh/authorized_keys/%u" >> /etc/ssh/sshd_config && \
     echo "ListenAddress 0.0.0.0" >> /etc/ssh/sshd_config && \
     echo "Port 22" >> /etc/ssh/sshd_config && \
     mkdir -p /home/${USERNAME}/.ssh && \
