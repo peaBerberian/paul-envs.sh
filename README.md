@@ -1,6 +1,6 @@
-# paul-envs.sh
+# paul-envs
 
-`paul-envs.sh` allows me to manage development containers so I can easily work
+`paul-envs` allows me to manage development containers so I can easily work
 on multiple large projects with rapidly changing dependencies in isolated and
 minimal containers.
 
@@ -42,7 +42,8 @@ Key features:
 -  **Easy to use**: I made it compatible with MacOS, Linux and Windows, with
    automatic x86_64 or arm64 container creation depending on the host.
 
-   The script also guides you when you call any command without argument.
+   The `paul-envs` binary also guides you when you call any command without
+   argument.
 
 
 ## Comparison with other similar tools
@@ -75,7 +76,7 @@ isolation (same issue than with `devbox`).
 1. Clone this repository, `cd` to it, and ensure `docker compose` is installed
    locally and accessible in path.
 
-2. Run `./paul-envs.sh create <path/to/your/project> --name myApp`.
+2. Run `./paul-envs create <path/to/your/project> --name myApp`.
 
    This will just create a compose and env file in a new `projects/` directory
    with the right preset properties and name the project `myApp`. If no
@@ -90,15 +91,15 @@ isolation (same issue than with `devbox`).
    `~/.aws`, `~/.git-credentials` etc.) as those could have issues being
    copied (due to restrictive permissions).
 
-   If you want to copy some of those, see `./paul-envs.sh create` flags.
+   If you want to copy some of those, see `./paul-envs create` flags.
 
-4. Run `./paul-envs.sh build myApp`.
+4. Run `./paul-envs build myApp`.
 
    It will build the container through the right `docker compose build`
    invokation and initialize persistent volumes.
 
 5. Then launch the container each time you want to work on the project:
-   `./paul-envs.sh run myApp`.
+   `./paul-envs run myApp`.
 
    The mounted project is available in that container at `~/projects/myApp`.
 
@@ -149,14 +150,14 @@ through persistent volumes.
 First you need to clone this repository and make it your current working
 directory:
 ```sh
-git clone https://github.com/peaBerberian/paul-envs.sh.git
-cd paul-envs.sh
+git clone https://github.com/peaBerberian/paul-envs.git
+cd paul-envs
 ```
 
-Running `./paul-envs.sh` without any argument will list all available operations
+Running `./paul-envs` without any argument will list all available operations
 and corresponding flags:
 ```sh
-./paul-envs.sh
+./paul-envs
 ```
 
 ### 1. Create a new container's config
@@ -166,11 +167,11 @@ same base with variations).
 
 This container first need to be configured to point to your project and have the
 right arguments (e.g. the right tools and git configuration). This is done
-through the `paul-envs.sh create` "command".
+through the `paul-envs create` "command".
 
 First ensure the target project is present locally in your host, then run:
 ```sh
-./paul-envs.sh create <path/to/your/project>
+./paul-envs create <path/to/your/project>
 ```
 
 Optionally, you may add a lot of flags to better configure that container.
@@ -178,7 +179,7 @@ Here's an example of a real-life usage:
 ```sh
 # Will create a container named `myapp` with a default `zsh` shell and many
 # configurations. Also mount your `.git-credentials` readonly to the container.
-./paul-envs.sh create myapp ~/work/api \
+./paul-envs create myapp ~/work/api \
   --name myProject
   --shell zsh \
   --node-version 22.11.0 \
@@ -190,7 +191,7 @@ Here's an example of a real-life usage:
   --volume ~/.git-credentials:/home/dev/.git-credentials:ro
 ```
 
-Without the corresponding flags, prompts will be proposed by `paul-envs.sh` for
+Without the corresponding flags, prompts will be proposed by `paul-envs` for
 important parameters (choosen shell, wanted pre-mounted volumes etc.).
 
 What this step does is just to create both a `yaml` and a `.env` file containing
@@ -207,10 +208,10 @@ configuration to define the container we want to build.
 
 This step relies on `docker compose`, which you should have locally installed.
 
-To build a container, just run the `paul-envs.sh build <NAME>` command.
+To build a container, just run the `paul-envs build <NAME>` command.
 For example, with a container named `myApp`, you would just do:
 ```sh
-./paul-envs.sh build myApp
+./paul-envs build myApp
 ```
 
 This will take some time as the initialization of the container is going on:
@@ -219,10 +220,10 @@ packages are loaded, tools are set-up etc.
 ### 3. Run the container
 
 Now that the container is built. It can be run at any time, with the
-`./paul-envs.sh run` command.
+`./paul-envs run` command.
 For example, with a container named `myApp`, you would do:
 ```sh
-./paul-envs.sh build myApp
+./paul-envs build myApp
 ```
 
 You will directly switch to that container's `$HOME/projects/<NAME>` directory
@@ -242,16 +243,16 @@ rebuild just to update some base tools).
 
 ### Other commands
 
-`paul-envs.sh` also proposes the `list` and `remove` commands, respectively to
+`paul-envs` also proposes the `list` and `remove` commands, respectively to
 list "created" configurations (what's in the `projects` directory basically) and
 to easily remove one of them (basically a `rm` command for that configuration)
 respectively:
 ```sh
 # List all created configurations, built or not
-./paul-envs.sh list
+./paul-envs list
 
 # Remove the configuration file for the `myApp` container
-./paul-envs.sh remove myApp
+./paul-envs remove myApp
 ```
 
 ## What gets preserved vs. ephemeral
@@ -271,13 +272,13 @@ will be removed when the container is exited).
 ## Deep dive on how it works
 
 Much like container applications, this repository is organized in separate
-layers: `Dockerfile`, `compose.yaml` and `paul-envs.sh` script, from the core
-layer to the most outer one, each inner layer being able to run independently
-of its outer layers (just losing some features in the process).
+layers: `Dockerfile`, `compose.yaml` and `paul-envs`, from the core layer to the
+most outer one, each inner layer being able to run independently of its outer
+layers (just losing some features in the process).
 
 The following chapters explain each layer and how to run them independently if
 wanted. If you just want to [run this without understanding every little
-details](https://www.youtube.com/watch?v=bJHPfpOnDzg) just run `paul-envs.sh`
+details](https://www.youtube.com/watch?v=bJHPfpOnDzg) just run `paul-envs`
 and performs the operations it advertises.
 
 ### Dockerfile
@@ -336,7 +337,7 @@ the dockerfile.
 
 The job of copying the `configs` directory's content is taken by the
 `Dockerfile`. Meaning that you'll profit from this even if you're not relying on
-`docker compose` or `paul-envs.sh`.
+`docker compose` or `paul-envs`.
 
 #### Note about neovim
 
@@ -345,7 +346,7 @@ container is built if you rely on the `lazy.nvim` plugin manager.
 
 With other solutions, the installation will need to be done the first time the
 container is ran (it should be persisted thereafter if going the
-`compose.yaml` or `paul-envs.sh` route).
+`compose.yaml` or `paul-envs` route).
 
 ### compose.yaml
 
@@ -360,9 +361,9 @@ rely on `docker compose` directly (e.g. `docker compose build`). It works!
 
 If you just want to do that, refer to the `compose.yaml` file. It contains
 documentation on how to exploit `docker compose` directly instead of going
-through my `paul-envs.sh` script.
+through my `paul-envs` binary.
 
-### The paul-envs.sh script
+### The paul-envs binary
 
 Managing very dynamic configurations for multiple projects just with
 `docker compose` is not as straightforward as I would have liked: depending on
@@ -370,14 +371,14 @@ what you want to do, the idiomatic ways to configure it are through either
 environment variables or new compose files.
 
 Instead of doing both, which would have been difficult to maintain (and to
-remember what goes where and why), I thus decided to create a `paul-envs.sh`
-script whose job is to wrap both compose files creation and `docker compose`
+remember what goes where and why), I thus decided to create a `paul-envs`
+tool whose job is to wrap both compose files creation and `docker compose`
 calls.
 
 Through a small list of commands and a high number of flags, it is now possible
 to easily create configurations, build containers, run them, list them etc.
 
-That script actually just writes `compose.yaml` files and wraps `docker compose`
+That binary actually just writes `compose.yaml` files and wraps `docker compose`
 calls, with also some input validation and the printing of helpful information
 on top.
 

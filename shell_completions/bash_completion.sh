@@ -11,9 +11,9 @@ _paulenvs()
     # Options for create command
     local create_flags="--name --uid --gid --username --shell --nodejs --rust --python --go --git-name --git-email --packages --enable-ssh --enable-sudo --neovim --starship --atuin --mise --zellij --jujutsu --port --volume"
 
-    # Get list of existing containers from paul-envs.sh ls
+    # Get list of existing containers from paul-envs ls
     _get_containers() {
-        paul-envs.sh ls 2>/dev/null | grep -E '^\s+-\s+' | sed 's/^\s*-\s*//'
+        paul-envs ls 2>/dev/null | grep -E '^\s+-\s+' | sed 's/^\s*-\s*//'
     }
 
     # First argument (command)
@@ -79,4 +79,4 @@ _paulenvs()
     esac
 }
 
-complete -F _paulenvs paul-envs.sh
+complete -F _paulenvs paul-envs

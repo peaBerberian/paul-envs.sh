@@ -74,7 +74,7 @@ type ContainerConfig struct {
 }
 
 type App struct {
-	scriptDir   string
+	binaryDir   string
 	projectsDir string
 	io          *IoCtrl
 }
@@ -92,7 +92,7 @@ func NewIoCtrl(rd io.Reader, w io.Writer) *IoCtrl {
 }
 
 func NewApp() (*App, error) {
-	// Get script directory
+	// Get binary directory
 	// TODO: Rely on something like XDG_DATA_HOME, XDG_CONFIG_HOME etc.
 	ex, err := os.Executable()
 	if err != nil {
@@ -100,7 +100,7 @@ func NewApp() (*App, error) {
 	}
 
 	return &App{
-		scriptDir:   filepath.Dir(ex),
+		binaryDir:   filepath.Dir(ex),
 		projectsDir: filepath.Join(filepath.Dir(ex), "projects"),
 		io:          NewIoCtrl(os.Stdin, os.Stdout),
 	}, nil
@@ -330,7 +330,7 @@ func lightSanitize(str string) string {
 
 // File path helpers
 func (app *App) getBaseCompose() string {
-	return filepath.Join(app.scriptDir, baseComposeFilename)
+	return filepath.Join(app.binaryDir, baseComposeFilename)
 }
 
 func (app *App) getProjectDir(name string) string {
@@ -1241,7 +1241,7 @@ func (app *App) Create(args []string) {
 	fmt.Printf("     - %s\n", app.getProjectEnv(name))
 	fmt.Printf("     - %s\n", app.getProjectCompose(name))
 	fmt.Printf("  2. Put the $HOME dotfiles you want to port in:\n")
-	fmt.Printf("     - %s/configs/\n", app.scriptDir)
+	fmt.Printf("     - %s/configs/\n", app.binaryDir)
 	fmt.Printf("  3. Build the environment:\n")
 	fmt.Printf("     paul-envs build %s\n", name)
 	fmt.Printf("  4. Run the environment:\n")
@@ -1320,7 +1320,7 @@ func (app *App) Build(ctx context.Context, args []string) error {
 	composeFile := app.getProjectCompose(name)
 	envFile := app.getProjectEnv(name)
 	if _, err := os.Stat(composeFile); os.IsNotExist(err) {
-		return fmt.Errorf("Project '%s' not found. Hint: Use 'paul-envs.sh list' to see available projects or 'paul-envs create' to make a new one", name)
+		return fmt.Errorf("Project '%s' not found. Hint: Use 'paul-envs list' to see available projects or 'paul-envs create' to make a new one", name)
 	}
 	if _, err := os.Stat(envFile); os.IsNotExist(err) {
 		return fmt.Errorf("Project '%s' not found. Hint: Use 'paul-envs list' to see available projects or 'paul-envs create' to make a new one", name)
@@ -1518,9 +1518,7 @@ Options for create (all optional):
   --volume HOST:CONT[:ro]  Mount volume (prompted if not specified, can be repeated)
 
 Windows/Git Bash Notes:
-  - Paths are automatically converted (C:\Users\... -> /c/Users/...)
   - UID/GID default to 1000 on Windows (Docker Desktop requirement)
-  - Use forward slashes or let the script normalize paths for you
 
 Interactive Mode (default):
   paul-envs create ~/projects/myapp

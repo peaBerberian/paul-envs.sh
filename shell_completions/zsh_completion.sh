@@ -1,4 +1,4 @@
-#compdef paul-envs.sh
+#compdef paul-envs
 
 _paulenvs() {
     local -a commands
@@ -10,9 +10,9 @@ _paulenvs() {
         'remove:Remove a container'
     )
 
-    # Get list of existing containers from paul-envs.sh ls
+    # Get list of existing containers from paul-envs ls
     local -a containers
-    containers=(${(f)"$(paul-envs.sh ls 2>/dev/null | grep -E '^\s+-\s+' | sed 's/^\s*-\s*//')"})
+    containers=(${(f)"$(paul-envs ls 2>/dev/null | grep -E '^\s+-\s+' | sed 's/^\s*-\s*//')"})
 
 
     _arguments -C \

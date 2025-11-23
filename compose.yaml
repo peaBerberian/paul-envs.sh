@@ -19,9 +19,9 @@
 # `docker compose --profile reset up reset-cache reset-local`
 # ```
 #
-# If you don't mind running the `paul-envs.sh` script, none of this is
-# necessary, the `paul-envs.sh` script extends this compose.yaml file into other
-# more refined compose files and auto-fills the right parameters.
+# If you don't mind running the `paul-envs` binary, none of this is necessary,
+# the `paul-envs` tool extends this compose.yaml file into other more refined
+# compose files and auto-fills the right parameters.
 
 services:
 
