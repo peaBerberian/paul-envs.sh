@@ -1,0 +1,34 @@
+# Compose file for your project, which will be fed to docker compose alongside
+# ".env" in the same directory.
+#
+# Can be freely updated to update ports, volumes etc.
+
+services:
+  paulenv:
+    build:
+    image: paulenv:{{.ProjectName}}
+
+{{- if or .Ports .EnableSSH}}
+    ports:
+{{- range .Ports}}
+      - "{{.}}:{{.}}"
+{{- end}}
+{{- if .EnableSSH}}
+      # To listen for ssh connections:
+      - "22:22"
+{{- end}}
+{{- end}}
+
+    volumes:
+{{- range .Volumes}}
+      - {{.}}
+{{- end}}
+{{- if .EnableSSH}}
+{{- if .SSHKeyPath}}
+      # The host's public key, so it can connect through SSH:
+      - {{.SSHKeyPath}}:/etc/ssh/authorized_keys/${USERNAME}:ro
+{{- else}}
+      # Add your SSH public key here, for example:
+      # - ~/.ssh/id_ed25519.pub:/etc/ssh/authorized_keys/${USERNAME}:ro
+{{- end}}
+{{- end}}

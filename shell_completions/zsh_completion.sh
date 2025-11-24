@@ -3,11 +3,14 @@
 _paulenvs() {
     local -a commands
     commands=(
+			  'interactive:Start interactive mode'
         'create:Create a container configuration'
         'list:List all available containers'
         'build:Build a container'
         'run:Start a container'
         'remove:Remove a container'
+        'help:Show help'
+        'version:Show version'
     )
 
     # Get list of existing containers from paul-envs ls
@@ -25,6 +28,9 @@ _paulenvs() {
             ;;
         args)
             case ${words[2]} in
+                interactive)
+                    # No additional arguments
+                    ;;
                 create)
                     _arguments \
                         '2:project path:_directories' \
@@ -39,7 +45,6 @@ _paulenvs() {
                         '--go[Go installation]:version:' \
                         '--git-name[Git author name]:name:' \
                         '--git-email[Git author email]:email:' \
-                        '--packages[Additional packages]:packages:' \
                         '--enable-ssh[Enable ssh access]' \
                         '--enable-sudo[Enable sudo access (password: \"dev\")]' \
                         '--neovim[Install latest Neovim]' \
@@ -48,6 +53,7 @@ _paulenvs() {
                         '--mise[Install latest Mise]' \
                         '--zellij[Install latest Zellij]' \
                         '--jujutsu[Install latest Jujutsu]' \
+                        '*--package[Additional package from Ubuntu repo]:package:' \
                         '*--port[Expose port]:port:' \
                         '*--volume[Add volume]:volume:_files'
                     ;;
@@ -65,6 +71,12 @@ _paulenvs() {
                         "2:container name:(${containers[@]})"
                     ;;
                 list)
+                    # No additional arguments
+                    ;;
+                help)
+                    # No additional arguments
+                    ;;
+                version)
                     # No additional arguments
                     ;;
             esac

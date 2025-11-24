@@ -406,6 +406,15 @@ Along the mounted project, those are the only directories which are persisted.
 
 ## TODO:
 
+- BUG: DOES NOT PROMPT FOR LANGUAGE
+- Build does not work
+- Use XDG dirs etc.: Should projects configs go in DATA_HOME or in CONFIG_HOME?
+- on Remove, propose to call docker ourselve to remove the volume
+- Uninstallation command
+- Detect Docker compose automatically
+- Update CI
+- => Go can be merged I think
+- Commands work even if a subset is written
+- Only max a single instance of each project-container?
 - something like `up` / `down` commands make now much more sense with ssh
 - Add Kakoune and Helix as potential tools
-- Only max a single instance of each project-container?

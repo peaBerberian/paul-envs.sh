@@ -25,6 +25,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Get go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      - name: Check go version
+        run: go version
+
       - name: Set up Docker (Ubuntu)
         if: runner.os == 'Linux'
         run: |
@@ -44,6 +53,14 @@ jobs:
           echo "Docker Desktop should be pre-installed on Windows runners"
           docker --version
 
+      - name: Set Up paul-envs
+        shell: bash
+        run: |
+          make
+          # TODO: Remove the need for this:
+          cp dist/paul-envs .
+          mkdir -p test-project
+
       - name: Create test directory
         shell: bash
         run: |
@@ -53,17 +70,17 @@ jobs:
       - name: Test script help
         shell: bash
         run: |
-          ./paul-envs.sh
+          ./paul-envs
 
       - name: Test list (empty)
         shell: bash
         run: |
-          ./paul-envs.sh list
+          ./paul-envs list
 
       - name: Test create with --no-prompt (minimal)
         shell: bash
         run: |
-          ./paul-envs.sh create ./test-project \
+          ./paul-envs create ./test-project \
             --no-prompt \
             --name test-minimal \
             --shell bash
@@ -71,7 +88,7 @@ jobs:
       - name: Test create with Node.js
         shell: bash
         run: |
-          ./paul-envs.sh create ./test-project \
+          ./paul-envs create ./test-project \
             --no-prompt \
             --name test-node \
             --shell bash \
@@ -80,7 +97,7 @@ jobs:
       - name: Test create with multiple languages
         shell: bash
         run: |
-          ./paul-envs.sh create ./test-project \
+          ./paul-envs create ./test-project \
             --no-prompt \
             --name test-multi-lang \
             --shell zsh \
@@ -92,7 +109,7 @@ jobs:
       - name: Test create with specific versions (requires mise)
         shell: bash
         run: |
-          ./paul-envs.sh create ./test-project \
+          ./paul-envs create ./test-project \
             --no-prompt \
             --name test-versions \
             --shell bash \
@@ -103,7 +120,7 @@ jobs:
       - name: Test create with tools
         shell: bash
         run: |
-          ./paul-envs.sh create ./test-project \
+          ./paul-envs create ./test-project \
             --no-prompt \
             --name test-tools \
             --shell fish \
@@ -117,7 +134,7 @@ jobs:
       - name: Test create with WASM and sudo
         shell: bash
         run: |
-          ./paul-envs.sh create ./test-project \
+          ./paul-envs create ./test-project \
             --no-prompt \
             --name test-wasm-sudo \
             --shell bash \
@@ -128,7 +145,7 @@ jobs:
       - name: Test create with git config
         shell: bash
         run: |
-          ./paul-envs.sh create ./test-project \
+          ./paul-envs create ./test-project \
             --no-prompt \
             --name test-git \
             --shell bash \
@@ -138,16 +155,18 @@ jobs:
       - name: Test create with packages
         shell: bash
         run: |
-          ./paul-envs.sh create ./test-project \
+          ./paul-envs create ./test-project \
             --no-prompt \
             --name test-packages \
             --shell bash \
-            --packages "curl wget git"
+            --package curl \
+            --package wget \
+            --package git
 
       - name: Test create with ports
         shell: bash
         run: |
-          ./paul-envs.sh create ./test-project \
+          ./paul-envs create ./test-project \
             --no-prompt \
             --name test-ports \
             --shell bash \
@@ -158,7 +177,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p test-volume-source
-          ./paul-envs.sh create ./test-project \
+          ./paul-envs create ./test-project \
             --no-prompt \
             --name test-volumes \
             --shell bash \
@@ -168,7 +187,7 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          ./paul-envs.sh create ./test-project \
+          ./paul-envs create ./test-project \
             --no-prompt \
             --name test-uid-gid \
             --shell bash \
@@ -178,7 +197,7 @@ jobs:
       - name: Test create with custom username
         shell: bash
         run: |
-          ./paul-envs.sh create ./test-project \
+          ./paul-envs create ./test-project \
             --no-prompt \
             --name test-username \
             --shell bash \
@@ -187,7 +206,7 @@ jobs:
       - name: Test create full configuration
         shell: bash
         run: |
-          ./paul-envs.sh create ./test-project \
+          ./paul-envs create ./test-project \
             --no-prompt \
             --name test-full \
             --shell zsh \
@@ -206,14 +225,15 @@ jobs:
             --jujutsu \
             --git-name "Full Test" \
             --git-email "full@test.com" \
-            --packages "ripgrep fzf" \
+            --package ripgrep \
+            --package fzf \
             --port 3000 \
             --port 5432
 
       - name: Test list (with projects)
         shell: bash
         run: |
-          ./paul-envs.sh list
+          ./paul-envs list
 
       - name: Verify project files
         shell: bash
@@ -253,14 +273,14 @@ jobs:
       - name: Test remove command
         shell: bash
         run: |
-          echo "y" | ./paul-envs.sh remove test-minimal
+          echo "y" | ./paul-envs remove test-minimal
           test ! -d projects/test-minimal || exit 1
           echo "Remove command verified"
 
       - name: Test error handling - invalid project name
         shell: bash
         run: |
-          if ./paul-envs.sh create ./test-project --no-prompt --name "invalid name!" 2>/dev/null; then
+          if ./paul-envs create ./test-project --no-prompt --name "invalid name!" 2>/dev/null; then
             echo "Should have failed with invalid project name"
             exit 1
           fi
@@ -269,7 +289,7 @@ jobs:
       - name: Test error handling - invalid shell
         shell: bash
         run: |
-          if ./paul-envs.sh create ./test-project --no-prompt --name test-invalid-shell --shell invalidshell 2>/dev/null; then
+          if ./paul-envs create ./test-project --no-prompt --name test-invalid-shell --shell invalidshell 2>/dev/null; then
             echo "Should have failed with invalid shell"
             exit 1
           fi
@@ -278,7 +298,7 @@ jobs:
       - name: Test error handling - invalid version
         shell: bash
         run: |
-          if ./paul-envs.sh create ./test-project --no-prompt --name test-invalid-version --nodejs "invalid.version" 2>/dev/null; then
+          if ./paul-envs create ./test-project --no-prompt --name test-invalid-version --nodejs "invalid.version" 2>/dev/null; then
             echo "Should have failed with invalid version"
             exit 1
           fi
@@ -287,7 +307,7 @@ jobs:
       - name: Test error handling - invalid port
         shell: bash
         run: |
-          if ./paul-envs.sh create ./test-project --no-prompt --name test-invalid-port --port 99999 2>/dev/null; then
+          if ./paul-envs create ./test-project --no-prompt --name test-invalid-port --port 99999 2>/dev/null; then
             echo "Should have failed with invalid port"
             exit 1
           fi
@@ -296,8 +316,8 @@ jobs:
       - name: Test error handling - duplicate project
         shell: bash
         run: |
-          ./paul-envs.sh create ./test-project --no-prompt --name test-duplicate --shell bash
-          if ./paul-envs.sh create ./test-project --no-prompt --name test-duplicate --shell bash 2>/dev/null; then
+          ./paul-envs create ./test-project --no-prompt --name test-duplicate --shell bash
+          if ./paul-envs create ./test-project --no-prompt --name test-duplicate --shell bash 2>/dev/null; then
             echo "Should have failed with duplicate project name"
             exit 1
           fi
@@ -329,6 +349,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Get go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      - name: Check go version
+        run: go version
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
@@ -353,6 +382,14 @@ jobs:
           docker --version
           docker compose version
 
+      - name: Set Up paul-envs
+        shell: bash
+        run: |
+          make
+          # TODO: Remove the need for this:
+          cp dist/paul-envs .
+          mkdir -p test-project
+
       - name: Create test projects directory
         shell: bash
         run: |
@@ -374,7 +411,7 @@ jobs:
       - name: Create minimal build test project
         shell: bash
         run: |
-          ./paul-envs.sh create ./test-project \
+          ./paul-envs create ./test-project \
             --no-prompt \
             --name build-minimal \
             --shell bash
@@ -388,7 +425,7 @@ jobs:
           DOCKER_DEFAULT_PLATFORM: ${{ matrix.platform }}
         run: |
           echo "Building minimal project for ${{ matrix.platform }}..."
-          ./paul-envs.sh build build-minimal
+          ./paul-envs build build-minimal
           echo "✓ Build completed successfully"
 
           echo "Verifying built image architecture..."
@@ -405,7 +442,7 @@ jobs:
         run: |
           echo "Running container to verify it starts..."
           set +e
-          timeout 30s ./paul-envs.sh run build-minimal bash -c "echo 'Container started successfully' && whoami && pwd && uname -m"
+          timeout 30s ./paul-envs run build-minimal bash -c "echo 'Container started successfully' && whoami && pwd && uname -m"
           EXIT_CODE=$?
           set -e
 
@@ -420,7 +457,7 @@ jobs:
       - name: Create project with Node.js
         shell: bash
         run: |
-          ./paul-envs.sh create ./test-project \
+          ./paul-envs create ./test-project \
             --no-prompt \
             --name build-node \
             --shell bash \
@@ -432,7 +469,7 @@ jobs:
           DOCKER_DEFAULT_PLATFORM: ${{ matrix.platform }}
         run: |
           echo "Building Node.js project..."
-          ./paul-envs.sh build build-node
+          ./paul-envs build build-node
           echo "✓ Node.js build completed"
 
       - name: Test Node.js installation
@@ -440,7 +477,7 @@ jobs:
         run: |
           echo "Verifying Node.js is installed..."
           set +e
-          timeout 30s ./paul-envs.sh run build-node bash -c "node --version && npm --version"
+          timeout 30s ./paul-envs run build-node bash -c "node --version && npm --version"
           EXIT_CODE=$?
           set -e
 
@@ -458,7 +495,7 @@ jobs:
         run: |
           echo "Testing file access in mounted project..."
           set +e
-          timeout 30s ./paul-envs.sh run build-minimal bash -c "
+          timeout 30s ./paul-envs run build-minimal bash -c "
             cd ~/projects/* || exit 1
             ls -la
             test -f README.md && echo '✓ Can read project files' || { echo '✗ Cannot read files'; exit 1; }
@@ -512,6 +549,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Get go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      - name: Check go version
+        run: go version
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
@@ -531,6 +577,14 @@ jobs:
             ${{ runner.os }}-${{ matrix.arch }}-buildx-full-
             ${{ runner.os }}-${{ matrix.arch }}-buildx-
 
+      - name: Set Up paul-envs
+        shell: bash
+        run: |
+          make
+          # TODO: Remove the need for this:
+          cp dist/paul-envs .
+          mkdir -p test-project
+
       - name: Create test project
         shell: bash
         run: |
@@ -540,7 +594,7 @@ jobs:
       - name: Create full build
         shell: bash
         run: |
-          ./paul-envs.sh create ./test-project \
+          ./paul-envs create ./test-project \
             --no-prompt \
             --name full-build \
             --uid 1500 \
@@ -562,7 +616,10 @@ jobs:
             --jujutsu \
             --git-name "Kitchen Sink" \
             --git-email "sink@kitchen.com" \
-            --packages "ripgrep fzf htop iproute2" \
+            --package ripgrep \
+            --package fzf \
+            --package htop \
+            --package iproute2 \
             --port 3000 \
             --port 8080
 
@@ -572,7 +629,7 @@ jobs:
           DOCKER_DEFAULT_PLATFORM: ${{ matrix.platform }}
         run: |
           echo "Building full build for ${{ matrix.platform }}..."
-          ./paul-envs.sh build full-build
+          ./paul-envs build full-build
           echo "✓ Full build completed"
 
           echo "Verifying built image architecture..."
@@ -592,7 +649,7 @@ jobs:
           # First, test that fish shell loads without errors by capturing stderr
           echo "Testing fish shell initialization..."
           set +e
-          FISH_OUTPUT=$(timeout 10s ./paul-envs.sh run full-build fish -c 'echo "Fish shell loaded successfully"' 2>&1)
+          FISH_OUTPUT=$(timeout 10s ./paul-envs run full-build fish -c 'echo "Fish shell loaded successfully"' 2>&1)
           FISH_EXIT=$?
           set -e
 
@@ -622,7 +679,7 @@ jobs:
           echo "=========================================="
 
           EXPECTED_ARCH="${{ matrix.arch }}"
-          CONTAINER_OUTPUT=$(timeout 60s ./paul-envs.sh run full-build bash -c "
+          CONTAINER_OUTPUT=$(timeout 60s ./paul-envs run full-build bash -c "
             source ~/.bashrc
             echo \"Shell: bash\"
             echo \"Architecture: \$(uname -m)\"
@@ -789,7 +846,7 @@ jobs:
           echo "=========================================="
 
           set +e
-          FISH_CONTAINER_OUTPUT=$(timeout 60s ./paul-envs.sh run full-build fish -l -c '
+          FISH_CONTAINER_OUTPUT=$(timeout 60s ./paul-envs run full-build fish -l -c '
             echo "Shell: fish"
             echo "Architecture: "(uname -m)
             echo ""
@@ -918,24 +975,3 @@ jobs:
             projects/
             *.log
           retention-days: 7
-
-  shellcheck:
-    name: ShellCheck Linting
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install ShellCheck
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y shellcheck
-
-      - name: Run ShellCheck
-        run: |
-          shellcheck --version
-          shellcheck -x -S warning paul-envs.sh || true
-          echo ""
-          echo "=== Detailed analysis ==="
-          shellcheck -x paul-envs.sh

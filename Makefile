@@ -1,4 +1,4 @@
-.PHONY: build release clean
+.PHONY: build release clean test
 
 DIST := dist
 RELEASE := $(DIST)/release
@@ -35,3 +35,5 @@ release:
 clean:
 	rm -rf $(DIST)
 
+test:
+	CGO_ENABLED=1 go test ./... -race -count=1

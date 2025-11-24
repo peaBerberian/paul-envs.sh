@@ -6,11 +6,14 @@ function __paul_envs_containers
 end
 
 # Main commands
+complete -c paul-envs -f -n __fish_use_subcommand -a interactive -d 'Start interactive mode'
 complete -c paul-envs -f -n __fish_use_subcommand -a create -d 'Create a container configuration'
 complete -c paul-envs -f -n __fish_use_subcommand -a list -d 'List all available containers'
 complete -c paul-envs -f -n __fish_use_subcommand -a build -d 'Build a container'
 complete -c paul-envs -f -n __fish_use_subcommand -a run -d 'Start a container'
 complete -c paul-envs -f -n __fish_use_subcommand -a remove -d 'Remove a container'
+complete -c paul-envs -f -n __fish_use_subcommand -a help -d 'Show help'
+complete -c paul-envs -f -n __fish_use_subcommand -a version -d 'Show version'
 
 # Create command options
 complete -c paul-envs -n "__fish_seen_subcommand_from create" -l name -d "Specific a container name" -x
@@ -24,7 +27,7 @@ complete -c paul-envs -n "__fish_seen_subcommand_from create" -l python -d 'Pyth
 complete -c paul-envs -n "__fish_seen_subcommand_from create" -l go -d 'Go installation' -x
 complete -c paul-envs -n "__fish_seen_subcommand_from create" -l git-name -d 'Git author name' -x
 complete -c paul-envs -n "__fish_seen_subcommand_from create" -l git-email -d 'Git author email' -x
-complete -c paul-envs -n "__fish_seen_subcommand_from create" -l packages -d 'Additional Ubuntu packages' -x
+complete -c paul-envs -n "__fish_seen_subcommand_from create" -l package -d 'Additional Ubuntu package' -x
 complete -c paul-envs -n "__fish_seen_subcommand_from create" -l enable-ssh -d "Enable ssh access" -f
 complete -c paul-envs -n "__fish_seen_subcommand_from create" -l enable-sudo -d "Enable sudo access (password: \"dev\")" -f
 complete -c paul-envs -n "__fish_seen_subcommand_from create" -l neovim -d "Install Neovim" -f
