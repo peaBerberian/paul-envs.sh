@@ -126,11 +126,7 @@ func (c *Console) AskString(prompt, defaultVal string) (string, error) {
 		case input := <-inputCh:
 			input = strings.TrimSpace(input)
 			if input == "" {
-				if defaultVal != "" {
-					return defaultVal, nil
-				}
-				fmt.Fprintln(c.writer, "Input cannot be empty.")
-				continue // re-prompt
+				return defaultVal, nil
 			}
 			return input, nil
 		}

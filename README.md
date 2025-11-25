@@ -283,9 +283,10 @@ and performs the operations it advertises.
 
 ### Dockerfile
 
-The `Dockerfile` sets a simple Ubuntu LTS environment with a shell of your
-preference (either `bash` as default or `zsh` or `fish`) and optional popular
-CLI tools (`neovim`, `starship`, `atuin`, `zellij`, `jujutsu` and `mise`).
+The `Dockerfile` (`./internal/files/assets/Dockerfile`) sets a simple Ubuntu
+LTS environment with a shell of your preference (either `bash` as default or
+`zsh` or `fish`) and optional popular CLI tools (`neovim`, `starship`, `atuin`,
+`zellij`, `jujutsu` and `mise`).
 
 It also copies the content of the `configs` directory inside of that container
 and sets-up `$HOME/.container-cache` and `$HOME/.container-local` directories
@@ -350,10 +351,10 @@ container is ran (it should be persisted thereafter if going the
 
 ### compose.yaml
 
-The `compose.yaml` file allows `docker compose` to build a container with
-the right arguments for your project. More importantly, it also mount the
-right "volumes" so that some changes (project changes, cache, tools data,
-shell history etc.) are persisted.
+The `compose.yaml` file (`./internal/files/assets/compose.yaml`) allows
+`docker compose` to build a container with the right arguments for your project.
+More importantly, it also mount the right "volumes" so that some changes
+(project changes, cache, tools data, shell history etc.) are persisted.
 
 In simple single-projects scenarios, it can also be relied on directly.
 Just set the right env variables listed in there (.e.g in an `env` file) and
@@ -406,14 +407,12 @@ Along the mounted project, those are the only directories which are persisted.
 
 ## TODO:
 
-- BUG: DOES NOT PROMPT FOR LANGUAGE
-- Build does not work
 - Use XDG dirs etc.: Should projects configs go in DATA_HOME or in CONFIG_HOME?
 - on Remove, propose to call docker ourselve to remove the volume
 - Uninstallation command
 - Detect Docker compose automatically
-- Update CI
 - => Go can be merged I think
+- Shell completions under specific command?
 - Commands work even if a subset is written
 - Only max a single instance of each project-container?
 - something like `up` / `down` commands make now much more sense with ssh

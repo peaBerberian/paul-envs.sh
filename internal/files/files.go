@@ -11,13 +11,14 @@ import (
 	"github.com/peaberberian/paul-envs/internal/console"
 )
 
-//go:embed templates/*
-var templates embed.FS
+//go:embed assets/*
+var assets embed.FS
 
 const (
-	BaseComposeFilename    = "compose.yaml"
-	ProjectComposeFilename = "compose.yaml"
-	ProjectEnvFilename     = ".env"
+	BaseComposeFilename       = "compose.yaml"
+	ProjectComposeFilename    = "compose.yaml"
+	ProjectDockerfileFilename = "Dockerfile"
+	ProjectEnvFilename        = ".env"
 )
 
 type FileStore struct {
@@ -37,6 +38,49 @@ func NewFileStore() (*FileStore, error) {
 		baseDir:     filepath.Dir(ex),
 		projectsDir: filepath.Join(filepath.Dir(ex), "projects"),
 	}, nil
+}
+
+// Write the base Dockerfile and compose.yaml file in the base directory if not
+// already done
+func (f *FileStore) ensureCreatedBaseFiles() error {
+	// Write docker file if needed
+	baseDockerfilePath := filepath.Join(f.baseDir, "Dockerfile")
+	_, err := os.Stat(baseDockerfilePath)
+	if os.IsNotExist(err) {
+		dockerfileData, err := assets.ReadFile("assets/Dockerfile")
+		if err != nil {
+			return err
+		}
+
+		err = os.WriteFile(
+			filepath.Join(f.baseDir, "Dockerfile"),
+			dockerfileData, 0644)
+		if err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
+	}
+
+	// Then write base compose if needed
+	baseComposePath := filepath.Join(f.baseDir, "Compose")
+	_, err = os.Stat(baseComposePath)
+	if os.IsNotExist(err) {
+		composeData, err := assets.ReadFile("assets/compose.yaml")
+		if err != nil {
+			return err
+		}
+
+		err = os.WriteFile(
+			filepath.Join(f.baseDir, "compose.yaml"),
+			composeData, 0644)
+		if err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
+	}
+	return nil
 }
 
 // File path helpers
@@ -116,7 +160,7 @@ func (f *FileStore) CreateProjectEnvFile(projectName string, tplData EnvTemplate
 		return err
 	}
 
-	tmplContent, err := templates.ReadFile("templates/env.tmpl")
+	tmplContent, err := assets.ReadFile("assets/env.tmpl")
 	if err != nil {
 		return fmt.Errorf("read env template: %w", err)
 	}
@@ -131,6 +175,9 @@ func (f *FileStore) CreateProjectEnvFile(projectName string, tplData EnvTemplate
 		return fmt.Errorf("execute env template: %w", err)
 	}
 
+	if err := f.ensureCreatedBaseFiles(); err != nil {
+		return fmt.Errorf("write base project files: %w", err)
+	}
 	if err := os.WriteFile(fileLoc, buf.Bytes(), 0644); err != nil {
 		return fmt.Errorf("write env file: %w", err)
 	}
@@ -143,7 +190,7 @@ func (f *FileStore) CreateProjectComposeFile(projectName string, tplData Compose
 		return err
 	}
 
-	tmplContent, err := templates.ReadFile("templates/compose.tmpl")
+	tmplContent, err := assets.ReadFile("assets/compose.tmpl")
 	if err != nil {
 		return fmt.Errorf("read compose template: %w", err)
 	}
@@ -158,6 +205,9 @@ func (f *FileStore) CreateProjectComposeFile(projectName string, tplData Compose
 		return fmt.Errorf("execute compose template: %w", err)
 	}
 
+	if err := f.ensureCreatedBaseFiles(); err != nil {
+		return fmt.Errorf("write base project files: %w", err)
+	}
 	if err := os.WriteFile(fileLoc, buf.Bytes(), 0644); err != nil {
 		return fmt.Errorf("write compose file: %w", err)
 	}

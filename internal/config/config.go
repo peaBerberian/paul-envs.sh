@@ -64,8 +64,8 @@ type Config struct {
 	//version wanted.
 	//
 	// Values can be:
-	// - if 'none': don't install Node.js
-	// - if 'latest': Install Ubuntu's default package for Node.js
+	// - if 'none' or empty: don't install
+	// - if 'latest': Install Ubuntu's default package
 	// - If anything else: The exact version to install (e.g. "1.90.0").
 	//   That last type of value will only work if INSTALL_MISE is 'true'.
 	InstallNode   string
@@ -116,13 +116,9 @@ func New(username string, shell Shell) Config {
 	}
 
 	return Config{
-		Username:      username,
-		Shell:         shell,
-		UID:           uid,
-		GID:           gid,
-		InstallNode:   "none",
-		InstallRust:   "none",
-		InstallPython: "none",
-		InstallGo:     "none",
+		Username: username,
+		Shell:    shell,
+		UID:      uid,
+		GID:      gid,
 	}
 }

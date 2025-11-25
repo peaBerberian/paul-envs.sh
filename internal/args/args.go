@@ -258,6 +258,20 @@ func promptMissing(cons *console.Console, cfg *config.Config) error {
 		}
 	}
 
+	// Set more explicit default values for disabled languages
+	if cfg.InstallNode == "" {
+		cfg.InstallNode = "none"
+	}
+	if cfg.InstallRust == "" {
+		cfg.InstallRust = "none"
+	}
+	if cfg.InstallPython == "" {
+		cfg.InstallPython = "none"
+	}
+	if cfg.InstallGo == "" {
+		cfg.InstallGo = "none"
+	}
+
 	// Tools
 	if !hasAnyTool(cfg) {
 		cons.WriteLn("")
@@ -428,120 +442,190 @@ func needsExactVersion(version string) bool {
 
 // TODO: Return Shell instead of filling Config itself?
 func promptShell(cons *console.Console, cfg *config.Config) error {
-	cons.Info("=== Shell Selection ===")
-	cons.WriteLn("Select shell:")
-	cons.WriteLn("  1) bash (default)")
-	cons.WriteLn("  2) zsh")
-	cons.WriteLn("  3) fish")
+	for {
+		cons.Info("=== Shell Selection ===")
+		cons.WriteLn("Select shell:")
+		cons.WriteLn("  1) bash (default)")
+		cons.WriteLn("  2) zsh")
+		cons.WriteLn("  3) fish")
 
-	choice, err := cons.AskString("Choice", "1")
-	if err != nil {
-		return fmt.Errorf("unable to prompt for shell choice: %w", err)
-	}
+		choice, err := cons.AskString("Choice", "1")
+		if err != nil {
+			return fmt.Errorf("unable to prompt for shell choice: %w", err)
+		}
 
-	switch choice {
-	case "1":
-		cfg.Shell = config.ShellBash
-	case "2":
-		cfg.Shell = config.ShellZsh
-	case "3":
-		cfg.Shell = config.ShellFish
-	default:
-		cfg.Shell = config.ShellBash
+		switch choice {
+		case "1", "bash":
+			cfg.Shell = config.ShellBash
+			return nil
+		case "2", "zsh":
+			cfg.Shell = config.ShellZsh
+			return nil
+		case "3", "fish":
+			cfg.Shell = config.ShellFish
+			return nil
+		default:
+			cons.Warn("Unrecognized choice: \"%s\"", choice)
+			cons.Warn("Please select an element from the list, or leave empty for the default.")
+			cons.WriteLn("")
+		}
 	}
-	return nil
 }
 
 // TODO: Return languages instead through a new type?
 func promptLanguages(cons *console.Console, cfg *config.Config) error {
-	cons.Info("=== Language Runtimes ===")
-	cons.WriteLn("Which language runtimes do you need? (space-separated numbers, or Enter to skip)")
-	cons.WriteLn("  1) Node.js")
-	cons.WriteLn("  2) Rust")
-	cons.WriteLn("  3) Python")
-	cons.WriteLn("  4) Go")
-	cons.WriteLn("  5) WebAssembly tools (Binaryen, Rust WASM target if Rust is enabled)")
+	for {
+		cons.Info("=== Language Runtimes ===")
+		cons.WriteLn("Which language runtimes do you need? (space-separated numbers, or Enter to skip)")
+		cons.WriteLn("  1) Node.js")
+		cons.WriteLn("  2) Rust")
+		cons.WriteLn("  3) Python")
+		cons.WriteLn("  4) Go")
+		cons.WriteLn("  5) WebAssembly tools (Binaryen, Rust WASM target if Rust is enabled)")
 
-	choices, err := cons.AskString("Choice", "none")
-	if err != nil {
-		return fmt.Errorf("unable to prompt for language choice: %w", err)
-	}
-
-	for choice := range strings.FieldsSeq(choices) {
-		switch choice {
-		case "1":
-			ver, err := cons.AskString("Node.js version (latest/none/X.Y.Z)", config.VersionLatest)
-			if err != nil {
-				return fmt.Errorf("unable to prompt for Node.js version: %w", err)
-			}
-			cfg.InstallNode = ver
-		case "2":
-			ver, err := cons.AskString("Rust version (latest/none/X.Y.Z)", config.VersionLatest)
-			if err != nil {
-				return fmt.Errorf("unable to prompt for Rust version: %w", err)
-			}
-			cfg.InstallRust = ver
-		case "3":
-			ver, err := cons.AskString("Python version (latest/none/X.Y.Z)", config.VersionLatest)
-			if err != nil {
-				return fmt.Errorf("unable to prompt for Python version: %w", err)
-			}
-			cfg.InstallPython = ver
-		case "4":
-			ver, err := cons.AskString("Go version (latest/none/X.Y.Z)", config.VersionLatest)
-			if err != nil {
-				return fmt.Errorf("unable to prompt for Go version: %w", err)
-			}
-			cfg.InstallGo = ver
-		case "5":
-			cfg.EnableWasm = true
-		case "none":
-			return nil
-		default:
-			cons.Warn("Unknown choice: %s (skipped)", choice)
+		choices, err := cons.AskString("Choice", "none")
+		if err != nil {
+			return fmt.Errorf("unable to prompt for language choice: %w", err)
 		}
+
+		// Track if we successfully processed all choices
+		allValid := true
+		selectedChoices := strings.FieldsSeq(choices)
+
+		for choice := range selectedChoices {
+			switch choice {
+			case "1":
+				ver, err := cons.AskString("Node.js version (latest/none/X.Y.Z)", config.VersionLatest)
+				if err != nil {
+					return fmt.Errorf("unable to prompt for Node.js version: %w", err)
+				}
+				if err := utils.ValidateVersionArg(ver); err != nil {
+					// TODO: just reask version, not the whole thing
+					cons.Warn("Invalid version format: %v", err)
+					allValid = false
+					break
+				}
+				cfg.InstallNode = ver
+			case "2":
+				ver, err := cons.AskString("Rust version (latest/none/X.Y.Z)", config.VersionLatest)
+				if err != nil {
+					return fmt.Errorf("unable to prompt for Rust version: %w", err)
+				}
+				if err := utils.ValidateVersionArg(ver); err != nil {
+					// TODO: just reask version, not the whole thing
+					cons.Warn("Invalid version format: %v", err)
+					allValid = false
+					break
+				}
+				cfg.InstallRust = ver
+			case "3":
+				ver, err := cons.AskString("Python version (latest/none/X.Y.Z)", config.VersionLatest)
+				if err != nil {
+					return fmt.Errorf("unable to prompt for Python version: %w", err)
+				}
+				if err := utils.ValidateVersionArg(ver); err != nil {
+					// TODO: just reask version, not the whole thing
+					cons.Warn("Invalid version format: %v", err)
+					allValid = false
+					break
+				}
+				cfg.InstallPython = ver
+			case "4":
+				ver, err := cons.AskString("Go version (latest/none/X.Y.Z)", config.VersionLatest)
+				if err != nil {
+					return fmt.Errorf("unable to prompt for Go version: %w", err)
+				}
+				if err := utils.ValidateVersionArg(ver); err != nil {
+					// TODO: just reask version, not the whole thing
+					cons.Warn("Invalid version format: %v", err)
+					allValid = false
+					break
+				}
+				cfg.InstallGo = ver
+			case "5":
+				cfg.EnableWasm = true
+			case "none":
+				return nil
+			default:
+				cons.Warn("Unrecognized choice: \"%s\"", choice)
+				allValid = false
+			}
+		}
+
+		if !allValid {
+			cons.Warn("Please select valid elements from the list, or leave empty no language.")
+			cons.WriteLn("")
+			// Reset any partial changes
+			cfg.InstallNode = ""
+			cfg.InstallRust = ""
+			cfg.InstallPython = ""
+			cfg.InstallGo = ""
+			cfg.EnableWasm = false
+			continue
+		}
+
+		return nil
 	}
-	return nil
 }
 
 // TODO: Return tools instead through a new type?
 func promptTools(cons *console.Console, cfg *config.Config) error {
-	cons.Info("=== Development Tools ===")
-	cons.WriteLn("Some dev tools are not pulled from Ubuntu's repositories to get their latest version instead.")
-	cons.WriteLn("Which of those tools do you want to install? (space-separated numbers, or Enter to skip all)")
-	cons.WriteLn("  1) Neovim (text editor)")
-	cons.WriteLn("  2) Starship (prompt)")
-	cons.WriteLn("  3) Atuin (shell history)")
-	cons.WriteLn("  4) Mise (version manager - required for specific language versions)")
-	cons.WriteLn("  5) Zellij (terminal multiplexer)")
-	cons.WriteLn("  6) Jujutsu (Git-compatible VCS)")
+	for {
+		cons.Info("=== Development Tools ===")
+		cons.WriteLn("Some dev tools are not pulled from Ubuntu's repositories to get their latest version instead.")
+		cons.WriteLn("Which of those tools do you want to install? (space-separated numbers, or Enter to skip all)")
+		cons.WriteLn("  1) Neovim (text editor)")
+		cons.WriteLn("  2) Starship (prompt)")
+		cons.WriteLn("  3) Atuin (shell history)")
+		cons.WriteLn("  4) Mise (version manager - required for specific language versions)")
+		cons.WriteLn("  5) Zellij (terminal multiplexer)")
+		cons.WriteLn("  6) Jujutsu (Git-compatible VCS)")
 
-	choices, err := cons.AskString("Choice", "none")
-	if err != nil {
-		return fmt.Errorf("unable to prompt for tools choice: %w", err)
-	}
-
-	for choice := range strings.FieldsSeq(choices) {
-		switch choice {
-		case "1":
-			cfg.InstallNeovim = true
-		case "2":
-			cfg.InstallStarship = true
-		case "3":
-			cfg.InstallAtuin = true
-		case "4":
-			cfg.InstallMise = true
-		case "5":
-			cfg.InstallZellij = true
-		case "6":
-			cfg.InstallJujutsu = true
-		case "none":
-			return nil
-		default:
-			cons.Warn("Unknown choice: %s (skipped)", choice)
+		choices, err := cons.AskString("Choice", "none")
+		if err != nil {
+			return fmt.Errorf("unable to prompt for tools choice: %w", err)
 		}
+
+		allValid := true
+		selectedChoices := strings.FieldsSeq(choices)
+
+		for choice := range selectedChoices {
+			switch choice {
+			case "1":
+				cfg.InstallNeovim = true
+			case "2":
+				cfg.InstallStarship = true
+			case "3":
+				cfg.InstallAtuin = true
+			case "4":
+				cfg.InstallMise = true
+			case "5":
+				cfg.InstallZellij = true
+			case "6":
+				cfg.InstallJujutsu = true
+			case "none":
+				return nil
+			default:
+				cons.Warn("Unrecognized choice: \"%s\"", choice)
+				allValid = false
+			}
+		}
+
+		if !allValid {
+			cons.Warn("Please select valid elements from the list, or leave empty for no tool.")
+			cons.WriteLn("")
+			// Reset any partial changes
+			cfg.InstallNeovim = false
+			cfg.InstallStarship = false
+			cfg.InstallAtuin = false
+			cfg.InstallMise = false
+			cfg.InstallZellij = false
+			cfg.InstallJujutsu = false
+			continue
+		}
+
+		return nil
 	}
-	return nil
 }
 
 // TODO: Return bool instead of filling Config itself?
@@ -586,80 +670,94 @@ func promptSSHKeys(cons *console.Console) (string, error) {
 		return "", errors.New("no ssh public key found")
 	}
 
-	cons.WriteLn("")
-	cons.WriteLn("Select SSH public key to mount:")
-	for i, key := range pubKeys {
-		cons.WriteLn("  %d) %s", i+1, filepath.Base(key))
-	}
-	cons.WriteLn("  %d) Custom path", len(pubKeys)+1)
-	cons.WriteLn("  %d) Skip (add manually later)", len(pubKeys)+2)
+	for {
+		cons.WriteLn("")
+		cons.WriteLn("Select SSH public key to mount:")
+		for i, key := range pubKeys {
+			cons.WriteLn("  %d) %s", i+1, filepath.Base(key))
+		}
+		cons.WriteLn("  %d) Custom path", len(pubKeys)+1)
+		cons.WriteLn("  %d) Skip (add manually later)", len(pubKeys)+2)
 
-	choice, err := cons.AskString("Choice", "1")
-	if err != nil {
-		return "", fmt.Errorf("unable to prompt for SSH key choice: %w", err)
-	}
-
-	choiceNum, err := strconv.Atoi(choice)
-	if err != nil {
-		// TODO: Ask in a loop?
-		cons.Warn("Invalid choice: %s. Skipping SSH key selection", choice)
-		return "", nil
-	}
-
-	var sshKeyPath string
-	if choiceNum >= 1 && choiceNum <= len(pubKeys) {
-		sshKeyPath = pubKeys[choiceNum-1]
-	} else if choiceNum == len(pubKeys)+1 {
-		customKey, err := cons.AskString("Enter path to public key", "")
+		choice, err := cons.AskString("Choice", "")
 		if err != nil {
-			return "", fmt.Errorf("failed to ask for public key input: %w", err)
+			return "", fmt.Errorf("unable to prompt for SSH key choice: %w", err)
 		}
-		if _, err := os.Stat(customKey); err == nil {
-			sshKeyPath = customKey
-		} else {
+
+		choiceNum, err := strconv.Atoi(choice)
+		if err != nil {
+			cons.Warn("Invalid choice: \"%s\"", choice)
+			cons.Warn("Please Enter a valid number.")
+			continue
+		}
+
+		if choiceNum >= 1 && choiceNum <= len(pubKeys) {
+			return pubKeys[choiceNum-1], nil
+		} else if choiceNum == len(pubKeys)+1 {
+			customKey, err := cons.AskString("Enter path to public key", "")
+			if err != nil {
+				return "", fmt.Errorf("failed to ask for public key input: %w", err)
+			}
+			if _, err := os.Stat(customKey); err == nil {
+				return customKey, nil
+			}
 			cons.Warn("File not found: %s", customKey)
+		} else if choiceNum == len(pubKeys)+2 {
+			return "", nil
+		} else {
+			cons.Warn("Invalid choice number: \"%s\"", choice)
+			cons.Warn("Please Enter a listed number.")
 		}
 	}
-	return sshKeyPath, nil
 }
 
 func promptPackages(cons *console.Console) ([]string, error) {
-	cons.Info("=== Additional Packages ===")
-	cons.WriteLn("The following packages are already installed on top of an Ubuntu:24.04 image:")
-	cons.WriteLn("curl git build-essential")
-	cons.WriteLn("")
-	cons.WriteLn("Enter additional Ubuntu packages (space-separated, or Enter to skip):")
-	cons.WriteLn("Examples: ripgrep fzf htop")
+	for {
+		cons.Info("=== Additional Packages ===")
+		cons.WriteLn("The following packages are already installed on top of an Ubuntu:24.04 image:")
+		cons.WriteLn("curl git build-essential")
+		cons.WriteLn("")
+		cons.WriteLn("Enter additional Ubuntu packages (space-separated, or Enter to skip):")
+		cons.WriteLn("Examples: ripgrep fzf htop")
 
-	input, err := cons.AskString("Packages", "")
-	if err != nil {
-		return nil, fmt.Errorf("unable to prompt for packages: %w", err)
-	}
+		input, err := cons.AskString("Packages", "")
+		if err != nil {
+			return nil, fmt.Errorf("unable to prompt for packages: %w", err)
+		}
 
-	packages := strings.Fields(input)
-	validPackages, invalidPackages := filterValidPackages(packages)
-	if len(invalidPackages) > 0 {
-		return validPackages, fmt.Errorf("invalid package list: %s", strings.Join(invalidPackages, " "))
+		packages := strings.Fields(input)
+		validPackages, invalidPackages := filterValidPackages(packages)
+		if len(invalidPackages) > 0 {
+			cons.Warn("Invalid package names: \"%s\"", strings.Join(invalidPackages, " "))
+			cons.Warn("Please input a valid list of space-separated Ubuntu packages.")
+			cons.WriteLn("")
+			continue
+		}
+		return validPackages, nil
 	}
-	return validPackages, nil
 }
 
 func promptPorts(cons *console.Console) ([]uint16, error) {
-	cons.Info("=== Port Forwarding ===")
-	cons.WriteLn("Enter supplementary container ports to expose (space-separated, or Enter to skip):")
-	cons.WriteLn("Examples: 3000 5432 8080")
+	for {
+		cons.Info("=== Port Forwarding ===")
+		cons.WriteLn("Enter supplementary container ports to expose (space-separated, or Enter to skip):")
+		cons.WriteLn("Examples: 3000 5432 8080")
 
-	input, err := cons.AskString("Ports", "")
-	if err != nil {
-		return nil, fmt.Errorf("unable to prompt for ports: %w", err)
-	}
+		input, err := cons.AskString("Ports", "")
+		if err != nil {
+			return nil, fmt.Errorf("unable to prompt for ports: %w", err)
+		}
 
-	ports := strings.Fields(input)
-	validPorts, invalidPorts := filterValidPorts(ports)
-	if len(invalidPorts) > 0 {
-		return validPorts, fmt.Errorf("invalid port list: %s", strings.Join(invalidPorts, " "))
+		ports := strings.Fields(input)
+		validPorts, invalidPorts := filterValidPorts(ports)
+		if len(invalidPorts) > 0 {
+			cons.Warn("Invalid port numbers: \"%s\"", strings.Join(invalidPorts, " "))
+			cons.Warn("Please input a valid list of space-separated ports (1-65535).")
+			cons.WriteLn("")
+			continue
+		}
+		return validPorts, nil
 	}
-	return validPorts, nil
 }
 
 func promptVolumes(cons *console.Console) ([]string, error) {
@@ -683,7 +781,6 @@ func promptVolumes(cons *console.Console) ([]string, error) {
 	var volumes []string
 	for choice := range strings.FieldsSeq(choices) {
 		switch choice {
-		// TODO: sanitization?
 		case "1":
 			volumes = append(volumes, fmt.Sprintf("%s/.ssh:/home/${USERNAME}/.ssh:ro", homeDir))
 		case "2":
@@ -693,9 +790,9 @@ func promptVolumes(cons *console.Console) ([]string, error) {
 		case "4":
 			volumes = append(volumes, "/etc/ssl/certs/custom-ca.crt:/usr/local/share/ca-certificates/custom-ca.crt:ro")
 		case "none":
-			return volumes, nil
+			// Skip
 		default:
-			cons.Warn("Unknown choice: %s (skipped)", choice)
+			cons.Warn("Ignoring unrecognized choice: \"%s\"", choice)
 		}
 	}
 
