@@ -6,7 +6,7 @@ _paulenvs()
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     # Main commands
-    local commands="create list build run remove"
+    local commands="create list build run remove version interactive help clean"
 
     # Options for create command
     local create_flags="--name --uid --gid --username --shell --nodejs --rust --python --go --git-name --git-email --package --enable-ssh --enable-sudo --neovim --starship --atuin --mise --zellij --jujutsu --port --volume"
@@ -76,7 +76,7 @@ _paulenvs()
             fi
             return 0
             ;;
-        list|help|version)
+        list|help|version|clean)
             # No further completion
             return 0
             ;;

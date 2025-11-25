@@ -11,6 +11,7 @@ _paulenvs() {
         'remove:Remove a container'
         'help:Show help'
         'version:Show version'
+        'clean:Remove all stored paul-envs data from your computer'
     )
 
     # Get list of existing containers from paul-envs ls
@@ -77,6 +78,9 @@ _paulenvs() {
                     # No additional arguments
                     ;;
                 version)
+                    # No additional arguments
+                    ;;
+                clean)
                     # No additional arguments
                     ;;
             esac

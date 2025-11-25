@@ -16,6 +16,8 @@
 
 FROM ubuntu:24.04 AS ubuntu-base
 
+LABEL paulenv=true
+
 # Configurable user settings
 ARG HOST_UID=1000
 ARG HOST_GID=1000

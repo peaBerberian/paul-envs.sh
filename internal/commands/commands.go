@@ -384,6 +384,10 @@ Usage:
   paul-envs build <name>
   paul-envs run <name> [commands]
   paul-envs remove <name>
+  paul-envs version
+  paul-envs help
+  paul-envs interactive
+  paul-envs clean
 
 Options for create (all optional):
   --no-prompt              Non-interactive mode (uses defaults)
@@ -543,7 +547,8 @@ func Interactive(ctx context.Context, fs *files.FileStore, c *console.Console) e
 		c.WriteLn("  4. run     - Run a container based on a built image")
 		c.WriteLn("  5. remove  - Remove a configuration and its data")
 		c.WriteLn("  6. version - Show the current version")
-		c.WriteLn("  7. exit    - Exit interactive mode")
+		c.WriteLn("  7. clean   - Remove all stored paul-envs data from your computer")
+		c.WriteLn("  8. exit    - Exit interactive mode")
 		c.WriteLn("")
 
 		choice, err := c.AskString("Select a command (1-7 or name)", "")
@@ -571,7 +576,9 @@ func Interactive(ctx context.Context, fs *files.FileStore, c *console.Console) e
 			cmdErr = Remove([]string{}, fs, c)
 		case "6", "version":
 			cmdErr = Version(ctx, c)
-		case "7", "exit", "quit", "q":
+		case "7", "clean":
+			cmdErr = Clean(ctx, fs, c)
+		case "8", "exit", "quit", "q":
 			c.Success("Goodbye!")
 			return nil
 		default:

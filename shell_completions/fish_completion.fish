@@ -14,6 +14,7 @@ complete -c paul-envs -f -n __fish_use_subcommand -a run -d 'Start a container'
 complete -c paul-envs -f -n __fish_use_subcommand -a remove -d 'Remove a container'
 complete -c paul-envs -f -n __fish_use_subcommand -a help -d 'Show help'
 complete -c paul-envs -f -n __fish_use_subcommand -a version -d 'Show version'
+complete -c paul-envs -f -n __fish_use_subcommand -a clean -d 'Remove all stored paul-envs data from your computer'
 
 # Create command options
 complete -c paul-envs -n "__fish_seen_subcommand_from create" -l name -d "Specific a container name" -x

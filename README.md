@@ -407,9 +407,13 @@ Along the mounted project, those are the only directories which are persisted.
 
 ## TODO:
 
+- add project files removal to clean command
+- flags for clean: --no-prompt, --no-config, --no-image, --no-cache
+- ci tests for clean command?
 - on Remove, propose to call docker ourselve to remove the volume
-- Uninstallation command
 - Detect Docker compose automatically
+- Find out what to do with configs
+- Sanitize project name better: needs to be fs-compatible
 - => Go can be merged I think
 - Shell completions under specific command?
 - Commands work even if a subset is written

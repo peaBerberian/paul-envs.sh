@@ -49,6 +49,8 @@ func main() {
 		cmdErr = commands.Remove(args, filestore, console)
 	case "version", "v", "--version", "-v":
 		cmdErr = commands.Version(ctx, console)
+	case "clean", "x", "--clean", "-x":
+		cmdErr = commands.Clean(ctx, filestore, console)
 	case "interactive", "i", "--interactive", "-i":
 		cmdErr = commands.Interactive(ctx, filestore, console)
 	case "help", "h", "--help", "-h":
