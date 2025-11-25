@@ -3,9 +3,12 @@ package files
 import (
 	"bytes"
 	"embed"
+	"errors"
 	"fmt"
 	"os"
+	"os/user"
 	"path/filepath"
+	"runtime"
 	"text/template"
 
 	"github.com/peaberberian/paul-envs/internal/console"
@@ -27,16 +30,13 @@ type FileStore struct {
 }
 
 func NewFileStore() (*FileStore, error) {
-	// Get binary directory
-	ex, err := os.Executable()
+	userDataDir, err := getUserDataDir()
 	if err != nil {
-		return nil, fmt.Errorf("get executable path: %w", err)
+		return nil, nil
 	}
-
-	// TODO: Rely on XDG_DATA_HOME and equivalents (Linux, MacOS, Windows)
 	return &FileStore{
-		baseDir:     filepath.Dir(ex),
-		projectsDir: filepath.Join(filepath.Dir(ex), "projects"),
+		baseDir:     userDataDir,
+		projectsDir: filepath.Join(userDataDir, "projects"),
 	}, nil
 }
 
@@ -222,4 +222,43 @@ func (f *FileStore) ensureProjectDir(fileLoc string) error {
 		return fmt.Errorf("create project directory: %w", err)
 	}
 	return nil
+}
+
+func getUserDataDir() (string, error) {
+	var baseDir string
+
+	switch runtime.GOOS {
+	case "windows":
+		baseDir = os.Getenv("APPDATA")
+		if baseDir == "" {
+			baseDir = filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Roaming")
+		}
+	case "darwin":
+		baseDir = filepath.Join(os.Getenv("HOME"), "Library", "Application Support")
+	default: // linux / unix
+		// Check if running under sudo
+		sudoUser := os.Getenv("SUDO_USER")
+		if sudoUser != "" && sudoUser != "root" {
+			// Running under sudo, use the original user's directory
+			realUser, err := user.Lookup(sudoUser)
+			if err != nil {
+				return "", fmt.Errorf("failed to lookup sudo user %s: %w", sudoUser, err)
+			}
+
+			// Check if SUDO_USER had XDG_DATA_HOME set (it won't be preserved by sudo)
+			// So we just use the default XDG location
+			baseDir = filepath.Join(realUser.HomeDir, ".local", "share")
+		} else {
+			// Normal operation (no sudo) or running as actual root
+			baseDir = os.Getenv("XDG_DATA_HOME")
+			if baseDir == "" {
+				homeDir := os.Getenv("HOME")
+				if homeDir == "" {
+					return "", errors.New("cannot find user data directory: both XDG_DATA_HOME and HOME are unset")
+				}
+				baseDir = filepath.Join(homeDir, ".local", "share")
+			}
+		}
+	}
+	return filepath.Join(baseDir, "paul-envs"), nil
 }

@@ -407,7 +407,6 @@ Along the mounted project, those are the only directories which are persisted.
 
 ## TODO:
 
-- Use XDG dirs etc.: Should projects configs go in DATA_HOME or in CONFIG_HOME?
 - on Remove, propose to call docker ourselve to remove the volume
 - Uninstallation command
 - Detect Docker compose automatically

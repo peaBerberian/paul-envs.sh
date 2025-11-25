@@ -317,7 +317,13 @@ func validateProjectFiles(filestore *files.FileStore, name string) error {
 
 func createSharedCacheVolume(ctx context.Context) error {
 	cmd := exec.CommandContext(ctx, "docker", "volume", "create", "paulenv-shared-cache")
-	return cmd.Run()
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("Failed to create shared volume: %w.", err)
+	}
+	return nil
 }
 
 func dockerComposeBuild(ctx context.Context, filestore *files.FileStore, name string) error {
@@ -363,7 +369,7 @@ func Version(ctx context.Context, console *console.Console) error {
 	cmd := exec.CommandContext(ctx, "docker", "--version")
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("Failed to obtain version: %w", err)
+		return fmt.Errorf("Failed to obtain docker version: %w", err)
 	}
 	console.WriteLn("Docker version: %s", output)
 	return nil
