@@ -41,6 +41,7 @@ func TestFileStore_CreateProjectEnvFile(t *testing.T) {
 		InstallJujutsu:         "false",
 		GitName:                "Test User",
 		GitEmail:               "test@example.com",
+		ConfigDir:              "/tmp/paul-envs-test",
 	}
 
 	err := store.CreateProjectEnvFile("testproject", tplData)

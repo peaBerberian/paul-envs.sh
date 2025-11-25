@@ -37,6 +37,7 @@ type EnvTemplateData struct {
 	InstallJujutsu         string
 	GitName                string
 	GitEmail               string
+	ConfigDir              string
 }
 
 type ComposeTemplateData struct {

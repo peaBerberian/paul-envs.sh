@@ -62,6 +62,7 @@ func generateProjectFiles(cfg *config.Config, filestore *files.FileStore, consol
 		InstallJujutsu:         strconv.FormatBool(cfg.InstallJujutsu),
 		GitName:                utils.EscapeEnvValue(cfg.GitName),
 		GitEmail:               utils.EscapeEnvValue(cfg.GitEmail),
+		ConfigDir:              filestore.GetDotfileDirBase(),
 	}
 
 	if err := filestore.CreateProjectEnvFile(cfg.ProjectName, envData); err != nil {
@@ -104,11 +105,10 @@ func printNextSteps(cfg *config.Config, filestore *files.FileStore, console *con
 	console.WriteLn("  1. Review/edit configuration:")
 	console.WriteLn("     - %s", filestore.GetEnvFilePathFor(cfg.ProjectName))
 	console.WriteLn("     - %s", filestore.GetComposeFilePathFor(cfg.ProjectName))
-	// TODO:
-	// console.WriteLn("  2. Put the $HOME dotfiles you want to port in:")
-	// console.WriteLn("     - %s/configs/", app.binaryDir)
-	console.WriteLn("  2. Build the environment:")
+	console.WriteLn("  2. Put the $HOME dotfiles you want to port in:")
+	console.WriteLn("     - %s", filestore.GetDotfileDirBase())
+	console.WriteLn("  3. Build the environment:")
 	console.WriteLn("     paul-envs build %s", cfg.ProjectName)
-	console.WriteLn("  3. Run the environment:")
+	console.WriteLn("  4. Run the environment:")
 	console.WriteLn("     paul-envs run %s", cfg.ProjectName)
 }

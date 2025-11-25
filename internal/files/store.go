@@ -30,6 +30,9 @@ func NewFileStore() (*FileStore, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := os.MkdirAll(userConfigDir, 0755); err != nil {
+		return nil, fmt.Errorf("create base config directory: %w", err)
+	}
 	return &FileStore{
 		baseDataDir: userDataDir,
 		dotfilesDir: filepath.Join(userConfigDir, "dotfiles"),
@@ -40,6 +43,10 @@ func NewFileStore() (*FileStore, error) {
 // File path helpers
 func (f *FileStore) GetBaseComposeFile() string {
 	return filepath.Join(f.baseDataDir, BaseComposeFilename)
+}
+
+func (f *FileStore) GetDotfileDirBase() string {
+	return f.dotfilesDir
 }
 
 func (f *FileStore) GetProjectDirBase() string {
