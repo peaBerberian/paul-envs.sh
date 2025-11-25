@@ -25,17 +25,23 @@ const (
 )
 
 type FileStore struct {
-	baseDir     string
+	baseDataDir string
+	dotfilesDir string
 	projectsDir string
 }
 
 func NewFileStore() (*FileStore, error) {
 	userDataDir, err := getUserDataDir()
 	if err != nil {
-		return nil, nil
+		return nil, err
+	}
+	userConfigDir, err := getUserConfigDir()
+	if err != nil {
+		return nil, err
 	}
 	return &FileStore{
-		baseDir:     userDataDir,
+		baseDataDir: userDataDir,
+		dotfilesDir: filepath.Join(userConfigDir, "dotfiles"),
 		projectsDir: filepath.Join(userDataDir, "projects"),
 	}, nil
 }
@@ -44,7 +50,7 @@ func NewFileStore() (*FileStore, error) {
 // already done
 func (f *FileStore) ensureCreatedBaseFiles() error {
 	// Write docker file if needed
-	baseDockerfilePath := filepath.Join(f.baseDir, "Dockerfile")
+	baseDockerfilePath := filepath.Join(f.baseDataDir, "Dockerfile")
 	_, err := os.Stat(baseDockerfilePath)
 	if os.IsNotExist(err) {
 		dockerfileData, err := assets.ReadFile("assets/Dockerfile")
@@ -53,7 +59,7 @@ func (f *FileStore) ensureCreatedBaseFiles() error {
 		}
 
 		err = os.WriteFile(
-			filepath.Join(f.baseDir, "Dockerfile"),
+			filepath.Join(f.baseDataDir, "Dockerfile"),
 			dockerfileData, 0644)
 		if err != nil {
 			return err
@@ -63,7 +69,7 @@ func (f *FileStore) ensureCreatedBaseFiles() error {
 	}
 
 	// Then write base compose if needed
-	baseComposePath := filepath.Join(f.baseDir, "Compose")
+	baseComposePath := filepath.Join(f.baseDataDir, "Compose")
 	_, err = os.Stat(baseComposePath)
 	if os.IsNotExist(err) {
 		composeData, err := assets.ReadFile("assets/compose.yaml")
@@ -72,7 +78,7 @@ func (f *FileStore) ensureCreatedBaseFiles() error {
 		}
 
 		err = os.WriteFile(
-			filepath.Join(f.baseDir, "compose.yaml"),
+			filepath.Join(f.baseDataDir, "compose.yaml"),
 			composeData, 0644)
 		if err != nil {
 			return err
@@ -85,7 +91,7 @@ func (f *FileStore) ensureCreatedBaseFiles() error {
 
 // File path helpers
 func (f *FileStore) GetBaseComposeFile() string {
-	return filepath.Join(f.baseDir, BaseComposeFilename)
+	return filepath.Join(f.baseDataDir, BaseComposeFilename)
 }
 
 func (f *FileStore) GetProjectDirBase() string {
@@ -224,41 +230,81 @@ func (f *FileStore) ensureProjectDir(fileLoc string) error {
 	return nil
 }
 
+func resolveRealUserHome() (string, error) {
+	sudoUser := os.Getenv("SUDO_USER")
+	if sudoUser != "" && sudoUser != "root" {
+		u, err := user.Lookup(sudoUser)
+		if err != nil {
+			return "", fmt.Errorf("failed to lookup sudo user %s: %w", sudoUser, err)
+		}
+		return u.HomeDir, nil
+	}
+
+	// Not running under sudo or actual root user
+	home := os.Getenv("HOME")
+	if home == "" {
+		return "", errors.New("cannot determine HOME: HOME not set")
+	}
+	return home, nil
+}
+
 func getUserDataDir() (string, error) {
-	var baseDir string
+	var baseDataDir string
 
 	switch runtime.GOOS {
 	case "windows":
-		baseDir = os.Getenv("APPDATA")
-		if baseDir == "" {
-			baseDir = filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Roaming")
+		baseDataDir = os.Getenv("APPDATA")
+		if baseDataDir == "" {
+			baseDataDir = filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Local")
 		}
 	case "darwin":
-		baseDir = filepath.Join(os.Getenv("HOME"), "Library", "Application Support")
+		baseDataDir = filepath.Join(os.Getenv("HOME"), "Library", "Application Support")
 	default: // linux / unix
-		// Check if running under sudo
-		sudoUser := os.Getenv("SUDO_USER")
-		if sudoUser != "" && sudoUser != "root" {
-			// Running under sudo, use the original user's directory
-			realUser, err := user.Lookup(sudoUser)
-			if err != nil {
-				return "", fmt.Errorf("failed to lookup sudo user %s: %w", sudoUser, err)
-			}
-
-			// Check if SUDO_USER had XDG_DATA_HOME set (it won't be preserved by sudo)
-			// So we just use the default XDG location
-			baseDir = filepath.Join(realUser.HomeDir, ".local", "share")
+		homeDir, err := resolveRealUserHome()
+		if err != nil {
+			return "", err
+		}
+		if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" && os.Getenv("SUDO_USER") == "" {
+			baseDataDir = xdg
 		} else {
-			// Normal operation (no sudo) or running as actual root
-			baseDir = os.Getenv("XDG_DATA_HOME")
-			if baseDir == "" {
-				homeDir := os.Getenv("HOME")
-				if homeDir == "" {
-					return "", errors.New("cannot find user data directory: both XDG_DATA_HOME and HOME are unset")
-				}
-				baseDir = filepath.Join(homeDir, ".local", "share")
-			}
+			// sudo don't preserve the original XDG_DATA_HOME
+			// So we just use the default XDG location
+			baseDataDir = filepath.Join(homeDir, ".local", "share")
 		}
 	}
-	return filepath.Join(baseDir, "paul-envs"), nil
+	return filepath.Join(baseDataDir, "paul-envs"), nil
+}
+
+func getUserConfigDir() (string, error) {
+	var baseDataDir string
+
+	switch runtime.GOOS {
+	case "windows":
+		// Windows: %APPDATA%
+		baseDataDir = os.Getenv("APPDATA")
+		if baseDataDir == "" {
+			baseDataDir = filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Roaming")
+		}
+
+	case "darwin":
+		home := os.Getenv("HOME")
+		if home == "" {
+			return "", errors.New("cannot determine HOME on macOS")
+		}
+		baseDataDir = filepath.Join(home, "Library", "Preferences")
+
+	default: // Linux / Unix
+		homeDir, err := resolveRealUserHome()
+		if err != nil {
+			return "", err
+		}
+		if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" && os.Getenv("SUDO_USER") == "" {
+			baseDataDir = xdg
+		} else {
+			// sudo don't preserve the original XDG_CONFIG_HOME
+			// So we just use the default XDG location
+			baseDataDir = filepath.Join(homeDir, ".config")
+		}
+	}
+	return filepath.Join(baseDataDir, "paul-envs"), nil
 }
