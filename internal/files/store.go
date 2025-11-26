@@ -41,6 +41,14 @@ func NewFileStore() (*FileStore, error) {
 }
 
 // File path helpers
+func (f *FileStore) RemoveBaseDataDirectory() error {
+	return os.RemoveAll(f.baseDataDir)
+}
+
+func (f *FileStore) RemoveConfigDirectory() error {
+	return os.RemoveAll(f.dotfilesDir)
+}
+
 func (f *FileStore) GetBaseComposeFile() string {
 	return filepath.Join(f.baseDataDir, BaseComposeFilename)
 }
