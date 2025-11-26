@@ -13,6 +13,10 @@ import (
 )
 
 func Build(ctx context.Context, args []string, filestore *files.FileStore, console *console.Console) error {
+	if err := checkDockerPermissions(ctx); err != nil {
+		return err
+	}
+
 	if err := ensureBaseComposeExists(filestore); err != nil {
 		return err
 	}
@@ -40,7 +44,7 @@ func Build(ctx context.Context, args []string, filestore *files.FileStore, conso
 
 func ensureBaseComposeExists(filestore *files.FileStore) error {
 	if _, err := os.Stat(filestore.GetBaseComposeFile()); os.IsNotExist(err) {
-		return fmt.Errorf("base compose.yaml not found at %s", filestore.GetBaseComposeFile())
+		return fmt.Errorf("base compose.yaml not found at %s\nCreate a configuration through the 'create' command first.", filestore.GetBaseComposeFile())
 	}
 	return nil
 }

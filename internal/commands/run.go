@@ -18,6 +18,10 @@ func Run(ctx context.Context, args []string, filestore *files.FileStore, console
 	default:
 	}
 
+	if err := checkDockerPermissions(ctx); err != nil {
+		return err
+	}
+
 	baseCompose := filestore.GetBaseComposeFile()
 	if _, err := os.Stat(baseCompose); os.IsNotExist(err) {
 		return fmt.Errorf("Base compose.yaml not found at %s", baseCompose)

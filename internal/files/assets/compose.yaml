@@ -120,7 +120,7 @@ services:
 
         # Directory where your dotfiles to copy to the container's home folder reside.
         # Will be copied on build
-        CONFIG_DIR: ${CONFIG_DIR:-$HOME/.config/paul-envs/dotfiles/}
+        CONFIG_DIR: ${CONFIG_DIR:-}
 
         # Additional packages outside the core base, separated by a space.
         # Have to be in Ubuntu's default repository
