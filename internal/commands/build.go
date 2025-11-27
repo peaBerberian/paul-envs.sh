@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/peaberberian/paul-envs/internal/console"
 	"github.com/peaberberian/paul-envs/internal/files"
@@ -30,11 +31,21 @@ func Build(ctx context.Context, args []string, filestore *files.FileStore, conso
 		return err
 	}
 
+	tmpDotfilesDir := filepath.Join(filestore.GetProjectDir(name), "nextdotfiles")
+	if err := os.Mkdir(tmpDotfilesDir, 0755); err != nil {
+		return fmt.Errorf("failed to create dotfiles temp directory for the container: %w", err)
+	}
+	if err := files.CopyDir(filestore.GetDotfileDirBase(), tmpDotfilesDir); err != nil {
+		os.RemoveAll(tmpDotfilesDir)
+		return fmt.Errorf("failed to prepare dotfiles for the container: %w", err)
+	}
+	defer os.RemoveAll(tmpDotfilesDir)
+
 	if err := createSharedCacheVolume(ctx); err != nil {
 		return err
 	}
 
-	if err := dockerComposeBuild(ctx, filestore, name); err != nil {
+	if err := dockerComposeBuild(ctx, filestore, name, tmpDotfilesDir); err != nil {
 		return err
 	}
 
@@ -91,13 +102,16 @@ func createSharedCacheVolume(ctx context.Context) error {
 	return nil
 }
 
-func dockerComposeBuild(ctx context.Context, filestore *files.FileStore, name string) error {
+func dockerComposeBuild(ctx context.Context, filestore *files.FileStore, name string, dotfilesDir string) error {
 	base := filestore.GetBaseComposeFile()
 	compose := filestore.GetComposeFilePathFor(name)
 	env := filestore.GetEnvFilePathFor(name)
 
 	cmd := exec.CommandContext(ctx, "docker", "compose", "-f", base, "-f", compose, "--env-file", env, "build")
+	// TODO: Shouldn't both be escaped?
 	cmd.Env = append(os.Environ(), "COMPOSE_PROJECT_NAME=paulenv-"+name)
+	// TODO: It doesn't seem to be considered by the Dockerfile linked to the compose.yaml?
+	cmd.Env = append(os.Environ(), "DOTFILES_DIR="+dotfilesDir)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
@@ -111,6 +125,7 @@ func resetVolumes(ctx context.Context, filestore *files.FileStore, name string, 
 
 	cmd := exec.CommandContext(ctx, "docker", "compose", "-f", base, "-f", compose, "--env-file", env,
 		"--profile", "reset", "up", "reset-cache", "reset-local")
+	// TODO: Shouldn't it be escaped?
 	cmd.Env = append(os.Environ(), "COMPOSE_PROJECT_NAME=paulenv-"+name)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

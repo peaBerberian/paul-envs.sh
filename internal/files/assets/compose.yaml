@@ -118,10 +118,6 @@ services:
         GIT_AUTHOR_NAME: ${GIT_AUTHOR_NAME:-}
         GIT_AUTHOR_EMAIL: ${GIT_AUTHOR_EMAIL:-}
 
-        # Directory where your dotfiles to copy to the container's home folder reside.
-        # Will be copied on build
-        CONFIG_DIR: ${CONFIG_DIR:-}
-
         # Additional packages outside the core base, separated by a space.
         # Have to be in Ubuntu's default repository
         # (e.g. "ripgrep fzf". Can be left empty for no supplementary packages)

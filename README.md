@@ -407,11 +407,13 @@ Along the mounted project, those are the only directories which are persisted.
 
 ## TODO:
 
-- How to version the various assets (Dockerfile, compose etc.)? Through name?
+- Finish dotfiles work
+- Check directory first in 'create' command?
+- lockfile versionning
 - Detect Docker compose automatically
-- Finish config work
 - Sanitize project name better: needs to be fs-compatible
 - => Go can be merged I think
+- Does remove also remove networks?
 - ci tests for clean command?
 - on Remove, propose to call docker ourselve to remove the volume
 - flags for clean: --no-prompt, --no-config, --no-image, --no-cache

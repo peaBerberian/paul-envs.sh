@@ -62,7 +62,6 @@ func generateProjectFiles(cfg *config.Config, filestore *files.FileStore, consol
 		InstallJujutsu:         strconv.FormatBool(cfg.InstallJujutsu),
 		GitName:                utils.EscapeEnvValue(cfg.GitName),
 		GitEmail:               utils.EscapeEnvValue(cfg.GitEmail),
-		ConfigDir:              filestore.GetDotfileDirBase(),
 	}
 
 	if err := filestore.CreateProjectEnvFile(cfg.ProjectName, envData); err != nil {

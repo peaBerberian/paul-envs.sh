@@ -16,27 +16,37 @@ const (
 )
 
 type FileStore struct {
-	baseDataDir string
-	dotfilesDir string
-	projectsDir string
+	userFS        *UserFS
+	baseDataDir   string
+	baseConfigDir string
+	dotfilesDir   string
+	projectsDir   string
 }
 
 func NewFileStore() (*FileStore, error) {
-	userDataDir, err := getUserDataDir()
+	userFS, err := NewUserFS()
 	if err != nil {
 		return nil, err
 	}
-	userConfigDir, err := getUserConfigDir()
-	if err != nil {
-		return nil, err
-	}
-	if err := os.MkdirAll(userConfigDir, 0755); err != nil {
+
+	paulEnvsDataDir := filepath.Join(userFS.GetUserDataDir(), "paul-envs")
+	paulEnvsConfigDir := filepath.Join(userFS.GetUserConfigDir(), "paul-envs")
+	dotfilesDir := filepath.Join(paulEnvsConfigDir, "dotfiles")
+
+	if err := userFS.MkdirAsUser(dotfilesDir, 0755); err != nil {
 		return nil, fmt.Errorf("create base config directory: %w", err)
 	}
+
+	if err := userFS.MkdirAsUser(filepath.Join(paulEnvsDataDir, "placeholder"), 0755); err != nil {
+		return nil, fmt.Errorf("create empty dotfiles placeholder: %w", err)
+	}
+
 	return &FileStore{
-		baseDataDir: userDataDir,
-		dotfilesDir: filepath.Join(userConfigDir, "dotfiles"),
-		projectsDir: filepath.Join(userDataDir, "projects"),
+		userFS:        userFS,
+		baseDataDir:   paulEnvsDataDir,
+		baseConfigDir: paulEnvsConfigDir,
+		dotfilesDir:   filepath.Join(paulEnvsConfigDir, "dotfiles"),
+		projectsDir:   filepath.Join(paulEnvsDataDir, "projects"),
 	}, nil
 }
 
@@ -46,7 +56,7 @@ func (f *FileStore) RemoveBaseDataDirectory() error {
 }
 
 func (f *FileStore) RemoveConfigDirectory() error {
-	return os.RemoveAll(f.dotfilesDir)
+	return os.RemoveAll(f.baseConfigDir)
 }
 
 func (f *FileStore) GetBaseComposeFile() string {

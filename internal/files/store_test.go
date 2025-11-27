@@ -21,6 +21,12 @@ func TestNewFileStore(t *testing.T) {
 	if store.baseDataDir == "" {
 		t.Error("baseDataDir should not be empty")
 	}
+	if store.baseConfigDir == "" {
+		t.Error("baseConfigDir should not be empty")
+	}
+	if store.dotfilesDir == "" {
+		t.Error("dotfilesDir should not be empty")
+	}
 	if store.projectsDir == "" {
 		t.Error("projectsDir should not be empty")
 	}
@@ -28,9 +34,10 @@ func TestNewFileStore(t *testing.T) {
 
 func TestFileStore_PathHelpers(t *testing.T) {
 	store := &FileStore{
-		baseDataDir: "/test/base",
-		dotfilesDir: "/test/config",
-		projectsDir: "/test/base/projects",
+		baseDataDir:   "/test/base",
+		baseConfigDir: "/test/config",
+		dotfilesDir:   "/test/config/dotfiles",
+		projectsDir:   "/test/base/projects",
 	}
 
 	tests := []struct {
@@ -62,9 +69,10 @@ func TestFileStore_PathHelpers(t *testing.T) {
 
 func TestFileStore_GetProjectDir(t *testing.T) {
 	store := &FileStore{
-		baseDataDir: "/test/base",
-		dotfilesDir: "/test/config",
-		projectsDir: "/test/base/projects",
+		baseDataDir:   "/test/base",
+		baseConfigDir: "/test/config",
+		dotfilesDir:   "/test/config/dotfiles",
+		projectsDir:   "/test/base/projects",
 	}
 
 	got := store.GetProjectDir("myproject")
@@ -76,9 +84,10 @@ func TestFileStore_GetProjectDir(t *testing.T) {
 
 func TestFileStore_GetComposeFilePathFor(t *testing.T) {
 	store := &FileStore{
-		baseDataDir: "/test/base",
-		dotfilesDir: "/test/config",
-		projectsDir: "/test/base/projects",
+		baseDataDir:   "/test/base",
+		baseConfigDir: "/test/config",
+		dotfilesDir:   "/test/config/dotfiles",
+		projectsDir:   "/test/base/projects",
 	}
 
 	got := store.GetComposeFilePathFor("myproject")
@@ -90,9 +99,10 @@ func TestFileStore_GetComposeFilePathFor(t *testing.T) {
 
 func TestFileStore_GetEnvFilePathFor(t *testing.T) {
 	store := &FileStore{
-		baseDataDir: "/test/base",
-		dotfilesDir: "/test/config",
-		projectsDir: "/test/base/projects",
+		baseDataDir:   "/test/base",
+		baseConfigDir: "/test/config",
+		dotfilesDir:   "/test/config/dotfiles",
+		projectsDir:   "/test/base/projects",
 	}
 
 	got := store.GetEnvFilePathFor("myproject")
@@ -104,11 +114,12 @@ func TestFileStore_GetEnvFilePathFor(t *testing.T) {
 
 func TestFileStore_CheckProjectNameAvailable(t *testing.T) {
 	baseDataDir := t.TempDir()
-	dotfilesDir := t.TempDir()
+	baseConfigDir := t.TempDir()
 	store := &FileStore{
-		baseDataDir: baseDataDir,
-		dotfilesDir: dotfilesDir,
-		projectsDir: filepath.Join(baseDataDir, "projects"),
+		baseDataDir:   baseDataDir,
+		baseConfigDir: baseConfigDir,
+		dotfilesDir:   filepath.Join(baseConfigDir, "dotfiles"),
+		projectsDir:   filepath.Join(baseDataDir, "projects"),
 	}
 	ctx := t.Context()
 	cons := console.New(ctx, os.Stdin, io.Discard, io.Discard)

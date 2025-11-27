@@ -94,7 +94,7 @@ ARG ENABLE_WASM=false
 ARG ENABLE_SUDO=false
 ARG GIT_AUTHOR_NAME=""
 ARG GIT_AUTHOR_EMAIL=""
-ARG CONFIG_DIR="/dev/null"
+ARG DOTFILES_DIR="./placeholder"
 
 USER root
 
@@ -355,7 +355,7 @@ RUN if [ -n "$INSTALL_NODE" ] && [ "$INSTALL_NODE" != "none" ]; then \
 RUN git config --global merge.conflictstyle zdiff3
 
 # Copy config files (may overwrite shell configs with tool init lines)
-RUN --mount=type=bind,source=${CONFIG_DIR},target=/tmp/configs \
+RUN --mount=type=bind,source=${DOTFILES_DIR},target=/tmp/configs \
   if [ -d /tmp/configs ] && [ "$(ls -A /tmp/configs 2>/dev/null)" ]; then \
     cp -r /tmp/configs/. /home/${USERNAME}/; \
   fi
