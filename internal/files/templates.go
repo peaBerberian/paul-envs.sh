@@ -77,8 +77,7 @@ func (f *FileStore) CreateProjectFiles(
 		return fmt.Errorf("create project directory: %w", err)
 	}
 
-	// TODO: As user
-	if err := os.WriteFile(f.GetEnvFilePathFor(projectName), buf.Bytes(), 0644); err != nil {
+	if err := f.userFS.WriteFileAsUser(f.GetEnvFilePathFor(projectName), buf.Bytes(), 0644); err != nil {
 		return fmt.Errorf("write env file: %w", err)
 	}
 
@@ -99,8 +98,7 @@ func (f *FileStore) CreateProjectFiles(
 		return fmt.Errorf("execute compose template: %w", err)
 	}
 
-	// TODO: As user
-	if err := os.WriteFile(f.GetComposeFilePathFor(projectName), buf.Bytes(), 0644); err != nil {
+	if err := f.userFS.WriteFileAsUser(f.GetComposeFilePathFor(projectName), buf.Bytes(), 0644); err != nil {
 		return fmt.Errorf("write compose file: %w", err)
 	}
 	return nil
@@ -118,8 +116,7 @@ func (f *FileStore) ensureCreatedBaseFiles() error {
 			return err
 		}
 
-		// TODO: As user
-		err = os.WriteFile(
+		err = f.userFS.WriteFileAsUser(
 			filepath.Join(f.baseDataDir, "Dockerfile"),
 			dockerfileData, 0644)
 		if err != nil {
@@ -138,8 +135,7 @@ func (f *FileStore) ensureCreatedBaseFiles() error {
 			return err
 		}
 
-		// TODO: As user
-		err = os.WriteFile(
+		err = f.userFS.WriteFileAsUser(
 			filepath.Join(f.baseDataDir, "compose.yaml"),
 			composeData, 0644)
 		if err != nil {

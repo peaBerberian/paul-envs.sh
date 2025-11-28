@@ -1,7 +1,7 @@
 package files
 
 import (
-	"os"
+	"os/user"
 	"path/filepath"
 	"testing"
 )
@@ -13,6 +13,18 @@ func mockOS(t *testing.T, osName string) {
 	t.Cleanup(func() { detectOS = orig })
 }
 
+func mockGeteuid(t *testing.T, uid int) {
+	orig := geteuid
+	geteuid = func() int { return uid }
+	t.Cleanup(func() { geteuid = orig })
+}
+
+func mockUserLookup(t *testing.T, fn func(string) (*user.User, error)) {
+	orig := userLookup
+	userLookup = fn
+	t.Cleanup(func() { userLookup = orig })
+}
+
 //
 // ─────────────────────────────────────────────────────────────
 //   TEST GetUserConfigDir()
@@ -21,6 +33,7 @@ func mockOS(t *testing.T, osName string) {
 
 func TestGetUserConfigDir_Linux_XDG(t *testing.T) {
 	mockOS(t, "linux")
+	mockGeteuid(t, 1000)
 	t.Setenv("HOME", "/home/test")
 	t.Setenv("XDG_CONFIG_HOME", "/xdg/config")
 	t.Setenv("SUDO_USER", "")
@@ -38,6 +51,7 @@ func TestGetUserConfigDir_Linux_XDG(t *testing.T) {
 
 func TestGetUserConfigDir_Linux_NoXDG(t *testing.T) {
 	mockOS(t, "linux")
+	mockGeteuid(t, 1000)
 	t.Setenv("HOME", "/home/test")
 	t.Setenv("XDG_CONFIG_HOME", "")
 	t.Setenv("SUDO_USER", "")
@@ -55,24 +69,33 @@ func TestGetUserConfigDir_Linux_NoXDG(t *testing.T) {
 
 func TestGetUserConfigDir_Linux_Sudo(t *testing.T) {
 	mockOS(t, "linux")
+	mockGeteuid(t, 0) // Running as root
+	mockUserLookup(t, func(username string) (*user.User, error) {
+		return &user.User{
+			Uid:     "1000",
+			Gid:     "1000",
+			HomeDir: "/home/testuser",
+		}, nil
+	})
 	t.Setenv("HOME", "/root")
-	t.Setenv("SUDO_USER", os.Getenv("USER")) // Use actual current user for lookup
+	t.Setenv("SUDO_USER", "testuser")
 	t.Setenv("XDG_CONFIG_HOME", "/wrong/xdg")
 
 	ufs, err := NewUserFS()
 	if err != nil {
-		t.Skipf("skipping sudo test: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	dir := ufs.GetUserConfigDir()
-	// Should use real user's home, not XDG_CONFIG_HOME
-	if filepath.Base(dir) != ".config" {
-		t.Errorf("expected path ending in .config, got %s", dir)
+	expected := "/home/testuser/.config"
+	if dir != expected {
+		t.Errorf("expected %s, got %s", expected, dir)
 	}
 }
 
 func TestGetUserConfigDir_MacOS(t *testing.T) {
 	mockOS(t, "darwin")
+	mockGeteuid(t, 501)
 	t.Setenv("HOME", "/Users/test")
 	t.Setenv("SUDO_USER", "")
 
@@ -90,6 +113,7 @@ func TestGetUserConfigDir_MacOS(t *testing.T) {
 
 func TestGetUserConfigDir_Windows(t *testing.T) {
 	mockOS(t, "windows")
+	mockGeteuid(t, 1000)
 	t.Setenv("USERPROFILE", "C:\\Users\\test")
 	t.Setenv("APPDATA", "C:\\Users\\test\\AppData\\Roaming")
 	t.Setenv("SUDO_USER", "")
@@ -108,6 +132,7 @@ func TestGetUserConfigDir_Windows(t *testing.T) {
 
 func TestGetUserConfigDir_Windows_NoAppData(t *testing.T) {
 	mockOS(t, "windows")
+	mockGeteuid(t, 1000)
 	t.Setenv("USERPROFILE", "C:\\Users\\test")
 	t.Setenv("APPDATA", "")
 	t.Setenv("SUDO_USER", "")
@@ -132,6 +157,7 @@ func TestGetUserConfigDir_Windows_NoAppData(t *testing.T) {
 
 func TestGetUserDataDir_Linux_XDG(t *testing.T) {
 	mockOS(t, "linux")
+	mockGeteuid(t, 1000)
 	t.Setenv("HOME", "/home/test")
 	t.Setenv("XDG_DATA_HOME", "/xdg/data")
 	t.Setenv("SUDO_USER", "")
@@ -149,6 +175,7 @@ func TestGetUserDataDir_Linux_XDG(t *testing.T) {
 
 func TestGetUserDataDir_Linux_NoXDG(t *testing.T) {
 	mockOS(t, "linux")
+	mockGeteuid(t, 1000)
 	t.Setenv("HOME", "/home/test")
 	t.Setenv("XDG_DATA_HOME", "")
 	t.Setenv("SUDO_USER", "")
@@ -166,24 +193,33 @@ func TestGetUserDataDir_Linux_NoXDG(t *testing.T) {
 
 func TestGetUserDataDir_Linux_Sudo(t *testing.T) {
 	mockOS(t, "linux")
+	mockGeteuid(t, 0)
+	mockUserLookup(t, func(username string) (*user.User, error) {
+		return &user.User{
+			Uid:     "1000",
+			Gid:     "1000",
+			HomeDir: "/home/testuser",
+		}, nil
+	})
 	t.Setenv("HOME", "/root")
-	t.Setenv("SUDO_USER", os.Getenv("USER"))
+	t.Setenv("SUDO_USER", "testuser")
 	t.Setenv("XDG_DATA_HOME", "/wrong/xdg")
 
 	ufs, err := NewUserFS()
 	if err != nil {
-		t.Skipf("skipping sudo test: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	dir := ufs.GetUserDataDir()
-	// Should use real user's home, not XDG_DATA_HOME
-	if filepath.Base(dir) != "share" {
-		t.Errorf("expected path ending in .local/share, got %s", dir)
+	expected := "/home/testuser/.local/share"
+	if dir != expected {
+		t.Errorf("expected %s, got %s", expected, dir)
 	}
 }
 
 func TestGetUserDataDir_MacOS(t *testing.T) {
 	mockOS(t, "darwin")
+	mockGeteuid(t, 501)
 	t.Setenv("HOME", "/Users/test")
 	t.Setenv("SUDO_USER", "")
 
@@ -201,6 +237,7 @@ func TestGetUserDataDir_MacOS(t *testing.T) {
 
 func TestGetUserDataDir_Windows(t *testing.T) {
 	mockOS(t, "windows")
+	mockGeteuid(t, 1000)
 	t.Setenv("USERPROFILE", "C:\\Users\\test")
 	t.Setenv("LOCALAPPDATA", "C:\\Users\\test\\AppData\\Local")
 	t.Setenv("SUDO_USER", "")
@@ -219,6 +256,7 @@ func TestGetUserDataDir_Windows(t *testing.T) {
 
 func TestGetUserDataDir_Windows_NoLocalAppData(t *testing.T) {
 	mockOS(t, "windows")
+	mockGeteuid(t, 1000)
 	t.Setenv("USERPROFILE", "C:\\Users\\test")
 	t.Setenv("LOCALAPPDATA", "")
 	t.Setenv("SUDO_USER", "")
@@ -243,6 +281,7 @@ func TestGetUserDataDir_Windows_NoLocalAppData(t *testing.T) {
 
 func TestNewUserFS_Normal(t *testing.T) {
 	mockOS(t, "linux")
+	mockGeteuid(t, 1000)
 	t.Setenv("HOME", "/home/test")
 	t.Setenv("SUDO_USER", "")
 
@@ -260,6 +299,7 @@ func TestNewUserFS_Normal(t *testing.T) {
 
 func TestNewUserFS_Windows(t *testing.T) {
 	mockOS(t, "windows")
+	mockGeteuid(t, 1000)
 	t.Setenv("USERPROFILE", "C:\\Users\\test")
 	t.Setenv("HOME", "")
 	t.Setenv("SUDO_USER", "")
@@ -275,6 +315,7 @@ func TestNewUserFS_Windows(t *testing.T) {
 
 func TestNewUserFS_NoHome(t *testing.T) {
 	mockOS(t, "linux")
+	mockGeteuid(t, 1000)
 	t.Setenv("HOME", "")
 	t.Setenv("SUDO_USER", "")
 

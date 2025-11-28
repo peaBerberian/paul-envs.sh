@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -13,6 +14,8 @@ import (
 )
 
 // Isolated for tests
+var geteuid = os.Geteuid
+var userLookup = user.Lookup
 var detectOS = func() string {
 	return runtime.GOOS
 }
@@ -29,7 +32,7 @@ type sudoUser struct {
 
 func NewUserFS() (*UserFS, error) {
 	sudoUserEnv := os.Getenv("SUDO_USER")
-	if sudoUserEnv == "" {
+	if geteuid() != 0 || sudoUserEnv == "" {
 		var home string
 		if detectOS() == "windows" {
 			home = os.Getenv("USERPROFILE")
@@ -41,7 +44,7 @@ func NewUserFS() (*UserFS, error) {
 		}
 		return &UserFS{sudoUser: nil, homeDir: home}, nil
 	}
-	usr, err := user.Lookup(sudoUserEnv)
+	usr, err := userLookup(sudoUserEnv)
 	if err != nil {
 		return nil, fmt.Errorf("running sudo but cannot retrieve info on the SUDO_USER: %w", err)
 	}
@@ -66,10 +69,14 @@ func (u *UserFS) MkdirAsUser(path string, perm os.FileMode) error {
 	if err := os.MkdirAll(path, perm); err != nil {
 		return err
 	}
-	if u.sudoUser != nil {
-		return os.Chown(path, u.sudoUser.uid, u.sudoUser.gid)
+	return u.chownIfNeeded(path)
+}
+
+func (u *UserFS) WriteFileAsUser(path string, data []byte, perm os.FileMode) error {
+	if err := os.WriteFile(path, data, perm); err != nil {
+		return err
 	}
-	return nil
+	return u.chownIfNeeded(path)
 }
 
 func (u *UserFS) GetUserDataDir() string {
@@ -87,7 +94,7 @@ func (u *UserFS) GetUserDataDir() string {
 		if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" && u.sudoUser == nil {
 			return xdg
 		} else {
-			// sudo don't preserve the original XDG_DATA_HOME
+			// sudo doesn't preserve the original XDG_DATA_HOME
 			// So we just use the default XDG location
 			return filepath.Join(u.homeDir, ".local", "share")
 		}
@@ -118,13 +125,13 @@ func (u *UserFS) GetUserConfigDir() string {
 }
 
 // recursively copies a directory tree from src to dst
-func (u *UserFS) CopyDirAsUser(ctx context.Context, src string, dst string) error {
-	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+func (u *UserFS) CopyDirAsUser(ctx context.Context, src, dst string) error {
+	return filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return err
+			return fmt.Errorf("walk %q: %w", path, err)
 		}
 
-		// Check context cancellation
+		// Context check
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -133,36 +140,86 @@ func (u *UserFS) CopyDirAsUser(ctx context.Context, src string, dst string) erro
 
 		rel, err := filepath.Rel(src, path)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to obtain relative path from '%q' to '%q': %w", src, path, err)
 		}
-
 		target := filepath.Join(dst, rel)
 
-		if info.IsDir() {
-			return u.MkdirAsUser(target, info.Mode())
-		}
-
-		// Copy file
-		srcFile, err := os.Open(path)
+		info, err := d.Info()
 		if err != nil {
-			return err
-		}
-		defer srcFile.Close()
-
-		dstFile, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, info.Mode())
-		if err != nil {
-			return err
-		}
-		defer dstFile.Close()
-
-		if _, err := io.Copy(dstFile, srcFile); err != nil {
-			return err
+			return fmt.Errorf("failed to get information on '%q': %w", path, err)
 		}
 
-		// Set the right ownership if needed
-		if u.sudoUser != nil {
-			return os.Chown(target, u.sudoUser.uid, u.sudoUser.gid)
+		if d.IsDir() {
+			if err := u.MkdirAsUser(target, info.Mode()); err != nil {
+				return fmt.Errorf("failed to create directory '%q': %w", target, err)
+			}
+			return nil
 		}
-		return nil
+
+		// Handle symlink (copy symlink, not contents)
+		if d.Type()&os.ModeSymlink != 0 {
+			linkTarget, err := os.Readlink(path)
+			if err != nil {
+				return fmt.Errorf("failed to read the symlink '%q': %w", path, err)
+			}
+			if err := os.Symlink(linkTarget, target); err != nil {
+				return fmt.Errorf("failed to create symlink '%q' to '%q': %w", linkTarget, target, err)
+			}
+			return u.chownIfNeeded(target)
+		}
+
+		if err := copyFileContext(ctx, path, target, info.Mode()); err != nil {
+			return err
+		}
+
+		return u.chownIfNeeded(target)
 	})
+}
+
+func copyFileContext(ctx context.Context, path, target string, mode fs.FileMode) error {
+	in, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("failed to open '%q': %w", path, err)
+	}
+	defer in.Close()
+
+	out, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
+	if err != nil {
+		return fmt.Errorf("failed to create or update '%q': %w", target, err)
+	}
+	defer out.Close()
+
+	buf := make([]byte, 128*1024)
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		n, rerr := in.Read(buf)
+		if n > 0 {
+			if _, werr := out.Write(buf[:n]); werr != nil {
+				return fmt.Errorf("failed to write '%q': %w", target, werr)
+			}
+		}
+		if rerr == io.EOF {
+			break
+		}
+		if rerr != nil {
+			return fmt.Errorf("failed to read '%q': %w", path, rerr)
+		}
+	}
+	return nil
+}
+
+func (u *UserFS) chownIfNeeded(path string) error {
+	if u.sudoUser == nil || runtime.GOOS == "windows" {
+		return nil
+	}
+	// NOTE: `Lchown` is used, so a symlink itself has its owner changed, not the target
+	if err := os.Lchown(path, u.sudoUser.uid, u.sudoUser.gid); err != nil {
+		return fmt.Errorf("failed to change owner of '%q': %w", path, err)
+	}
+	return nil
 }
