@@ -32,9 +32,6 @@ func Build(ctx context.Context, args []string, filestore *files.FileStore, conso
 	}
 
 	tmpDotfilesDir := filepath.Join(filestore.GetProjectDir(name), "nextdotfiles")
-	if err := os.Mkdir(tmpDotfilesDir, 0755); err != nil {
-		return fmt.Errorf("failed to create dotfiles temp directory for the container: %w", err)
-	}
 	if err := filestore.CopyDotfilesTo(ctx, tmpDotfilesDir); err != nil {
 		os.RemoveAll(tmpDotfilesDir)
 		return fmt.Errorf("failed to prepare dotfiles for the container: %w", err)
@@ -107,10 +104,15 @@ func dockerComposeBuild(ctx context.Context, filestore *files.FileStore, name st
 	compose := filestore.GetComposeFilePathFor(name)
 	env := filestore.GetEnvFilePathFor(name)
 
+	relativeDotfilesDir, err := filepath.Rel(base, dotfilesDir)
+	if err != nil {
+		return fmt.Errorf("failed to construct dotfiles relative path: %w", err)
+	}
+
 	cmd := exec.CommandContext(ctx, "docker", "compose", "-f", base, "-f", compose, "--env-file", env, "build")
 	envVars := append(os.Environ(),
 		"COMPOSE_PROJECT_NAME=paulenv-"+name,
-		"DOTFILES_DIR="+dotfilesDir,
+		"DOTFILES_DIR="+relativeDotfilesDir,
 	)
 	cmd.Env = envVars
 	cmd.Stdout = os.Stdout

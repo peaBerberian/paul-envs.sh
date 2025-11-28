@@ -83,6 +83,7 @@ isolation (same issue than with `devbox`).
    `--name` flag is provided, the choosen name will be the name of the project's
    directory.
 
+XXX TODO
 3. Optionally, put the "dotfiles" that you want to retrieve in the container's
    home directory in `configs`. They will be copied to the container when it is
    build (next step).
@@ -288,10 +289,10 @@ LTS environment with a shell of your preference (either `bash` as default or
 `zsh` or `fish`) and optional popular CLI tools (`neovim`, `starship`, `atuin`,
 `zellij`, `jujutsu` and `mise`).
 
-It also copies the content of the `configs` directory inside of that container
-and sets-up `$HOME/.container-cache` and `$HOME/.container-local` directories
-for cache and tools' local data (including shell history, `atuin` database,
-`mise` environments) respectively.
+It also copies your dotfiles directory inside of that container and sets-up
+`$HOME/.container-cache` and `$HOME/.container-local` directories for cache and
+tools' local data (including shell history, `atuin` database, `mise`
+environments) respectively.
 
 You can rely on this `Dockerfile` without anything else, as a standalone, e.g.
 via `docker`. Note that if you do that, you won't have persistent volumes for
@@ -299,9 +300,10 @@ cache, tools data and the project code, which would have to be re-populated each
 time the container is run. Adding persistence is the main point of the
 `compose.yaml` file.
 
-### The configs directory
+### The dotfiles directory
 
-The `configs` directory in this repository helps with the initialization of
+XXX TODO
+The `dotfiles` directory in this repository helps with the initialization of
 so-called "dotfiles" in the created containers.
 
 Its content will be merged with the home directory of the container. As such you
@@ -407,12 +409,10 @@ Along the mounted project, those are the only directories which are persisted.
 
 ## TODO:
 
-- Finish dotfiles work
-- Check directory first in 'create' command?
+- Check directories first?
 - lockfile versionning
-- Detect Docker compose automatically
-- Sanitize project name better: needs to be fs-compatible
 - => Go can be merged I think
+- Detect Docker compose automatically in build / run etc. commands?
 - Does remove also remove networks?
 - ci tests for clean command?
 - on Remove, propose to call docker ourselve to remove the volume

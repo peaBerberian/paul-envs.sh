@@ -69,6 +69,9 @@ func (f *FileStore) GetDotfileDirBase() string {
 }
 
 func (f *FileStore) CopyDotfilesTo(ctx context.Context, destDir string) error {
+	if err := os.RemoveAll(destDir); err != nil {
+		return fmt.Errorf("cannot copy dotfiles because %s cannot be removed: %w", destDir, err)
+	}
 	return f.userFS.CopyDirAsUser(ctx, f.dotfilesDir, destDir)
 }
 
