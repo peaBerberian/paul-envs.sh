@@ -108,10 +108,11 @@ func dockerComposeBuild(ctx context.Context, filestore *files.FileStore, name st
 	env := filestore.GetEnvFilePathFor(name)
 
 	cmd := exec.CommandContext(ctx, "docker", "compose", "-f", base, "-f", compose, "--env-file", env, "build")
-	// TODO: Shouldn't both be escaped?
-	cmd.Env = append(os.Environ(), "COMPOSE_PROJECT_NAME=paulenv-"+name)
-	// TODO: It doesn't seem to be considered by the Dockerfile linked to the compose.yaml?
-	cmd.Env = append(os.Environ(), "DOTFILES_DIR="+dotfilesDir)
+	envVars := append(os.Environ(),
+		"COMPOSE_PROJECT_NAME=paulenv-"+name,
+		"DOTFILES_DIR="+dotfilesDir,
+	)
+	cmd.Env = envVars
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
@@ -125,7 +126,6 @@ func resetVolumes(ctx context.Context, filestore *files.FileStore, name string, 
 
 	cmd := exec.CommandContext(ctx, "docker", "compose", "-f", base, "-f", compose, "--env-file", env,
 		"--profile", "reset", "up", "reset-cache", "reset-local")
-	// TODO: Shouldn't it be escaped?
 	cmd.Env = append(os.Environ(), "COMPOSE_PROJECT_NAME=paulenv-"+name)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
