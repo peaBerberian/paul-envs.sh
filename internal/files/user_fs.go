@@ -117,7 +117,7 @@ func (u *UserFS) GetUserConfigDir() string {
 	}
 }
 
-// CopyDir recursively copies a directory tree from src to dst
+// recursively copies a directory tree from src to dst
 // TODO: Pass context
 func (u *UserFS) CopyDirAsUser(src string, dst string) error {
 	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
@@ -143,14 +143,23 @@ func (u *UserFS) CopyDirAsUser(src string, dst string) error {
 		}
 		defer srcFile.Close()
 
-		// TODO: as user
 		dstFile, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, info.Mode())
 		if err != nil {
 			return err
 		}
 		defer dstFile.Close()
 
-		_, err = io.Copy(dstFile, srcFile)
-		return err
+		if _, err := io.Copy(dstFile, srcFile); err != nil {
+			return err
+		}
+
+		// Set the right ownership if needed
+		if u.sudoUser != nil {
+			if err := os.Chown(target, u.sudoUser.uid, u.sudoUser.gid); err != nil {
+				return err
+			}
+		}
+
+		return nil
 	})
 }
