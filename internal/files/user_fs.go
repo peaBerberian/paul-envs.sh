@@ -75,12 +75,11 @@ func (u *UserFS) MkdirAsUser(path string, perm os.FileMode) error {
 func (u *UserFS) GetUserDataDir() string {
 	switch detectOS() {
 	case "windows":
-		appDataEnv := os.Getenv("APPDATA")
-		if appDataEnv == "" {
+		localAppDataEnv := os.Getenv("LOCALAPPDATA")
+		if localAppDataEnv == "" {
 			return filepath.Join(u.homeDir, "AppData", "Local")
 		} else {
-			// TODO: Conflict with config
-			return appDataEnv
+			return localAppDataEnv
 		}
 	case "darwin":
 		return filepath.Join(u.homeDir, "Library", "Application Support")
