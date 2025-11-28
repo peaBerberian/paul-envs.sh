@@ -417,6 +417,10 @@ Along the mounted project, those are the only directories which are persisted.
 - ci tests for clean command?
 - on Remove, propose to call docker ourselve to remove the volume
 - flags for clean: --no-prompt, --no-config, --no-image, --no-cache
+- `run` should propose to `build` if not already done
+- we should hash the last version of the .env and compose.yaml to propose a
+  re-build when it changed.
+- `update` command?
 - Shell completions under specific command?
 - Commands work even if a subset is written
 - Only max a single instance of each project-container?
