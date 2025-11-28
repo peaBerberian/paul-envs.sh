@@ -44,8 +44,14 @@ func NewUserFS() (*UserFS, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot retrieve info on the SUDO_USER: %w", err)
 	}
-	uid, _ := strconv.Atoi(usr.Uid)
-	gid, _ := strconv.Atoi(usr.Gid)
+	uid, err := strconv.Atoi(usr.Uid)
+	if err != nil {
+		return nil, err
+	}
+	gid, err := strconv.Atoi(usr.Gid)
+	if err != nil {
+		return nil, err
+	}
 	return &UserFS{
 		sudoUser: &sudoUser{
 			uid: uid,
