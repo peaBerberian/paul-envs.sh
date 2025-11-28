@@ -25,7 +25,7 @@ func Run(ctx context.Context, args []string, filestore *files.FileStore, console
 		return err
 	}
 
-	baseCompose := filestore.GetBaseComposeFile()
+	baseCompose := filestore.GetBaseComposeFilename()
 	if _, err := os.Stat(baseCompose); os.IsNotExist(err) {
 		return fmt.Errorf("Base compose.yaml not found at %s", baseCompose)
 	}

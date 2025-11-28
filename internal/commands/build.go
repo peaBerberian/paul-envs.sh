@@ -54,8 +54,8 @@ func Build(ctx context.Context, args []string, filestore *files.FileStore, conso
 }
 
 func ensureBaseComposeExists(filestore *files.FileStore) error {
-	if _, err := os.Stat(filestore.GetBaseComposeFile()); os.IsNotExist(err) {
-		return fmt.Errorf("base compose.yaml not found at %s\nCreate a configuration through the 'create' command first.", filestore.GetBaseComposeFile())
+	if _, err := os.Stat(filestore.GetBaseComposeFilename()); os.IsNotExist(err) {
+		return fmt.Errorf("base compose.yaml not found at %s\nCreate a configuration through the 'create' command first.", filestore.GetBaseComposeFilename())
 	}
 	return nil
 }
@@ -103,7 +103,7 @@ func createSharedCacheVolume(ctx context.Context) error {
 }
 
 func dockerComposeBuild(ctx context.Context, filestore *files.FileStore, name string, dotfilesDir string) error {
-	base := filestore.GetBaseComposeFile()
+	base := filestore.GetBaseComposeFilename()
 	compose := filestore.GetComposeFilePathFor(name)
 	env := filestore.GetEnvFilePathFor(name)
 
@@ -125,7 +125,7 @@ func dockerComposeBuild(ctx context.Context, filestore *files.FileStore, name st
 
 func resetVolumes(ctx context.Context, filestore *files.FileStore, name string, console *console.Console) error {
 	console.WriteLn("\nResetting persistent volumes...")
-	base := filestore.GetBaseComposeFile()
+	base := filestore.GetBaseComposeFilename()
 	compose := filestore.GetComposeFilePathFor(name)
 	env := filestore.GetEnvFilePathFor(name)
 

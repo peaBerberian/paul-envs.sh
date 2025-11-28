@@ -7,16 +7,21 @@ import (
 	"testing"
 )
 
-func TestFileStore_CreateProjectEnvFile(t *testing.T) {
+func TestFileStore_CreateProjectFiles(t *testing.T) {
 	baseDataDir := t.TempDir()
-	dotfilesDir := t.TempDir()
+	configDir := t.TempDir()
 	store := &FileStore{
-		baseDataDir: baseDataDir,
-		dotfilesDir: dotfilesDir,
-		projectsDir: filepath.Join(baseDataDir, "projects"),
+		userFS: &UserFS{
+			homeDir:  t.TempDir(),
+			sudoUser: nil,
+		},
+		baseDataDir:   baseDataDir,
+		baseConfigDir: configDir,
+		dotfilesDir:   filepath.Join(configDir, "dotfiles"),
+		projectsDir:   filepath.Join(baseDataDir, "projects"),
 	}
 
-	tplData := EnvTemplateData{
+	envTplData := EnvTemplateData{
 		ProjectComposeFilename: "compose.yaml",
 		ProjectID:              "test-id",
 		ProjectDestPath:        "myproject",
@@ -43,25 +48,38 @@ func TestFileStore_CreateProjectEnvFile(t *testing.T) {
 		GitEmail:               "test@example.com",
 	}
 
-	err := store.CreateProjectEnvFile("testproject", tplData)
-	if err != nil {
-		t.Fatalf("CreateProjectEnvFile() error = %v", err)
+	composeTplData := ComposeTemplateData{
+		ProjectName: "testproject",
+		Ports:       []uint16{3000, 8080},
+		EnableSSH:   true,
+		SSHKeyPath:  "/home/user/.ssh/id_ed25519.pub",
+		Volumes:     []string{"./data:/app/data", "./config:/app/config"},
 	}
 
-	// Verify file exists
+	err := store.CreateProjectFiles("testproject", envTplData, composeTplData)
+	if err != nil {
+		t.Fatalf("CreateProjectFiles() error = %v", err)
+	}
+
+	// Verify files exists
 	envFile := store.GetEnvFilePathFor("testproject")
 	if _, err := os.Stat(envFile); os.IsNotExist(err) {
 		t.Fatal("env file was not created")
 	}
+	composeFile := store.GetComposeFilePathFor("testproject")
+	if _, err := os.Stat(composeFile); os.IsNotExist(err) {
+		t.Fatal("compose file was not created")
+	}
 
 	// Read and verify content
-	content, err := os.ReadFile(envFile)
+
+	envCtnt, err := os.ReadFile(envFile)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	contentStr := string(content)
-	checks := []string{
+	envCtntStr := string(envCtnt)
+	envChecks := []string{
 		`PROJECT_ID="test-id"`,
 		`PROJECT_DIRNAME="myproject"`,
 		`PROJECT_PATH="/host/path"`,
@@ -71,51 +89,23 @@ func TestFileStore_CreateProjectEnvFile(t *testing.T) {
 		`INSTALL_NODE="latest"`,
 		`GIT_AUTHOR_NAME="Test User"`,
 		`GIT_AUTHOR_EMAIL="test@example.com"`,
+		`ENABLE_SSH="true"`,
 	}
 
-	for _, check := range checks {
-		if !strings.Contains(contentStr, check) {
+	for _, check := range envChecks {
+		if !strings.Contains(envCtntStr, check) {
 			t.Errorf("env file missing expected content: %s", check)
 		}
 	}
-}
-
-func TestFileStore_CreateProjectComposeFile(t *testing.T) {
-	baseDataDir := t.TempDir()
-	dotfilesDir := t.TempDir()
-	store := &FileStore{
-		baseDataDir: baseDataDir,
-		dotfilesDir: dotfilesDir,
-		projectsDir: filepath.Join(baseDataDir, "projects"),
-	}
-
-	tplData := ComposeTemplateData{
-		ProjectName: "testproject",
-		Ports:       []uint16{3000, 8080},
-		EnableSSH:   true,
-		SSHKeyPath:  "/home/user/.ssh/id_ed25519.pub",
-		Volumes:     []string{"./data:/app/data", "./config:/app/config"},
-	}
-
-	err := store.CreateProjectComposeFile("testproject", tplData)
-	if err != nil {
-		t.Fatalf("CreateProjectComposeFile() error = %v", err)
-	}
-
-	// Verify file exists
-	composeFile := store.GetComposeFilePathFor("testproject")
-	if _, err := os.Stat(composeFile); os.IsNotExist(err) {
-		t.Fatal("compose file was not created")
-	}
 
 	// Read and verify content
-	content, err := os.ReadFile(composeFile)
+	composeCtnt, err := os.ReadFile(composeFile)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	contentStr := string(content)
-	checks := []string{
+	composeCtntString := string(composeCtnt)
+	composeChecks := []string{
 		`image: paulenv:testproject`,
 		`"3000:3000"`,
 		`"8080:8080"`,
@@ -125,68 +115,91 @@ func TestFileStore_CreateProjectComposeFile(t *testing.T) {
 		`/home/user/.ssh/id_ed25519.pub:/etc/ssh/authorized_keys/${USERNAME}:ro`,
 	}
 
-	for _, check := range checks {
-		if !strings.Contains(contentStr, check) {
+	for _, check := range composeChecks {
+		if !strings.Contains(composeCtntString, check) {
 			t.Errorf("compose file missing expected content: %s", check)
 		}
 	}
 }
 
-func TestFileStore_CreateProjectComposeFile_NoSSH(t *testing.T) {
+func TestFileStore_CreateProjectComposeFiles(t *testing.T) {
 	baseDataDir := t.TempDir()
-	dotfilesDir := t.TempDir()
+	configDir := t.TempDir()
 	store := &FileStore{
-		baseDataDir: baseDataDir,
-		dotfilesDir: dotfilesDir,
-		projectsDir: filepath.Join(baseDataDir, "projects"),
+		userFS: &UserFS{
+			homeDir:  t.TempDir(),
+			sudoUser: nil,
+		},
+		baseDataDir:   baseDataDir,
+		baseConfigDir: configDir,
+		dotfilesDir:   filepath.Join(configDir, "dotfiles"),
+		projectsDir:   filepath.Join(baseDataDir, "projects"),
 	}
 
-	tplData := ComposeTemplateData{
+	envTplData := EnvTemplateData{
+		ProjectComposeFilename: "compose.yaml",
+		ProjectID:              "test-id",
+		ProjectDestPath:        "myproject",
+		ProjectHostPath:        "/host/path",
+		HostUID:                "1000",
+		HostGID:                "1000",
+		Username:               "testuser",
+		Shell:                  "bash",
+		InstallNode:            "latest",
+		InstallRust:            "none",
+		InstallPython:          "3.12.0",
+		InstallGo:              "none",
+		EnableWasm:             "false",
+		EnableSSH:              "false",
+		EnableSudo:             "true",
+		Packages:               "git vim",
+		InstallNeovim:          "true",
+		InstallStarship:        "true",
+		InstallAtuin:           "false",
+		InstallMise:            "true",
+		InstallZellij:          "false",
+		InstallJujutsu:         "false",
+		GitName:                "Test User",
+		GitEmail:               "test@example.com",
+	}
+
+	composeTplData := ComposeTemplateData{
 		ProjectName: "testproject",
 		Ports:       []uint16{3000},
 		EnableSSH:   false,
 		Volumes:     []string{"./data:/app/data"},
 	}
 
-	err := store.CreateProjectComposeFile("testproject", tplData)
+	err := store.CreateProjectFiles("testproject", envTplData, composeTplData)
 	if err != nil {
-		t.Fatalf("CreateProjectComposeFile() error = %v", err)
+		t.Fatalf("CreateProjectFiles() error = %v", err)
 	}
 
-	content, err := os.ReadFile(store.GetComposeFilePathFor("testproject"))
+	envCtnt, err := os.ReadFile(store.GetEnvFilePathFor("testproject"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	contentStr := string(content)
-	if strings.Contains(contentStr, `"22:22"`) {
+	envCtntStr := string(envCtnt)
+	envChecks := []string{
+		`ENABLE_SSH="false"`,
+	}
+	for _, check := range envChecks {
+		if !strings.Contains(envCtntStr, check) {
+			t.Errorf("env file should not enable SSH: %s", check)
+		}
+	}
+
+	composeCtnt, err := os.ReadFile(store.GetComposeFilePathFor("testproject"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	composeCtntStr := string(composeCtnt)
+	if strings.Contains(composeCtntStr, `"22:22"`) {
 		t.Error("compose file should not contain SSH port when disabled")
 	}
-	if strings.Contains(contentStr, "authorized_keys") {
+	if strings.Contains(composeCtntStr, "authorized_keys") {
 		t.Error("compose file should not contain SSH key mount when disabled")
-	}
-}
-
-func TestFileStore_ensureProjectDir(t *testing.T) {
-	baseDataDir := t.TempDir()
-	dotfilesDir := t.TempDir()
-	store := &FileStore{
-		baseDataDir: baseDataDir,
-		dotfilesDir: dotfilesDir,
-		projectsDir: filepath.Join(baseDataDir, "projects"),
-	}
-
-	testFile := filepath.Join(store.projectsDir, "newproject", "test.txt")
-	err := store.ensureProjectDir(testFile)
-	if err != nil {
-		t.Fatalf("ensureProjectDir() error = %v", err)
-	}
-
-	// Verify directories were created
-	if _, err := os.Stat(store.projectsDir); os.IsNotExist(err) {
-		t.Error("base projects directory was not created")
-	}
-	if _, err := os.Stat(filepath.Dir(testFile)); os.IsNotExist(err) {
-		t.Error("project directory was not created")
 	}
 }

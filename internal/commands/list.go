@@ -12,8 +12,8 @@ import (
 
 func List(filestore *files.FileStore, console *console.Console) error {
 	// TODO: All that in filestore?
-	if _, err := os.Stat(filestore.GetBaseComposeFile()); os.IsNotExist(err) {
-		return fmt.Errorf("base compose.yaml not found at %s", filestore.GetBaseComposeFile())
+	if _, err := os.Stat(filestore.GetBaseComposeFilename()); os.IsNotExist(err) {
+		return fmt.Errorf("base compose.yaml not found at %s", filestore.GetBaseComposeFilename())
 	}
 
 	dirBase := filestore.GetProjectDirBase()

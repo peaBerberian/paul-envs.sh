@@ -28,6 +28,10 @@ func Create(argsList []string, filestore *files.FileStore, console *console.Cons
 		return err
 	}
 
+	if err := filestore.CreateDotfilesDirBase(); err != nil {
+		return err
+	}
+
 	printNextSteps(&cfg, filestore, console)
 	return nil
 }
@@ -64,10 +68,6 @@ func generateProjectFiles(cfg *config.Config, filestore *files.FileStore, consol
 		GitEmail:               utils.EscapeEnvValue(cfg.GitEmail),
 	}
 
-	if err := filestore.CreateProjectEnvFile(cfg.ProjectName, envData); err != nil {
-		return fmt.Errorf("failed to create project env file: %w", err)
-	}
-
 	composeData := files.ComposeTemplateData{
 		ProjectName: cfg.ProjectName,
 		Ports:       cfg.Ports,
@@ -76,10 +76,10 @@ func generateProjectFiles(cfg *config.Config, filestore *files.FileStore, consol
 		Volumes:     cfg.Volumes,
 	}
 
-	if err := filestore.CreateProjectComposeFile(cfg.ProjectName, composeData); err != nil {
-		return fmt.Errorf("failed to create project compose file: %w", err)
+	err := filestore.CreateProjectFiles(cfg.ProjectName, envData, composeData)
+	if err != nil {
+		return fmt.Errorf("failed to create project files: %w", err)
 	}
-
 	return nil
 }
 
@@ -105,7 +105,7 @@ func printNextSteps(cfg *config.Config, filestore *files.FileStore, console *con
 	console.WriteLn("     - %s", filestore.GetEnvFilePathFor(cfg.ProjectName))
 	console.WriteLn("     - %s", filestore.GetComposeFilePathFor(cfg.ProjectName))
 	console.WriteLn("  2. Put the $HOME dotfiles you want to port in:")
-	console.WriteLn("     - %s", filestore.GetDotfileDirBase())
+	console.WriteLn("     - %s", filestore.GetDotfilesDirBase())
 	console.WriteLn("  3. Build the environment:")
 	console.WriteLn("     paul-envs build %s", cfg.ProjectName)
 	console.WriteLn("  4. Run the environment:")

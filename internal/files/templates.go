@@ -47,72 +47,61 @@ type ComposeTemplateData struct {
 	Volumes     []string
 }
 
-func (f *FileStore) CreateProjectEnvFile(projectName string, tplData EnvTemplateData) error {
-	fileLoc := f.GetEnvFilePathFor(projectName)
-	if err := f.ensureProjectDir(fileLoc); err != nil {
-		return err
+func (f *FileStore) CreateProjectFiles(
+	projectName string,
+	envTplData EnvTemplateData,
+	composeTplData ComposeTemplateData,
+) error {
+	if err := f.ensureCreatedBaseFiles(); err != nil {
+		return fmt.Errorf("create base files: %w", err)
 	}
 
-	tmplContent, err := assets.ReadFile("assets/env.tmpl")
+	// For env
+
+	envTplCtnt, err := assets.ReadFile("assets/env.tmpl")
 	if err != nil {
 		return fmt.Errorf("read env template: %w", err)
 	}
 
-	envTpl, err := template.New("env").Parse(string(tmplContent))
+	envTpl, err := template.New("env").Parse(string(envTplCtnt))
 	if err != nil {
 		return fmt.Errorf("parse env template: %w", err)
 	}
 
 	var buf bytes.Buffer
-	if err := envTpl.Execute(&buf, tplData); err != nil {
+	if err := envTpl.Execute(&buf, envTplData); err != nil {
 		return fmt.Errorf("execute env template: %w", err)
 	}
 
-	if err := f.ensureCreatedBaseFiles(); err != nil {
-		return fmt.Errorf("write base project files: %w", err)
+	if err := f.userFS.MkdirAsUser(f.GetProjectDir(projectName), 0755); err != nil {
+		return fmt.Errorf("create project directory: %w", err)
 	}
-	if err := os.WriteFile(fileLoc, buf.Bytes(), 0644); err != nil {
+
+	// TODO: As user
+	if err := os.WriteFile(f.GetEnvFilePathFor(projectName), buf.Bytes(), 0644); err != nil {
 		return fmt.Errorf("write env file: %w", err)
 	}
-	return nil
-}
 
-func (f *FileStore) CreateProjectComposeFile(projectName string, tplData ComposeTemplateData) error {
-	fileLoc := f.GetComposeFilePathFor(projectName)
-	if err := f.ensureProjectDir(fileLoc); err != nil {
-		return err
-	}
+	// Now for compose
 
-	tmplContent, err := assets.ReadFile("assets/compose.tmpl")
+	composeTplCtnt, err := assets.ReadFile("assets/compose.tmpl")
 	if err != nil {
 		return fmt.Errorf("read compose template: %w", err)
 	}
 
-	composeTpl, err := template.New("compose").Parse(string(tmplContent))
+	composeTpl, err := template.New("compose").Parse(string(composeTplCtnt))
 	if err != nil {
 		return fmt.Errorf("parse compose template: %w", err)
 	}
 
-	var buf bytes.Buffer
-	if err := composeTpl.Execute(&buf, tplData); err != nil {
+	buf.Reset()
+	if err := composeTpl.Execute(&buf, composeTplData); err != nil {
 		return fmt.Errorf("execute compose template: %w", err)
 	}
 
-	if err := f.ensureCreatedBaseFiles(); err != nil {
-		return fmt.Errorf("write base project files: %w", err)
-	}
-	if err := os.WriteFile(fileLoc, buf.Bytes(), 0644); err != nil {
+	// TODO: As user
+	if err := os.WriteFile(f.GetComposeFilePathFor(projectName), buf.Bytes(), 0644); err != nil {
 		return fmt.Errorf("write compose file: %w", err)
-	}
-	return nil
-}
-
-func (f *FileStore) ensureProjectDir(fileLoc string) error {
-	if err := os.MkdirAll(f.GetProjectDirBase(), 0755); err != nil {
-		return fmt.Errorf("create base project directory: %w", err)
-	}
-	if err := os.MkdirAll(filepath.Dir(fileLoc), 0755); err != nil {
-		return fmt.Errorf("create project directory: %w", err)
 	}
 	return nil
 }
@@ -129,6 +118,7 @@ func (f *FileStore) ensureCreatedBaseFiles() error {
 			return err
 		}
 
+		// TODO: As user
 		err = os.WriteFile(
 			filepath.Join(f.baseDataDir, "Dockerfile"),
 			dockerfileData, 0644)
@@ -148,6 +138,7 @@ func (f *FileStore) ensureCreatedBaseFiles() error {
 			return err
 		}
 
+		// TODO: As user
 		err = os.WriteFile(
 			filepath.Join(f.baseDataDir, "compose.yaml"),
 			composeData, 0644)

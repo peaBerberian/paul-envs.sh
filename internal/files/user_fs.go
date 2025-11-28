@@ -37,21 +37,21 @@ func NewUserFS() (*UserFS, error) {
 			home = os.Getenv("HOME")
 		}
 		if home == "" {
-			return nil, errors.New("cannot determine HOME: HOME not set")
+			return nil, errors.New("cannot determine the home directory, your system might not be supported")
 		}
 		return &UserFS{sudoUser: nil, homeDir: home}, nil
 	}
 	usr, err := user.Lookup(sudoUserEnv)
 	if err != nil {
-		return nil, fmt.Errorf("cannot retrieve info on the SUDO_USER: %w", err)
+		return nil, fmt.Errorf("running sudo but cannot retrieve info on the SUDO_USER: %w", err)
 	}
 	uid, err := strconv.Atoi(usr.Uid)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to convert the sudo user uid into an integer: %w", err)
 	}
 	gid, err := strconv.Atoi(usr.Gid)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to convert the sudo user gid into an integer: %w", err)
 	}
 	return &UserFS{
 		sudoUser: &sudoUser{

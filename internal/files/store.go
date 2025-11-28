@@ -25,6 +25,7 @@ type FileStore struct {
 }
 
 func NewFileStore() (*FileStore, error) {
+	// TODO: Set lazily?
 	userFS, err := NewUserFS()
 	if err != nil {
 		return nil, err
@@ -32,12 +33,8 @@ func NewFileStore() (*FileStore, error) {
 
 	paulEnvsDataDir := filepath.Join(userFS.GetUserDataDir(), "paul-envs")
 	paulEnvsConfigDir := filepath.Join(userFS.GetUserConfigDir(), "paul-envs")
-	dotfilesDir := filepath.Join(paulEnvsConfigDir, "dotfiles")
 
-	if err := userFS.MkdirAsUser(dotfilesDir, 0755); err != nil {
-		return nil, fmt.Errorf("create base config directory: %w", err)
-	}
-
+	// TODO: lazily would be best
 	if err := userFS.MkdirAsUser(filepath.Join(paulEnvsDataDir, "placeholder"), 0755); err != nil {
 		return nil, fmt.Errorf("create empty dotfiles placeholder: %w", err)
 	}
@@ -60,11 +57,18 @@ func (f *FileStore) RemoveConfigDirectory() error {
 	return os.RemoveAll(f.baseConfigDir)
 }
 
-func (f *FileStore) GetBaseComposeFile() string {
+func (f *FileStore) GetBaseComposeFilename() string {
 	return filepath.Join(f.baseDataDir, BaseComposeFilename)
 }
 
-func (f *FileStore) GetDotfileDirBase() string {
+func (f *FileStore) CreateDotfilesDirBase() error {
+	if err := f.userFS.MkdirAsUser(f.dotfilesDir, 0755); err != nil {
+		return fmt.Errorf("create base config directory: %w", err)
+	}
+	return nil
+}
+
+func (f *FileStore) GetDotfilesDirBase() string {
 	return f.dotfilesDir
 }
 
