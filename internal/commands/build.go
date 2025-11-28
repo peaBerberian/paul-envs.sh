@@ -14,6 +14,9 @@ import (
 )
 
 func Build(ctx context.Context, args []string, filestore *files.FileStore, console *console.Console) error {
+	if err := checkDockerComposeInstallation(ctx); err != nil {
+		return fmt.Errorf("docker compose not found, is it installed: %w", err)
+	}
 	if err := checkDockerPermissions(ctx); err != nil {
 		return err
 	}

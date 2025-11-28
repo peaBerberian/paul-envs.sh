@@ -38,3 +38,8 @@ func getSudoCommand() string {
 	}
 	return fmt.Sprintf("  sudo %s %s", executable, args)
 }
+
+func checkDockerComposeInstallation(ctx context.Context) error {
+	cmd := exec.CommandContext(ctx, "docker", "ps")
+	return cmd.Run()
+}

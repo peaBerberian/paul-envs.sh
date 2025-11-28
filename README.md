@@ -412,7 +412,6 @@ Along the mounted project, those are the only directories which are persisted.
 - Check directories first?
 - lockfile versionning
 - => Go can be merged I think
-- Detect Docker compose automatically in build / run etc. commands?
 - Does remove also remove networks?
 - ci tests for clean command?
 - on Remove, propose to call docker ourselve to remove the volume
