@@ -76,31 +76,32 @@ isolation (same issue than with `devbox`).
 1. Clone this repository, `cd` to it, and ensure `docker compose` is installed
    locally and accessible in path.
 
-2. Run `./paul-envs create <path/to/your/project> --name myApp`.
+2. Run `./paul-envs create <path/to/your/project>`
 
    This will just create a compose and env file in a new `projects/` directory
-   with the right preset properties and name the project `myApp`. If no
-   `--name` flag is provided, the choosen name will be the name of the project's
-   directory.
+   with the right preset properties depending on your answers on what it
+   prompted you (default shell, packages to install, languages etc.).
 
-XXX TODO
-3. Optionally, put the "dotfiles" that you want to retrieve in the container's
-   home directory in `configs`. They will be copied to the container when it is
-   build (next step).
+3. The `create` command you ran at the previous step should have finished by
+   listing what you can do now. You may review the created configuration to see
+   if it seems right (and you can update those files at any time).
 
-   Note that you shouldn't put your credentials/secrets in there (`~/.ssh`,
-   `~/.aws`, `~/.git-credentials` etc.) as those could have issues being
-   copied (due to restrictive permissions).
+   More importantly, it will also invite you to put the "dotfiles" (e.g. your
+   `.zshrc`) that you want to retrieve in the container's home directory in a
+   specific folder.
 
-   If you want to copy some of those, see `./paul-envs create` flags.
+   They will be copied to the container when it is build (next step).
 
-4. Run `./paul-envs build myApp`.
+4. Run `./paul-envs build <name>`
+
+   With the `<name>` being the name given at the end of step `2`.
 
    It will build the container through the right `docker compose build`
-   invokation and initialize persistent volumes.
+   invokation and initialize persistent volumes. You can call again `build` any
+   time you update the config or want to update the installed tools.
 
 5. Then launch the container each time you want to work on the project:
-   `./paul-envs run myApp`.
+   `./paul-envs run <name>`.
 
    The mounted project is available in that container at `~/projects/myApp`.
 
@@ -302,16 +303,13 @@ time the container is run. Adding persistence is the main point of the
 
 ### The dotfiles directory
 
-XXX TODO
-The `dotfiles` directory in this repository helps with the initialization of
-so-called "dotfiles" in the created containers.
-
-Its content will be merged with the home directory of the container. As such you
-can put a `.bashrc` directly in there at its root, and the config for the tools
-you planned to install (e.g. the `starship` configuration file: `starship.toml`,
-a `nvim` directory for `neovim` etc.):
+The "dotfiles directory" is a special location that will be merged with the home
+directory of an image once built. As such you can put a `.bashrc` directly in
+there at its root, and the config for the tools you planned to install (e.g. the
+`starship` configuration file: `starship.toml`, a `nvim` directory for `neovim`
+etc.):
 ```
-configs/
+dotfiles_dir/
 ├── .bashrc
 └── .config/
     ├── starship.toml (config for the starship tool)
@@ -319,7 +317,7 @@ configs/
         └── ... (your neovim config)
 ```
 
-All files in `configs` will be copied as is unmodified, with two exceptions:
+All its content will be copied as is unmodified, with two exceptions:
 
 1.  shell files  (`.bashrc`, `.zshrc` and/or `.config/fish/config.fish` files)
     may still be updated after being copied in the dockerfile to redirect their
@@ -338,9 +336,13 @@ If you're not overwriting those files however, the default provided one will
 already contain the initialization code for all the tools explicitely listed in
 the dockerfile.
 
-The job of copying the `configs` directory's content is taken by the
+The job of copying the dotfiles directory's content is taken by the
 `Dockerfile`. Meaning that you'll profit from this even if you're not relying on
 `docker compose` or `paul-envs`.
+
+If you don't go through `paul-envs`, you will have to set the `DOTFILES_DIR` env
+variable yourself so it points to the dotfiles directory you defined yourself.
+When relying on `paul-envs`, a directory will be created for you.
 
 #### Note about neovim
 
@@ -411,6 +413,9 @@ Along the mounted project, those are the only directories which are persisted.
 
 - Check directories first?
 - lockfile versionning
+- executable in github release on tag
+- update project name
+- fix CI
 - => Go can be merged I think
 - Does remove also remove networks?
 - ci tests for clean command?
@@ -425,3 +430,4 @@ Along the mounted project, those are the only directories which are persisted.
 - Only max a single instance of each project-container?
 - something like `up` / `down` commands make now much more sense with ssh
 - Add Kakoune and Helix as potential tools
+- less gh-action, more scripts (in-docker for local tests?)
