@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 )
@@ -12,6 +13,13 @@ const (
 	VersionNone   = "none"
 	VersionLatest = "latest"
 )
+
+// Reserved filename on windows. Projects should not be called one of those
+var reservedWin = map[string]struct{}{
+	"CON": {}, "PRN": {}, "AUX": {}, "NUL": {},
+	"COM1": {}, "COM2": {}, "COM3": {}, "COM4": {}, "COM5": {}, "COM6": {}, "COM7": {}, "COM8": {}, "COM9": {},
+	"LPT1": {}, "LPT2": {}, "LPT3": {}, "LPT4": {}, "LPT5": {}, "LPT6": {}, "LPT7": {}, "LPT8": {}, "LPT9": {},
+}
 
 var (
 	// Debian/Ubuntu package name regex:
@@ -31,6 +39,12 @@ func ValidateProjectName(name string) error {
 	if !projectNameRegex.MatchString(name) {
 		return fmt.Errorf("invalid project name '%s'. Must be 1-128 characters, start with alphanumeric or underscore, and contain only alphanumeric, hyphens, and underscores", name)
 	}
+	if runtime.GOOS == "windows" {
+		if _, reserved := reservedWin[strings.ToUpper(name)]; reserved {
+			return fmt.Errorf("invalid project name '%s': reserved by Windows", name)
+		}
+	}
+
 	return nil
 }
 
