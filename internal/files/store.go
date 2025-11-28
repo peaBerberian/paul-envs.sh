@@ -1,6 +1,7 @@
 package files
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -65,6 +66,10 @@ func (f *FileStore) GetBaseComposeFile() string {
 
 func (f *FileStore) GetDotfileDirBase() string {
 	return f.dotfilesDir
+}
+
+func (f *FileStore) CopyDotfilesTo(ctx context.Context, destDir string) error {
+	return f.userFS.CopyDirAsUser(ctx, f.dotfilesDir, destDir)
 }
 
 func (f *FileStore) GetProjectDirBase() string {

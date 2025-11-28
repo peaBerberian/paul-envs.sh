@@ -35,7 +35,7 @@ func Build(ctx context.Context, args []string, filestore *files.FileStore, conso
 	if err := os.Mkdir(tmpDotfilesDir, 0755); err != nil {
 		return fmt.Errorf("failed to create dotfiles temp directory for the container: %w", err)
 	}
-	if err := files.CopyDir(filestore.GetDotfileDirBase(), tmpDotfilesDir); err != nil {
+	if err := filestore.CopyDotfilesTo(ctx, tmpDotfilesDir); err != nil {
 		os.RemoveAll(tmpDotfilesDir)
 		return fmt.Errorf("failed to prepare dotfiles for the container: %w", err)
 	}
