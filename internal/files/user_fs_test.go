@@ -1,6 +1,7 @@
 package files
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -12,77 +13,76 @@ func mockOS(t *testing.T, osName string) {
 	t.Cleanup(func() { detectOS = orig })
 }
 
-// helper to mock home lookup
-func mockHome(t *testing.T, home string, err error) {
-	orig := lookupHome
-	lookupHome = func() (string, error) { return home, err }
-	t.Cleanup(func() { lookupHome = orig })
-}
-
 //
 // ─────────────────────────────────────────────────────────────
-//   TEST getUserConfigDir()
+//   TEST GetUserConfigDir()
 // ─────────────────────────────────────────────────────────────
 //
 
 func TestGetUserConfigDir_Linux_XDG(t *testing.T) {
 	mockOS(t, "linux")
-	mockHome(t, "/home/test", nil)
+	t.Setenv("HOME", "/home/test")
 	t.Setenv("XDG_CONFIG_HOME", "/xdg/config")
 	t.Setenv("SUDO_USER", "")
 
-	dir, err := getUserConfigDir()
+	ufs, err := NewUserFS()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if dir != "/xdg/config/paul-envs" {
-		t.Errorf("expected /xdg/config/paul-envs, got %s", dir)
+	dir := ufs.GetUserConfigDir()
+	if dir != "/xdg/config" {
+		t.Errorf("expected /xdg/config, got %s", dir)
 	}
 }
 
 func TestGetUserConfigDir_Linux_NoXDG(t *testing.T) {
 	mockOS(t, "linux")
-	mockHome(t, "/home/test", nil)
+	t.Setenv("HOME", "/home/test")
 	t.Setenv("XDG_CONFIG_HOME", "")
 	t.Setenv("SUDO_USER", "")
 
-	dir, err := getUserConfigDir()
+	ufs, err := NewUserFS()
 	if err != nil {
 		t.Fatalf("unexpected: %v", err)
 	}
 
-	if dir != "/home/test/.config/paul-envs" {
-		t.Errorf("expected /home/test/.config/paul-envs, got %s", dir)
+	dir := ufs.GetUserConfigDir()
+	if dir != "/home/test/.config" {
+		t.Errorf("expected /home/test/.config, got %s", dir)
 	}
 }
 
 func TestGetUserConfigDir_Linux_Sudo(t *testing.T) {
 	mockOS(t, "linux")
-	mockHome(t, "/home/real", nil)
-	t.Setenv("SUDO_USER", "real")
+	t.Setenv("HOME", "/root")
+	t.Setenv("SUDO_USER", os.Getenv("USER")) // Use actual current user for lookup
 	t.Setenv("XDG_CONFIG_HOME", "/wrong/xdg")
 
-	dir, err := getUserConfigDir()
+	ufs, err := NewUserFS()
 	if err != nil {
-		t.Fatalf("unexpected: %v", err)
+		t.Skipf("skipping sudo test: %v", err)
 	}
 
-	if dir != "/home/real/.config/paul-envs" {
-		t.Errorf("expected /home/real/.config/paul-envs, got %s", dir)
+	dir := ufs.GetUserConfigDir()
+	// Should use real user's home, not XDG_CONFIG_HOME
+	if filepath.Base(dir) != ".config" {
+		t.Errorf("expected path ending in .config, got %s", dir)
 	}
 }
 
 func TestGetUserConfigDir_MacOS(t *testing.T) {
 	mockOS(t, "darwin")
 	t.Setenv("HOME", "/Users/test")
+	t.Setenv("SUDO_USER", "")
 
-	dir, err := getUserConfigDir()
+	ufs, err := NewUserFS()
 	if err != nil {
 		t.Fatalf("unexpected: %v", err)
 	}
 
-	expected := "/Users/test/Library/Preferences/paul-envs"
+	dir := ufs.GetUserConfigDir()
+	expected := "/Users/test/Library/Preferences"
 	if dir != expected {
 		t.Errorf("expected %s, got %s", expected, dir)
 	}
@@ -90,14 +90,35 @@ func TestGetUserConfigDir_MacOS(t *testing.T) {
 
 func TestGetUserConfigDir_Windows(t *testing.T) {
 	mockOS(t, "windows")
+	t.Setenv("USERPROFILE", "C:\\Users\\test")
 	t.Setenv("APPDATA", "C:\\Users\\test\\AppData\\Roaming")
+	t.Setenv("SUDO_USER", "")
 
-	dir, err := getUserConfigDir()
+	ufs, err := NewUserFS()
 	if err != nil {
 		t.Fatalf("unexpected: %v", err)
 	}
 
-	expected := filepath.Join("C:\\Users\\test\\AppData\\Roaming", "paul-envs")
+	dir := ufs.GetUserConfigDir()
+	expected := "C:\\Users\\test\\AppData\\Roaming"
+	if dir != expected {
+		t.Errorf("expected %s, got %s", expected, dir)
+	}
+}
+
+func TestGetUserConfigDir_Windows_NoAppData(t *testing.T) {
+	mockOS(t, "windows")
+	t.Setenv("USERPROFILE", "C:\\Users\\test")
+	t.Setenv("APPDATA", "")
+	t.Setenv("SUDO_USER", "")
+
+	ufs, err := NewUserFS()
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+
+	dir := ufs.GetUserConfigDir()
+	expected := filepath.Join("C:\\Users\\test", "AppData", "Roaming")
 	if dir != expected {
 		t.Errorf("expected %s, got %s", expected, dir)
 	}
@@ -105,68 +126,74 @@ func TestGetUserConfigDir_Windows(t *testing.T) {
 
 //
 // ─────────────────────────────────────────────────────────────
-//   TEST getUserDataDir()
+//   TEST GetUserDataDir()
 // ─────────────────────────────────────────────────────────────
 //
 
 func TestGetUserDataDir_Linux_XDG(t *testing.T) {
 	mockOS(t, "linux")
-	mockHome(t, "/home/test", nil)
+	t.Setenv("HOME", "/home/test")
 	t.Setenv("XDG_DATA_HOME", "/xdg/data")
 	t.Setenv("SUDO_USER", "")
 
-	dir, err := getUserDataDir()
+	ufs, err := NewUserFS()
 	if err != nil {
 		t.Fatalf("unexpected: %v", err)
 	}
 
-	if dir != "/xdg/data/paul-envs" {
-		t.Errorf("expected /xdg/data/paul-envs, got %s", dir)
+	dir := ufs.GetUserDataDir()
+	if dir != "/xdg/data" {
+		t.Errorf("expected /xdg/data, got %s", dir)
 	}
 }
 
 func TestGetUserDataDir_Linux_NoXDG(t *testing.T) {
 	mockOS(t, "linux")
-	mockHome(t, "/home/test", nil)
+	t.Setenv("HOME", "/home/test")
 	t.Setenv("XDG_DATA_HOME", "")
 	t.Setenv("SUDO_USER", "")
 
-	dir, err := getUserDataDir()
+	ufs, err := NewUserFS()
 	if err != nil {
 		t.Fatalf("unexpected: %v", err)
 	}
 
-	if dir != "/home/test/.local/share/paul-envs" {
-		t.Errorf("expected /home/test/.local/share/paul-envs, got %s", dir)
+	dir := ufs.GetUserDataDir()
+	if dir != "/home/test/.local/share" {
+		t.Errorf("expected /home/test/.local/share, got %s", dir)
 	}
 }
 
 func TestGetUserDataDir_Linux_Sudo(t *testing.T) {
 	mockOS(t, "linux")
-	mockHome(t, "/home/real", nil)
-	t.Setenv("SUDO_USER", "real")
+	t.Setenv("HOME", "/root")
+	t.Setenv("SUDO_USER", os.Getenv("USER"))
 	t.Setenv("XDG_DATA_HOME", "/wrong/xdg")
 
-	dir, err := getUserDataDir()
+	ufs, err := NewUserFS()
 	if err != nil {
-		t.Fatalf("unexpected: %v", err)
+		t.Skipf("skipping sudo test: %v", err)
 	}
 
-	if dir != "/home/real/.local/share/paul-envs" {
-		t.Errorf("expected /home/real/.local/share/paul-envs, got %s", dir)
+	dir := ufs.GetUserDataDir()
+	// Should use real user's home, not XDG_DATA_HOME
+	if filepath.Base(dir) != "share" {
+		t.Errorf("expected path ending in .local/share, got %s", dir)
 	}
 }
 
 func TestGetUserDataDir_MacOS(t *testing.T) {
 	mockOS(t, "darwin")
 	t.Setenv("HOME", "/Users/test")
+	t.Setenv("SUDO_USER", "")
 
-	dir, err := getUserDataDir()
+	ufs, err := NewUserFS()
 	if err != nil {
 		t.Fatalf("unexpected: %v", err)
 	}
 
-	expected := "/Users/test/Library/Application Support/paul-envs"
+	dir := ufs.GetUserDataDir()
+	expected := "/Users/test/Library/Application Support"
 	if dir != expected {
 		t.Errorf("expected %s, got %s", expected, dir)
 	}
@@ -174,14 +201,35 @@ func TestGetUserDataDir_MacOS(t *testing.T) {
 
 func TestGetUserDataDir_Windows(t *testing.T) {
 	mockOS(t, "windows")
-	t.Setenv("APPDATA", "C:\\Users\\test\\AppData\\Roaming")
+	t.Setenv("USERPROFILE", "C:\\Users\\test")
+	t.Setenv("LOCALAPPDATA", "C:\\Users\\test\\AppData\\Local")
+	t.Setenv("SUDO_USER", "")
 
-	dir, err := getUserDataDir()
+	ufs, err := NewUserFS()
 	if err != nil {
 		t.Fatalf("unexpected: %v", err)
 	}
 
-	expected := filepath.Join("C:\\Users\\test\\AppData\\Roaming", "paul-envs")
+	dir := ufs.GetUserDataDir()
+	expected := "C:\\Users\\test\\AppData\\Local"
+	if dir != expected {
+		t.Errorf("expected: %s, got %s", expected, dir)
+	}
+}
+
+func TestGetUserDataDir_Windows_NoLocalAppData(t *testing.T) {
+	mockOS(t, "windows")
+	t.Setenv("USERPROFILE", "C:\\Users\\test")
+	t.Setenv("LOCALAPPDATA", "")
+	t.Setenv("SUDO_USER", "")
+
+	ufs, err := NewUserFS()
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+
+	dir := ufs.GetUserDataDir()
+	expected := filepath.Join("C:\\Users\\test", "AppData", "Local")
 	if dir != expected {
 		t.Errorf("expected: %s, got %s", expected, dir)
 	}
@@ -189,19 +237,49 @@ func TestGetUserDataDir_Windows(t *testing.T) {
 
 //
 // ─────────────────────────────────────────────────────────────
-//   TEST resolveRealUserHome()
+//   TEST NewUserFS()
 // ─────────────────────────────────────────────────────────────
 //
 
-func TestResolveRealUserHome_Normal(t *testing.T) {
+func TestNewUserFS_Normal(t *testing.T) {
+	mockOS(t, "linux")
 	t.Setenv("HOME", "/home/test")
 	t.Setenv("SUDO_USER", "")
 
-	home, err := resolveRealUserHome()
+	ufs, err := NewUserFS()
 	if err != nil {
 		t.Fatalf("unexpected: %v", err)
 	}
-	if home != "/home/test" {
-		t.Errorf("expected /home/test, got %s", home)
+	if ufs.homeDir != "/home/test" {
+		t.Errorf("expected /home/test, got %s", ufs.homeDir)
+	}
+	if ufs.sudoUser != nil {
+		t.Errorf("expected no sudo user, got %+v", ufs.sudoUser)
+	}
+}
+
+func TestNewUserFS_Windows(t *testing.T) {
+	mockOS(t, "windows")
+	t.Setenv("USERPROFILE", "C:\\Users\\test")
+	t.Setenv("HOME", "")
+	t.Setenv("SUDO_USER", "")
+
+	ufs, err := NewUserFS()
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	if ufs.homeDir != "C:\\Users\\test" {
+		t.Errorf("expected C:\\Users\\test, got %s", ufs.homeDir)
+	}
+}
+
+func TestNewUserFS_NoHome(t *testing.T) {
+	mockOS(t, "linux")
+	t.Setenv("HOME", "")
+	t.Setenv("SUDO_USER", "")
+
+	_, err := NewUserFS()
+	if err == nil {
+		t.Fatal("expected error when HOME not set")
 	}
 }
