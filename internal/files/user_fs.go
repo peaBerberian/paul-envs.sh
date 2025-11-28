@@ -1,6 +1,7 @@
 package files
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -118,11 +119,17 @@ func (u *UserFS) GetUserConfigDir() string {
 }
 
 // recursively copies a directory tree from src to dst
-// TODO: Pass context
-func (u *UserFS) CopyDirAsUser(src string, dst string) error {
+func (u *UserFS) CopyDirAsUser(ctx context.Context, src string, dst string) error {
 	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
+		}
+
+		// Check context cancellation
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
 		}
 
 		rel, err := filepath.Rel(src, path)
@@ -155,11 +162,8 @@ func (u *UserFS) CopyDirAsUser(src string, dst string) error {
 
 		// Set the right ownership if needed
 		if u.sudoUser != nil {
-			if err := os.Chown(target, u.sudoUser.uid, u.sudoUser.gid); err != nil {
-				return err
-			}
+			return os.Chown(target, u.sudoUser.uid, u.sudoUser.gid)
 		}
-
 		return nil
 	})
 }
