@@ -17,37 +17,41 @@ import (
 )
 
 // ParseAndPrompt parses command-line arguments and prompts for missing configuration
-func ParseAndPrompt(args []string, cons *console.Console, filestor *files.FileStore) (config.Config, bool, error) {
+func ParseAndPrompt(args []string, cons *console.Console, filestor *files.FileStore) (config.Config, error) {
 	if len(args) == 0 {
 		// TODO: Here prompt path to project dir?
-		return config.Config{}, false, errors.New("no project path provided. Use --help for more info")
+		return config.Config{}, errors.New("no project path provided. Use --help for more info")
 	}
 
 	projectPath, err := filepath.Abs(args[0])
 	if err != nil {
-		return config.Config{}, false, fmt.Errorf("invalid project path: %w", err)
+		return config.Config{}, fmt.Errorf("invalid project path: %w", err)
 	}
 
 	parsed, noPrompt, err := parseFlags(args[1:])
 	if err != nil {
-		return config.Config{}, false, err
+		return config.Config{}, err
+	}
+
+	if err := ensureProjectPath(projectPath, noPrompt, cons); err != nil {
+		return config.Config{}, err
 	}
 
 	// Build initial config
 	cfg, err := buildConfig(projectPath, parsed)
 	if err != nil {
-		return config.Config{}, false, err
+		return config.Config{}, err
 	}
 
 	// Validate project name
 	if err := validateProjectName(cfg.ProjectDestPath, filestor, cons); err != nil {
-		return config.Config{}, false, err
+		return config.Config{}, err
 	}
 
 	// Prompt for missing values if interactive
 	if !noPrompt {
 		if err := promptMissing(cons, &cfg); err != nil {
-			return config.Config{}, false, err
+			return config.Config{}, err
 		}
 	}
 
@@ -56,7 +60,7 @@ func ParseAndPrompt(args []string, cons *console.Console, filestor *files.FileSt
 		checkMiseRequirement(cons, &cfg)
 	}
 
-	return cfg, noPrompt, nil
+	return cfg, nil
 }
 
 // parsedFlags holds raw flag values
@@ -812,4 +816,18 @@ func promptVolumes(cons *console.Console) ([]string, error) {
 	}
 
 	return volumes, nil
+}
+
+func ensureProjectPath(path string, noPrompt bool, console *console.Console) error {
+	if _, err := os.Stat(path); os.IsNotExist(err) && !noPrompt {
+		console.Warn("Warning: Path %s does not exist", path)
+		confirm, err := console.AskYesNo("Create config anyway?", false)
+		if err != nil {
+			return fmt.Errorf("asking user confirmation failed: %w", err)
+		}
+		if !confirm {
+			return errors.New("project creation aborted by user")
+		}
+	}
+	return nil
 }

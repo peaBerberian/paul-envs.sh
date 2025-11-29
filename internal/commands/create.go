@@ -3,7 +3,6 @@ package commands
 import (
 	"errors"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 
@@ -15,12 +14,8 @@ import (
 )
 
 func Create(argsList []string, filestore *files.FileStore, console *console.Console) error {
-	cfg, noPrompt, err := args.ParseAndPrompt(argsList, console, filestore)
+	cfg, err := args.ParseAndPrompt(argsList, console, filestore)
 	if err != nil {
-		return err
-	}
-
-	if err := ensureProjectPath(cfg.ProjectHostPath, noPrompt, console); err != nil {
 		return err
 	}
 
@@ -79,20 +74,6 @@ func generateProjectFiles(cfg *config.Config, filestore *files.FileStore, consol
 	err := filestore.CreateProjectFiles(cfg.ProjectName, envData, composeData)
 	if err != nil {
 		return fmt.Errorf("failed to create project files: %w", err)
-	}
-	return nil
-}
-
-func ensureProjectPath(path string, noPrompt bool, console *console.Console) error {
-	if _, err := os.Stat(path); os.IsNotExist(err) && !noPrompt {
-		console.Warn("Warning: Path %s does not exist", path)
-		confirm, err := console.AskYesNo("Create config anyway?", false)
-		if err != nil {
-			return fmt.Errorf("asking user confirmation failed: %w", err)
-		}
-		if !confirm {
-			return errors.New("project creation aborted by user")
-		}
 	}
 	return nil
 }
