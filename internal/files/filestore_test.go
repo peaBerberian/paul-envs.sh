@@ -18,9 +18,6 @@ func TestNewFileStore(t *testing.T) {
 	if store.baseConfigDir == "" {
 		t.Error("baseConfigDir should not be empty")
 	}
-	if store.dotfilesDir == "" {
-		t.Error("dotfilesDir should not be empty")
-	}
 	if store.projectsDir == "" {
 		t.Error("projectsDir should not be empty")
 	}
@@ -30,7 +27,6 @@ func TestFileStore_PathHelpers(t *testing.T) {
 	store := &FileStore{
 		baseDataDir:   "/test/base",
 		baseConfigDir: "/test/config",
-		dotfilesDir:   "/test/config/dotfiles",
 		projectsDir:   "/test/base/projects",
 	}
 
@@ -45,8 +41,8 @@ func TestFileStore_PathHelpers(t *testing.T) {
 			expected: "/test/base/compose.yaml",
 		},
 		{
-			name:     "GetProjectDirBase",
-			fn:       store.GetProjectDirBase,
+			name:     "getProjectDirBase",
+			fn:       store.getProjectDirBase,
 			expected: "/test/base/projects",
 		},
 	}
@@ -65,7 +61,6 @@ func TestFileStore_GetProjectDir(t *testing.T) {
 	store := &FileStore{
 		baseDataDir:   "/test/base",
 		baseConfigDir: "/test/config",
-		dotfilesDir:   "/test/config/dotfiles",
 		projectsDir:   "/test/base/projects",
 	}
 
@@ -76,32 +71,30 @@ func TestFileStore_GetProjectDir(t *testing.T) {
 	}
 }
 
-func TestFileStore_GetComposeFilePathFor(t *testing.T) {
+func TestFileStore_GetProjectComposeFilePath(t *testing.T) {
 	store := &FileStore{
 		baseDataDir:   "/test/base",
 		baseConfigDir: "/test/config",
-		dotfilesDir:   "/test/config/dotfiles",
 		projectsDir:   "/test/base/projects",
 	}
 
-	got := store.GetComposeFilePathFor("myproject")
+	got := store.GetProjectComposeFilePath("myproject")
 	expected := "/test/base/projects/myproject/compose.yaml"
 	if got != expected {
-		t.Errorf("GetComposeFilePathFor() = %v, want %v", got, expected)
+		t.Errorf("GetProjectComposeFilePath() = %v, want %v", got, expected)
 	}
 }
 
-func TestFileStore_GetEnvFilePathFor(t *testing.T) {
+func TestFileStore_GetProjectEnvFilePath(t *testing.T) {
 	store := &FileStore{
 		baseDataDir:   "/test/base",
 		baseConfigDir: "/test/config",
-		dotfilesDir:   "/test/config/dotfiles",
 		projectsDir:   "/test/base/projects",
 	}
 
-	got := store.GetEnvFilePathFor("myproject")
+	got := store.GetProjectEnvFilePath("myproject")
 	expected := "/test/base/projects/myproject/.env"
 	if got != expected {
-		t.Errorf("GetEnvFilePathFor() = %v, want %v", got, expected)
+		t.Errorf("GetProjectEnvFilePath() = %v, want %v", got, expected)
 	}
 }

@@ -59,22 +59,15 @@ func Run(ctx context.Context, args []string, filestore *files.FileStore, console
 		return err
 	}
 
-	composeFile := filestore.GetComposeFilePathFor(name)
-	envFile := filestore.GetEnvFilePathFor(name)
-	if _, err := os.Stat(composeFile); os.IsNotExist(err) {
-		return fmt.Errorf("Project '%s' not found\nHint: Use 'paul-envs list' to see available projects", name)
+	project, err := filestore.GetProject(name)
+	if err != nil {
+		if !filestore.DoesProjectExist(name) {
+			return fmt.Errorf("project '%s' not found\nHint: Use 'paul-envs list' to see available projects", name)
+		}
+		return fmt.Errorf("failed to obtain information on project '%s': %w", name, err)
 	}
-	if _, err := os.Stat(envFile); os.IsNotExist(err) {
-		return fmt.Errorf("Project '%s' not found\nHint: Use 'paul-envs list' to see available projects", name)
-	}
-
-	args = []string{"compose", "-f", baseCompose, "-f", composeFile, "--env-file", envFile, "run", "--rm", "paulenv"}
+	args = []string{"compose", "-f", baseCompose, "-f", project.ComposeFilePath, "--env-file", project.EnvFilePath, "run", "--rm", "paulenv"}
 	args = append(args, cmdArgs...)
-
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-
 	cmd := exec.CommandContext(ctx, "docker", args...)
 	cmd.Env = append(os.Environ(), "COMPOSE_PROJECT_NAME=paulenv-"+name)
 	cmd.Stdin = os.Stdin

@@ -21,6 +21,7 @@ func Build(ctx context.Context, args []string, filestore *files.FileStore, conso
 		return err
 	}
 
+	// TODO: Remove this check, should not be needed with a proper `getProjectName`
 	if err := ensureBaseComposeExists(filestore); err != nil {
 		return err
 	}
@@ -30,11 +31,14 @@ func Build(ctx context.Context, args []string, filestore *files.FileStore, conso
 		return err
 	}
 
-	if err := validateProjectFiles(filestore, name); err != nil {
+	if err := utils.ValidateProjectName(name); err != nil {
 		return err
 	}
+	if !filestore.DoesProjectExist(name) {
+		return fmt.Errorf("project '%s' not found\nHint: Use 'paul-envs list' to see available projects", name)
+	}
 	console.Info("Preparing dotfiles...")
-	tmpDotfilesDir, err := filestore.CreateDotfilesDirFor(ctx, name)
+	tmpDotfilesDir, err := filestore.CreateProjectDotfilesDir(ctx, name)
 	if err != nil {
 		os.RemoveAll(tmpDotfilesDir)
 		return fmt.Errorf("failed to prepare dotfiles for the container: %w", err)
@@ -66,6 +70,7 @@ func getProjectName(args []string, filestore *files.FileStore, console *console.
 		return args[0], nil
 	}
 
+	// TODO: Re-using list here is bad
 	if err := List(filestore, console); err != nil {
 		return "", fmt.Errorf("failed to list projects: %w", err)
 	}
@@ -80,18 +85,6 @@ func getProjectName(args []string, filestore *files.FileStore, console *console.
 	return name, nil
 }
 
-func validateProjectFiles(filestore *files.FileStore, name string) error {
-	composeFile := filestore.GetComposeFilePathFor(name)
-	envFile := filestore.GetEnvFilePathFor(name)
-	if _, err := os.Stat(composeFile); os.IsNotExist(err) {
-		return fmt.Errorf("project '%s' not found; use 'paul-envs list' to see available projects", name)
-	}
-	if _, err := os.Stat(envFile); os.IsNotExist(err) {
-		return fmt.Errorf("project '%s' not found; use 'paul-envs list' to see available projects", name)
-	}
-	return utils.ValidateProjectName(name)
-}
-
 func createSharedCacheVolume(ctx context.Context) error {
 	cmd := exec.CommandContext(ctx, "docker", "volume", "create", "paulenv-shared-cache")
 	cmd.Stderr = os.Stderr
@@ -103,15 +96,16 @@ func createSharedCacheVolume(ctx context.Context) error {
 
 func dockerComposeBuild(ctx context.Context, filestore *files.FileStore, name string, dotfilesDir string) error {
 	base := filestore.GetBaseComposeFilePath()
-	compose := filestore.GetComposeFilePathFor(name)
-	env := filestore.GetEnvFilePathFor(name)
-
 	relativeDotfilesDir, err := filepath.Rel(base, dotfilesDir)
 	if err != nil {
 		return fmt.Errorf("failed to construct dotfiles relative path: %w", err)
 	}
 
-	cmd := exec.CommandContext(ctx, "docker", "compose", "-f", base, "-f", compose, "--env-file", env, "build")
+	project, err := filestore.GetProject(name)
+	if err != nil {
+		return fmt.Errorf("failed to obtain information on project '%s': %w", name, err)
+	}
+	cmd := exec.CommandContext(ctx, "docker", "compose", "-f", base, "-f", project.ComposeFilePath, "--env-file", project.EnvFilePath, "build")
 	envVars := append(os.Environ(),
 		"COMPOSE_PROJECT_NAME=paulenv-"+name,
 		"DOTFILES_DIR="+relativeDotfilesDir,

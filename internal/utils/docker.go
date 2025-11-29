@@ -20,7 +20,7 @@ func CheckDockerPermissions(ctx context.Context) error {
 		if strings.Contains(stderrStr, "permission denied") ||
 			strings.Contains(stderrStr, "access denied") ||
 			strings.Contains(stderrStr, "dial unix") && strings.Contains(stderrStr, "connect: permission denied") {
-			return fmt.Errorf("Permission denied. Please run with elevated privileges:\n\n%s", getSudoCommand())
+			return fmt.Errorf("permission denied. Please run with elevated privileges:\n\n%s", getSudoCommand())
 		}
 		return fmt.Errorf("failed to connect to Docker: %w\n%s", err, stderrStr)
 	}

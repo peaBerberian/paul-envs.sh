@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -23,6 +24,8 @@ import (
 //go:embed embeds/*
 var assets embed.FS
 
+// Data needed to construct a project's `.env` file, which will list environment
+// variables
 type EnvTemplateData struct {
 	ProjectID       string
 	ProjectDestPath string
@@ -49,6 +52,8 @@ type EnvTemplateData struct {
 	GitEmail        string
 }
 
+// Data needed to construct a project's `compose.yaml` file, listing mounted
+// ports, volumes...
 type ComposeTemplateData struct {
 	ProjectName string
 	Ports       []uint16
@@ -57,14 +62,22 @@ type ComposeTemplateData struct {
 	Volumes     []string
 }
 
-// projectInfo holds the parsed values from the project.info file
+// Holds the parsed values from the `project.info` file associated to each project
 type projectInfo struct {
-	version           utils.Version
+	// The version of the `project.info` file
+	version utils.Version
+	// The Dockerfile version it has been created for.
 	dockerfileVersion utils.Version
-	buildEnvHash      string
-	buildComposeHash  string
+	// The hash of the `.env` file the last time the project has been built
+	buildEnvHash string
+	// The hash of the `compose.yaml` file the last time the project has been built
+	buildComposeHash string
+	lastBuildTs      *uint32
+	lastRunTs        *uint32
 }
 
+// Create the directory and all files needed for the given project name, with
+// the configuration given.
 func (f *FileStore) CreateProjectFiles(
 	projectName string,
 	envTplData EnvTemplateData,
@@ -96,8 +109,9 @@ func (f *FileStore) CreateProjectFiles(
 	}
 
 	envBytes := buf.Bytes()
-	envHash := utils.BufferHash(envBytes)
-	if err := f.userFS.WriteFileAsUser(f.GetEnvFilePathFor(projectName), envBytes, 0644); err != nil {
+	// TODO: On build only
+	// envHash := utils.BufferHash(envBytes)
+	if err := f.userFS.WriteFileAsUser(f.GetProjectEnvFilePath(projectName), envBytes, 0644); err != nil {
 		return fmt.Errorf("write env file: %w", err)
 	}
 
@@ -119,8 +133,9 @@ func (f *FileStore) CreateProjectFiles(
 	}
 
 	composeBytes := buf.Bytes()
-	composeHash := utils.BufferHash(composeBytes)
-	if err := f.userFS.WriteFileAsUser(f.GetComposeFilePathFor(projectName), composeBytes, 0644); err != nil {
+	// TODO: On build only
+	// composeHash := utils.BufferHash(composeBytes)
+	if err := f.userFS.WriteFileAsUser(f.GetProjectComposeFilePath(projectName), composeBytes, 0644); err != nil {
 		return fmt.Errorf("write compose file: %w", err)
 	}
 
@@ -139,115 +154,15 @@ func (f *FileStore) CreateProjectFiles(
 	pInfo := projectInfo{
 		version:           projectInfoVersion,
 		dockerfileVersion: dockerfileVersion,
-		buildEnvHash:      envHash,
-		buildComposeHash:  composeHash,
+		buildEnvHash:      "",
+		buildComposeHash:  "",
+		lastRunTs:         nil,
+		lastBuildTs:       nil,
 	}
 
 	if err := f.writeProjectInfo(projectName, pInfo); err != nil {
 		return fmt.Errorf("impossibility to write 'project.info' file: %w", err)
 	}
-	return nil
-}
-
-// ReadProjectInfo reads the project.info file and returns a populated projectInfo struct.
-// TODO: call it
-func (filestore *FileStore) CheckProject(projectName string) error {
-	file, err := os.Open(filestore.getProjectInfoFilePathFor(projectName))
-	if err != nil {
-		return fmt.Errorf("could not open project.info: %w", err)
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-
-	var fileVersion *utils.Version = nil
-	var dockerfileVersion *utils.Version = nil
-	var buildEnvHash = ""
-	var buildComposeHash = ""
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		if vStr, ok := strings.CutPrefix(line, "VERSION="); ok {
-			v, err := utils.ParseVersion(vStr)
-			if err != nil {
-				return fmt.Errorf("invalid 'project.info' version '%s': %w", vStr, err)
-			}
-
-			piVersion, err := utils.ParseVersion(constants.ProjectInfoVersion)
-			if err != nil {
-				return fmt.Errorf("embedded project.info version is wrong '%s': %w", constants.ProjectInfoVersion, err)
-			}
-			if !v.IsCompatibleWithBase(piVersion) {
-				return fmt.Errorf("this project is incompatible with the current version of paul-envs")
-			}
-			fileVersion = &v
-			continue
-		}
-		if vStr, ok := strings.CutPrefix(line, "DOCKERFILE_VERSION="); ok {
-			v, err := utils.ParseVersion(vStr)
-			if err != nil {
-				return fmt.Errorf("invalid 'project.info' Dockerfile version '%s': %w", vStr, err)
-			}
-
-			currBaseVersion, err := utils.ParseVersion(constants.FileVersion)
-			if err != nil {
-				return fmt.Errorf("embedded file version is wrong '%s': %w", constants.FileVersion, err)
-			}
-			if !v.IsCompatibleWithBase(currBaseVersion) {
-				return fmt.Errorf("this project is incompatible with our Dockerfile")
-			}
-
-			dockerfileVersion = &v
-			continue
-		}
-		if v, ok := strings.CutPrefix(line, "BUILD_ENV="); ok {
-			buildEnvHash = v
-			hash, err := utils.FileHash(filestore.GetEnvFilePathFor(projectName))
-			if err != nil {
-				// TODO:: Caller should then propose to re-build the project
-				return fmt.Errorf("error hashing project's env file: %w", err)
-			}
-			if hash != buildEnvHash {
-				// TODO:: Caller should then propose to re-build the project
-				return fmt.Errorf(".env file hash does not match its last build")
-			}
-			continue
-		}
-		if v, ok := strings.CutPrefix(line, "BUILD_COMPOSE="); ok {
-			buildComposeHash = v
-			hash, err := utils.FileHash(filestore.GetComposeFilePathFor(projectName))
-			if err != nil {
-				// TODO:: Caller should then propose to re-build the project
-				return fmt.Errorf("error hashing project's compose file: %w", err)
-			}
-			if hash != buildEnvHash {
-				// TODO:: Caller should then propose to re-build the project
-				return fmt.Errorf("compose.yaml file hash does not match its last build")
-			}
-			continue
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("error reading project.info: %w", err)
-	}
-
-	if fileVersion == nil {
-		return fmt.Errorf("error reading project.info: no VERSION key")
-	}
-
-	if dockerfileVersion == nil {
-		return fmt.Errorf("error reading project.info: no DOCKERFILE_VERSION key")
-	}
-
-	if buildEnvHash == "" {
-		return fmt.Errorf("error reading project.info: no BUILD_ENV key")
-	}
-
-	if buildComposeHash == "" {
-		return fmt.Errorf("error reading project.info: no BUILD_COMPOSE key")
-	}
-
 	return nil
 }
 
@@ -309,6 +224,11 @@ func (f *FileStore) ensureCreatedBaseFiles() error {
 	} else if err != nil {
 		return err
 	}
+
+	// Last, the placeholder file
+	if err := f.userFS.MkdirAsUser(filepath.Join(f.baseDataDir, "placeholder"), 0755); err != nil {
+		return fmt.Errorf("create empty dotfiles placeholder: %w", err)
+	}
 	return nil
 }
 
@@ -323,15 +243,27 @@ func (f *FileStore) writeProjectInfo(projectName string, pInfo projectInfo) erro
 
 func formatProjectInfo(pInfo projectInfo) ([]byte, error) {
 	var buf bytes.Buffer
+	lastBuildTs := ""
+	if pInfo.lastBuildTs != nil {
+		lastBuildTs = fmt.Sprint(*pInfo.lastBuildTs)
+	}
+	lastRunTs := ""
+	if pInfo.lastRunTs != nil {
+		lastRunTs = fmt.Sprint(*pInfo.lastRunTs)
+	}
 	_, err := fmt.Fprintf(&buf,
 		"VERSION=%s\n"+
 			"DOCKERFILE_VERSION=%s\n"+
 			"BUILD_ENV=%s\n"+
-			"BUILD_COMPOSE=%s\n",
+			"BUILD_COMPOSE=%s\n"+
+			"LAST_BUILD_TS=%s\n"+
+			"LAST_RUN_TS=%s\n",
 		pInfo.version.ToString(),
 		pInfo.dockerfileVersion.ToString(),
 		pInfo.buildEnvHash,
 		pInfo.buildComposeHash,
+		lastBuildTs,
+		lastRunTs,
 	)
 
 	if err != nil {
@@ -339,4 +271,180 @@ func formatProjectInfo(pInfo projectInfo) ([]byte, error) {
 	}
 
 	return buf.Bytes(), nil
+}
+
+// ReadProjectInfo reads the project.info file and returns a populated projectInfo struct.
+func (filestore *FileStore) ReadProjectInfo(projectName string) (projectInfo, error) {
+	file, err := os.Open(filestore.getProjectInfoFilePathFor(projectName))
+	if err != nil {
+		return projectInfo{}, fmt.Errorf("could not open project.info: %w", err)
+	}
+	defer file.Close()
+
+	var pInfo projectInfo
+	scanner := bufio.NewScanner(file)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		if vStr, ok := strings.CutPrefix(line, "VERSION="); ok {
+			v, err := utils.ParseVersion(vStr)
+			if err != nil {
+				return projectInfo{}, fmt.Errorf("invalid 'project.info' version '%s': %w", vStr, err)
+			}
+
+			pInfo.version = v
+			continue
+		}
+		if vStr, ok := strings.CutPrefix(line, "DOCKERFILE_VERSION="); ok {
+			v, err := utils.ParseVersion(vStr)
+			if err != nil {
+				return projectInfo{}, fmt.Errorf("invalid 'project.info' Dockerfile version '%s': %w", vStr, err)
+			}
+
+			pInfo.dockerfileVersion = v
+			continue
+		}
+		if v, ok := strings.CutPrefix(line, "BUILD_ENV="); ok {
+			pInfo.buildEnvHash = v
+			continue
+		}
+		if v, ok := strings.CutPrefix(line, "BUILD_COMPOSE="); ok {
+			pInfo.buildComposeHash = v
+			continue
+		}
+		if v, ok := strings.CutPrefix(line, "LAST_BUILD_TS="); ok {
+			if v == "" {
+				pInfo.lastBuildTs = nil
+			} else {
+				u, err := strconv.ParseUint(v, 10, 32)
+				if err != nil {
+					return projectInfo{}, fmt.Errorf("failed to parse LAST_BUILD_TS: %w", err)
+				}
+				result := uint32(u)
+				pInfo.lastBuildTs = &result
+			}
+			continue
+		}
+		if v, ok := strings.CutPrefix(line, "LAST_RUN_TS="); ok {
+			if v == "" {
+				pInfo.lastBuildTs = nil
+			} else {
+				u, err := strconv.ParseUint(v, 10, 32)
+				if err != nil {
+					return projectInfo{}, fmt.Errorf("failed to parse LAST_RUN_TS: %w", err)
+				}
+				result := uint32(u)
+				pInfo.lastRunTs = &result
+			}
+			continue
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return projectInfo{}, fmt.Errorf("error reading project.info: %w", err)
+	}
+
+	return pInfo, nil
+}
+
+// TODO:
+func (filestore *FileStore) CheckProject(projectName string) error {
+	file, err := os.Open(filestore.getProjectInfoFilePathFor(projectName))
+	if err != nil {
+		return fmt.Errorf("could not open project.info: %w", err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+
+	var fileVersion *utils.Version = nil
+	var dockerfileVersion *utils.Version = nil
+	var buildEnvHash = ""
+	var buildComposeHash = ""
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		if vStr, ok := strings.CutPrefix(line, "VERSION="); ok {
+			v, err := utils.ParseVersion(vStr)
+			if err != nil {
+				return fmt.Errorf("invalid 'project.info' version '%s': %w", vStr, err)
+			}
+
+			piVersion, err := utils.ParseVersion(constants.ProjectInfoVersion)
+			if err != nil {
+				return fmt.Errorf("embedded project.info version is wrong '%s': %w", constants.ProjectInfoVersion, err)
+			}
+			if !v.IsCompatibleWithBase(piVersion) {
+				return fmt.Errorf("this project is incompatible with the current version of paul-envs")
+			}
+			fileVersion = &v
+			continue
+		}
+		if vStr, ok := strings.CutPrefix(line, "DOCKERFILE_VERSION="); ok {
+			v, err := utils.ParseVersion(vStr)
+			if err != nil {
+				return fmt.Errorf("invalid 'project.info' Dockerfile version '%s': %w", vStr, err)
+			}
+
+			currBaseVersion, err := utils.ParseVersion(constants.FileVersion)
+			if err != nil {
+				return fmt.Errorf("embedded file version is wrong '%s': %w", constants.FileVersion, err)
+			}
+			if !v.IsCompatibleWithBase(currBaseVersion) {
+				return fmt.Errorf("this project is incompatible with our Dockerfile")
+			}
+
+			dockerfileVersion = &v
+			continue
+		}
+		if v, ok := strings.CutPrefix(line, "BUILD_ENV="); ok {
+			buildEnvHash = v
+			hash, err := utils.FileHash(filestore.GetProjectEnvFilePath(projectName))
+			if err != nil {
+				// TODO:: Caller should then propose to re-build the project
+				return fmt.Errorf("error hashing project's env file: %w", err)
+			}
+			if hash != buildEnvHash {
+				// TODO:: Caller should then propose to re-build the project
+				return fmt.Errorf(".env file hash does not match its last build")
+			}
+			continue
+		}
+		if v, ok := strings.CutPrefix(line, "BUILD_COMPOSE="); ok {
+			buildComposeHash = v
+			hash, err := utils.FileHash(filestore.GetProjectComposeFilePath(projectName))
+			if err != nil {
+				// TODO:: Caller should then propose to re-build the project
+				return fmt.Errorf("error hashing project's compose file: %w", err)
+			}
+			if hash != buildEnvHash {
+				// TODO:: Caller should then propose to re-build the project
+				return fmt.Errorf("compose.yaml file hash does not match its last build")
+			}
+			continue
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("error reading project.info: %w", err)
+	}
+
+	if fileVersion == nil {
+		return fmt.Errorf("error reading project.info: no VERSION key")
+	}
+
+	if dockerfileVersion == nil {
+		return fmt.Errorf("error reading project.info: no DOCKERFILE_VERSION key")
+	}
+
+	if buildEnvHash == "" {
+		return fmt.Errorf("error reading project.info: no BUILD_ENV key")
+	}
+
+	if buildComposeHash == "" {
+		return fmt.Errorf("error reading project.info: no BUILD_COMPOSE key")
+	}
+
+	return nil
 }

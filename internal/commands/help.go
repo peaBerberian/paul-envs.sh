@@ -6,6 +6,7 @@ import (
 )
 
 func Help(filestore *files.FileStore, console *console.Console) {
+	// TODO: only list commands and have `--help` flags per command
 	console.WriteLn(`paul-envs - Development Environment Manager
 
 Usage:
@@ -106,10 +107,6 @@ Full Configuration Example:
     --port 3000 \
     --port 5432 \
     --volume ~/.git-credentials:/home/dev/.git-credentials:ro
-
-Location of stored files created by this tool:
-  Base compose       : ` + filestore.GetBaseComposeFilePath() + `
-  Projects directory : ` + filestore.GetProjectDirBase() + `
 
 NOTE: To start a guided prompt, you can also just run:
   paul-envs interactive

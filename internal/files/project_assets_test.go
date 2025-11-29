@@ -19,7 +19,6 @@ func TestFileStore_CreateProjectFiles(t *testing.T) {
 		},
 		baseDataDir:   baseDataDir,
 		baseConfigDir: configDir,
-		dotfilesDir:   filepath.Join(configDir, "dotfiles"),
 		projectsDir:   filepath.Join(baseDataDir, "projects"),
 	}
 
@@ -63,11 +62,11 @@ func TestFileStore_CreateProjectFiles(t *testing.T) {
 	}
 
 	// Verify files exists
-	envFile := store.GetEnvFilePathFor("testproject")
+	envFile := store.GetProjectEnvFilePath("testproject")
 	if _, err := os.Stat(envFile); os.IsNotExist(err) {
 		t.Fatal("env file was not created")
 	}
-	composeFile := store.GetComposeFilePathFor("testproject")
+	composeFile := store.GetProjectComposeFilePath("testproject")
 	if _, err := os.Stat(composeFile); os.IsNotExist(err) {
 		t.Fatal("compose file was not created")
 	}
@@ -157,7 +156,6 @@ func TestFileStore_CreateProjectComposeFiles(t *testing.T) {
 		},
 		baseDataDir:   baseDataDir,
 		baseConfigDir: configDir,
-		dotfilesDir:   filepath.Join(configDir, "dotfiles"),
 		projectsDir:   filepath.Join(baseDataDir, "projects"),
 	}
 
@@ -199,7 +197,7 @@ func TestFileStore_CreateProjectComposeFiles(t *testing.T) {
 		t.Fatalf("CreateProjectFiles() error = %v", err)
 	}
 
-	envCtnt, err := os.ReadFile(store.GetEnvFilePathFor("testproject"))
+	envCtnt, err := os.ReadFile(store.GetProjectEnvFilePath("testproject"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,7 +212,7 @@ func TestFileStore_CreateProjectComposeFiles(t *testing.T) {
 		}
 	}
 
-	composeCtnt, err := os.ReadFile(store.GetComposeFilePathFor("testproject"))
+	composeCtnt, err := os.ReadFile(store.GetProjectComposeFilePath("testproject"))
 	if err != nil {
 		t.Fatal(err)
 	}

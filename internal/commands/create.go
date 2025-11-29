@@ -36,6 +36,8 @@ func generateProjectFiles(cfg *config.Config, filestore *files.FileStore) error 
 		return errors.New("project name already taken")
 	}
 
+	// TODO: Should those template definitions be moved to the `FileStore` code?
+	// It could only take the Config as argument
 	envData := files.EnvTemplateData{
 		ProjectID:       utils.EscapeEnvValue(cfg.ProjectName),
 		ProjectDestPath: utils.EscapeEnvValue(cfg.ProjectDestPath),
@@ -82,8 +84,9 @@ func printNextSteps(cfg *config.Config, dotfilesDir string, filestore *files.Fil
 	console.WriteLn("")
 	console.WriteLn("Next steps:")
 	console.WriteLn("  1. Review/edit configuration:")
-	console.WriteLn("     - %s", filestore.GetEnvFilePathFor(cfg.ProjectName))
-	console.WriteLn("     - %s", filestore.GetComposeFilePathFor(cfg.ProjectName))
+	// TODO: rely on just `GetProject` instead
+	console.WriteLn("     - %s", filestore.GetProjectEnvFilePath(cfg.ProjectName))
+	console.WriteLn("     - %s", filestore.GetProjectComposeFilePath(cfg.ProjectName))
 	console.WriteLn("  2. Put the $HOME dotfiles you want to port in:")
 	console.WriteLn("     - %s", dotfilesDir)
 	console.WriteLn("  3. Build the environment:")
