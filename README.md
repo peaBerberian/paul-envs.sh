@@ -411,7 +411,8 @@ Along the mounted project, those are the only directories which are persisted.
 
 ## TODO:
 
-- Check directories first?
+- Check existence of directory first in create command?
+- Check if already built on run
 - lockfile versionning
 - executable in github release on tag
 - update project name

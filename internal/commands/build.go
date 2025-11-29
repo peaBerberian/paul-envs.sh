@@ -50,7 +50,7 @@ func Build(ctx context.Context, args []string, filestore *files.FileStore, conso
 	}
 
 	console.Success("Built project '%s'", name)
-	return resetVolumes(ctx, filestore, name, console)
+	return nil
 }
 
 func ensureBaseComposeExists(filestore *files.FileStore) error {
@@ -121,23 +121,4 @@ func dockerComposeBuild(ctx context.Context, filestore *files.FileStore, name st
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
-}
-
-func resetVolumes(ctx context.Context, filestore *files.FileStore, name string, console *console.Console) error {
-	console.WriteLn("\nResetting persistent volumes...")
-	base := filestore.GetBaseComposeFilename()
-	compose := filestore.GetComposeFilePathFor(name)
-	env := filestore.GetEnvFilePathFor(name)
-
-	cmd := exec.CommandContext(ctx, "docker", "compose", "-f", base, "-f", compose, "--env-file", env,
-		"--profile", "reset", "up", "reset-cache", "reset-local")
-	cmd.Env = append(os.Environ(), "COMPOSE_PROJECT_NAME=paulenv-"+name)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to reset volumes: %w", err)
-	}
-	console.Success("Volumes reset complete")
-	return nil
 }

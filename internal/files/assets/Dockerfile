@@ -47,6 +47,7 @@ RUN if id -u ubuntu >/dev/null 2>&1; then userdel -r ubuntu; fi && \
 
 USER ${USERNAME}
 
+ENV USERNAME=${USERNAME}
 ENV SHELL=/usr/bin/${USER_SHELL}
 
 # Set-up persisted directories
@@ -426,20 +427,19 @@ RUN if [ "$ENABLE_SSH" = "true" ]; then \
     chown ${USERNAME}:${USERNAME} /home/${USERNAME}/.ssh; \
   fi
 
-# Create entrypoint script that conditionally starts SSH
-RUN echo '#!/usr/bin/env bash' > /usr/local/bin/docker-entrypoint.sh && \
-    echo 'if [[ -d /var/run/sshd ]] && ! pgrep -x sshd >/dev/null; then' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo '    /usr/sbin/sshd -D &' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo '    if [[ -t 0 ]] && [[ $# -eq 0 ]]; then' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo '        IP=$(hostname -I | awk "{print \$1}")' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo '        echo "NOTE: Listening for ssh connections at '"${USERNAME}"'@${IP}:22"' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo '    fi' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'fi' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'if [[ $# -eq 0 ]]; then' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo '    exec su '"${USERNAME}"' -s /usr/bin/'"${USER_SHELL}" >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'else' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo '    exec runuser -u '"${USERNAME}"' -- "$@"' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'fi' >> /usr/local/bin/docker-entrypoint.sh && \
-    chmod +x /usr/local/bin/docker-entrypoint.sh
+# Copy initial cache to another known place so it's not replaced by our volume
+RUN cp -a /home/${USERNAME}/.container-cache/. /home/${USERNAME}/.initial-cache/
+RUN cp -a /home/${USERNAME}/.container-local/. /home/${USERNAME}/.initial-local/
 
+# ENV needed by the entrypoint
+ENV INITIAL_CACHE_DIR=/home/${USERNAME}/.initial-cache
+ENV INITIAL_LOCAL_DIR=/home/${USERNAME}/.initial-local
+ENV DOCKER_USERNAME=${USERNAME}
+ENV USER_SHELL=${SHELL}
+ENV DOCKER_CACHE_DIR=/home/${USERNAME}/.container-cache/
+ENV DOCKER_LOCAL_DIR=/home/${USERNAME}/.container-local/
+
+# Add entrypoint script (conditionally starts SSH, init cache etc.)
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

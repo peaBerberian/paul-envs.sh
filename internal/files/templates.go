@@ -126,6 +126,24 @@ func (f *FileStore) ensureCreatedBaseFiles() error {
 		return err
 	}
 
+	baseEntryPointPath := filepath.Join(f.baseDataDir, "docker-entrypoint.sh")
+	_, err = os.Stat(baseEntryPointPath)
+	if os.IsNotExist(err) {
+		entrypointData, err := assets.ReadFile("assets/docker-entrypoint.sh")
+		if err != nil {
+			return err
+		}
+
+		err = f.userFS.WriteFileAsUser(
+			filepath.Join(f.baseDataDir, "docker-entrypoint.sh"),
+			entrypointData, 0644)
+		if err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
+	}
+
 	// Then write base compose if needed
 	baseComposePath := filepath.Join(f.baseDataDir, "Compose")
 	_, err = os.Stat(baseComposePath)

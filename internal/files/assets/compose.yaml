@@ -14,10 +14,6 @@
 # ```sh
 # docker volume create paulenv-shared-cache 2>/dev/null || true
 # ``
-# And after a `build`, to initialize persisted volumes:
-# ```sh
-# `docker compose --profile reset up reset-cache reset-local`
-# ```
 #
 # If you don't mind running the `paul-envs` binary, none of this is necessary,
 # the `paul-envs` tool extends this compose.yaml file into other more refined
@@ -155,48 +151,6 @@ services:
       # public key like so:
       # - ~/.ssh/PATH_TO_YOUR_KEY.pub:/etc/ssh/authorized_keys/${USERNAME}:ro
     working_dir: /home/${USERNAME:-dev}/projects/${PROJECT_DIRNAME}
-
-  # Reset cache directory to its state at build-time.
-  # The "cache directory" corresponds to cached data such as the one for
-  # installed npm/yarn packages.
-  # It can be shared through multiple containers simultaneously relatively safely.
-  reset-cache:
-    image: paulenv:${PROJECT_ID:-latest}
-    pull_policy: never
-    user: root
-    command: >
-      mkdir -p /mnt/cache &&
-             sh -c "cp -a /home/${USERNAME}/.container-cache/. /mnt/cache/ &&
-             chown -R ${HOST_UID}:${HOST_GID} /mnt/cache"
-    volumes:
-      - shared-cache:/mnt/cache
-    environment:
-      - USERNAME=${USERNAME:-dev}
-      - HOST_UID=${HOST_UID:-1000}
-      - HOST_GID=${HOST_GID:-1000}
-    profiles: ["reset"]
-
-  # Reset local directory to its state at build-time.
-  # The "local directory" corresponds roughly to the `XDG_DATA_HOME` and
-  # `XDG_STATE_HOME` directories (e.g. shell history, neovim plugins, tool data
-  # and database etc.)
-  # This volume is more concurrency-sensible and is thus mounted as separate
-  # distinct volumes on multiple simultaneous containers (one per project).
-  reset-local:
-    image: paulenv:${PROJECT_ID:-latest}
-    pull_policy: never
-    user: root
-    command: >
-      mkdir -p /mnt/local &&
-             sh -c "cp -a /home/${USERNAME}/.container-local/. /mnt/local/ &&
-             chown -R ${HOST_UID}:${HOST_GID} /mnt/local"
-    volumes:
-      - local-state:/mnt/local
-    environment:
-      - USERNAME=${USERNAME:-dev}
-      - HOST_UID=${HOST_UID:-1000}
-      - HOST_GID=${HOST_GID:-1000}
-    profiles: ["reset"]
 
 volumes:
   shared-cache:
