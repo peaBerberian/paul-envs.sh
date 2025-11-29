@@ -20,16 +20,26 @@ var detectOS = func() string {
 	return runtime.GOOS
 }
 
+// Allows to perform filesystem operations setting the current user as the
+// owner. The current user may be running sudo to run as root, in which
+// case we try to set permission as the sudo's user
 type UserFS struct {
-	homeDir  string
+	// The home directory where the user's files reside
+	homeDir string
+	// Only set if it has been detected that the user is running under `sudo`
 	sudoUser *sudoUser
 }
 
+// Information linked to a user running sudo
 type sudoUser struct {
+	// The `uid` of the user running sudo
 	uid int
+	// The `gid` of the user running sudo
 	gid int
 }
 
+// Create a new `UserFS`, allowing to perform operations on the filesystem as
+// the current user (who may be running sudo).
 func NewUserFS() (*UserFS, error) {
 	sudoUserEnv := os.Getenv("SUDO_USER")
 	if geteuid() != 0 || sudoUserEnv == "" {
@@ -65,20 +75,49 @@ func NewUserFS() (*UserFS, error) {
 	}, nil
 }
 
+// Create a directory with the associated file permissions and the set the
+// current user as the owner
 func (u *UserFS) MkdirAsUser(path string, perm os.FileMode) error {
+	existed := true
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		existed = false
+	}
 	if err := os.MkdirAll(path, perm); err != nil {
 		return err
 	}
-	return u.chownIfNeeded(path)
+	if err := u.chownIfNeeded(path); err != nil {
+		if !existed {
+			// NOTE: this is not perfect as this does not clean-up the potential
+			// parent directories that have been created under `MkdirAll`...
+			// Maybe a TODO for later.
+			os.RemoveAll(path)
+		}
+		return err
+	}
+	return nil
 }
 
+// Create a file with the associated file permissions and the set the
+// current user as the owner
 func (u *UserFS) WriteFileAsUser(path string, data []byte, perm os.FileMode) error {
+	existed := true
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		existed = false
+	}
 	if err := os.WriteFile(path, data, perm); err != nil {
 		return err
 	}
-	return u.chownIfNeeded(path)
+	if err := u.chownIfNeeded(path); err != nil {
+		if !existed {
+			os.Remove(path)
+		}
+		return err
+	}
+	return nil
 }
 
+// Returns the "data" directory associated with this user, where application
+// data can reside.
 func (u *UserFS) GetUserDataDir() string {
 	switch detectOS() {
 	case "windows":
@@ -101,6 +140,8 @@ func (u *UserFS) GetUserDataDir() string {
 	}
 }
 
+// Returns the "config" directory associated with this user, where application
+// configuration, that the user can update, can reside.
 func (u *UserFS) GetUserConfigDir() string {
 	switch detectOS() {
 	case "windows":
@@ -124,7 +165,8 @@ func (u *UserFS) GetUserConfigDir() string {
 	}
 }
 
-// recursively copies a directory tree from src to dst
+// Recursively copies a directory tree from src to dst and set the user as the
+// owner of dst files
 func (u *UserFS) CopyDirAsUser(ctx context.Context, src, dst string) error {
 	return filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
