@@ -19,20 +19,20 @@ func Create(argsList []string, filestore *files.FileStore, console *console.Cons
 		return err
 	}
 
-	if err := generateProjectFiles(&cfg, filestore, console); err != nil {
+	if err := generateProjectFiles(&cfg, filestore); err != nil {
+		return err
+	}
+	dotfilesDir, err := filestore.InitGlobalDotfilesDir()
+	if err != nil {
 		return err
 	}
 
-	if err := filestore.CreateDotfilesDirBase(); err != nil {
-		return err
-	}
-
-	printNextSteps(&cfg, filestore, console)
+	printNextSteps(&cfg, dotfilesDir, filestore, console)
 	return nil
 }
 
-func generateProjectFiles(cfg *config.Config, filestore *files.FileStore, console *console.Console) error {
-	if filestore.CheckProjectNameAvailable(cfg.ProjectName, console) != nil {
+func generateProjectFiles(cfg *config.Config, filestore *files.FileStore) error {
+	if filestore.DoesProjectExist(cfg.ProjectName) {
 		return errors.New("project name already taken")
 	}
 
@@ -77,7 +77,7 @@ func generateProjectFiles(cfg *config.Config, filestore *files.FileStore, consol
 	return nil
 }
 
-func printNextSteps(cfg *config.Config, filestore *files.FileStore, console *console.Console) {
+func printNextSteps(cfg *config.Config, dotfilesDir string, filestore *files.FileStore, console *console.Console) {
 	console.Success("Created project '%s'", cfg.ProjectName)
 	console.WriteLn("")
 	console.WriteLn("Next steps:")
@@ -85,7 +85,7 @@ func printNextSteps(cfg *config.Config, filestore *files.FileStore, console *con
 	console.WriteLn("     - %s", filestore.GetEnvFilePathFor(cfg.ProjectName))
 	console.WriteLn("     - %s", filestore.GetComposeFilePathFor(cfg.ProjectName))
 	console.WriteLn("  2. Put the $HOME dotfiles you want to port in:")
-	console.WriteLn("     - %s", filestore.GetDotfilesDirBase())
+	console.WriteLn("     - %s", dotfilesDir)
 	console.WriteLn("  3. Build the environment:")
 	console.WriteLn("     paul-envs build %s", cfg.ProjectName)
 	console.WriteLn("  4. Run the environment:")

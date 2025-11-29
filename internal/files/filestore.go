@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-
-	"github.com/peaberberian/paul-envs/internal/console"
 )
 
 const (
@@ -54,7 +52,7 @@ func NewFileStore() (*FileStore, error) {
 // configurations.
 //
 // Doing that will remove all project configuration files.
-func (f *FileStore) DeleteBaseDataDirectory() error {
+func (f *FileStore) DeleteDataDirectory() error {
 	return os.RemoveAll(f.baseDataDir)
 }
 
@@ -64,6 +62,11 @@ func (f *FileStore) DeleteBaseDataDirectory() error {
 // Doing that will remove the `paul-envs` configuration
 func (f *FileStore) DeleteConfigDirectory() error {
 	return os.RemoveAll(f.baseConfigDir)
+}
+
+// Delete files associated to the named project.
+func (f *FileStore) DeleteProjectDirectory(name string) error {
+	return os.RemoveAll(f.getProjectDir(name))
 }
 
 // Get the path to the "base" compose.yaml file on which all projects depend on.
@@ -78,43 +81,34 @@ func (f *FileStore) GetBaseComposeFilePath() string {
 //
 // This is only for information matters, the FileStore should take care of
 // creating all files inside.
+// TODO: make private
 func (f *FileStore) GetProjectDirBase() string {
 	return f.projectsDir
 }
 
-// Create the "dotfiles" directory in paul-envs' config directory.
-//
-// You can advertise this directory to the user, reading it through
-// `GetDotfilesDirBase`.
-func (f *FileStore) CreateDotfilesDirBase() error {
+// Ensure the "dotfiles" directory in paul-envs' config directory is created and
+// return its path so you can advertise it to the user.
+func (f *FileStore) InitGlobalDotfilesDir() (string, error) {
 	if err := f.userFS.MkdirAsUser(f.dotfilesDir, 0755); err != nil {
-		return fmt.Errorf("create base config directory: %w", err)
+		return "", fmt.Errorf("create base config directory: %w", err)
 	}
-	return nil
-}
-
-// Return the path to the "dotfiles" directory of paul-envs, where the dotfiles
-// to port to all containers should be put.
-//
-// /!\ The directory might not be yet created
-func (f *FileStore) GetDotfilesDirBase() string {
-	return f.dotfilesDir
+	return f.dotfilesDir, nil
 }
 
 // Copy the content of the "dotfiles" directory of paul-envs to the given
 // `destDir` path.
-func (f *FileStore) CopyDotfilesTo(ctx context.Context, destDir string) error {
-	if err := os.RemoveAll(destDir); err != nil {
-		return fmt.Errorf("cannot copy dotfiles because %s cannot be removed: %w", destDir, err)
-	}
-	return f.userFS.CopyDirAsUser(ctx, f.dotfilesDir, destDir)
-}
-
-// Get directory where a specific project's files will be put.
 //
-// TODO: make private
-func (f *FileStore) GetProjectDir(name string) string {
-	return filepath.Join(f.projectsDir, name)
+// Returns the path of the created project-specific dotfiles dir (should be
+// removed) when finished, or an error if it failed.
+func (f *FileStore) CreateDotfilesDirFor(ctx context.Context, projectName string) (string, error) {
+	destDir := filepath.Join(f.getProjectDir(projectName), "nextdotfiles")
+	if err := os.RemoveAll(destDir); err != nil {
+		return "", fmt.Errorf("cannot copy dotfiles because %s cannot be removed: %w", destDir, err)
+	}
+	if err := f.userFS.CopyDirAsUser(ctx, f.dotfilesDir, destDir); err != nil {
+		return "", fmt.Errorf("cannot copy dotfiles to '%s': %w", destDir, err)
+	}
+	return destDir, nil
 }
 
 // Get path to the given project's compose file.
@@ -127,24 +121,21 @@ func (f *FileStore) GetEnvFilePathFor(name string) string {
 	return filepath.Join(f.projectsDir, name, projectEnvFilename)
 }
 
-// Check that the given project name is not taken.
-// If it is, warn the user through the given console and return an error.
-func (f *FileStore) CheckProjectNameAvailable(name string, console *console.Console) error {
-	composeFile := f.GetComposeFilePathFor(name)
-	envFile := f.GetEnvFilePathFor(name)
-
-	if _, err := os.Stat(composeFile); err == nil {
-		console.Warn("Project '%s' already exists. You can have multiple configurations for the same project by calling 'create' with the '--name' flag. Hint: Use 'paul-envs list' to see all projects or 'paul-envs remove %s' to delete it", name, name)
-		return fmt.Errorf("project %s already exists", name)
+// Returns true if the given project name currently exists on disk.
+func (f *FileStore) DoesProjectExist(name string) bool {
+	infoFile := f.getProjectDir(name)
+	if _, err := os.Stat(infoFile); os.IsNotExist(err) {
+		return false
 	}
-	if _, err := os.Stat(envFile); err == nil {
-		console.Warn("Project '%s' already exists. You can have multiple configurations for the same project by calling 'create' with the '--name' flag. Hint: Use 'paul-envs list' to see all projects or 'paul-envs remove %s' to delete it", name, name)
-		return fmt.Errorf("project %s already exists", name)
-	}
-	return nil
+	return true
 }
 
 // Get path to the 'project.info' file associated to a project.
 func (f *FileStore) getProjectInfoFilePathFor(projectName string) string {
 	return filepath.Join(f.projectsDir, projectName, projectInfoFilename)
+}
+
+// Get directory where a specific project's files will be put.
+func (f *FileStore) getProjectDir(name string) string {
+	return filepath.Join(f.projectsDir, name)
 }

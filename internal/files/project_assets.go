@@ -91,7 +91,7 @@ func (f *FileStore) CreateProjectFiles(
 		return fmt.Errorf("execute env template: %w", err)
 	}
 
-	if err := f.userFS.MkdirAsUser(f.GetProjectDir(projectName), 0755); err != nil {
+	if err := f.userFS.MkdirAsUser(f.getProjectDir(projectName), 0755); err != nil {
 		return fmt.Errorf("create project directory: %w", err)
 	}
 

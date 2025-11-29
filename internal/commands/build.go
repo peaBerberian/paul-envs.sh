@@ -33,11 +33,9 @@ func Build(ctx context.Context, args []string, filestore *files.FileStore, conso
 	if err := validateProjectFiles(filestore, name); err != nil {
 		return err
 	}
-
-	// TODO: nextdotfiles creation should probably be done by the filestore
-	tmpDotfilesDir := filepath.Join(filestore.GetProjectDir(name), "nextdotfiles")
 	console.Info("Preparing dotfiles...")
-	if err := filestore.CopyDotfilesTo(ctx, tmpDotfilesDir); err != nil {
+	tmpDotfilesDir, err := filestore.CreateDotfilesDirFor(ctx, name)
+	if err != nil {
 		os.RemoveAll(tmpDotfilesDir)
 		return fmt.Errorf("failed to prepare dotfiles for the container: %w", err)
 	}

@@ -1,13 +1,7 @@
 package files
 
 import (
-	"io"
-	"os"
-	"path/filepath"
-	"strings"
 	"testing"
-
-	"github.com/peaberberian/paul-envs/internal/console"
 )
 
 func TestNewFileStore(t *testing.T) {
@@ -75,7 +69,7 @@ func TestFileStore_GetProjectDir(t *testing.T) {
 		projectsDir:   "/test/base/projects",
 	}
 
-	got := store.GetProjectDir("myproject")
+	got := store.getProjectDir("myproject")
 	expected := "/test/base/projects/myproject"
 	if got != expected {
 		t.Errorf("GetProjectDir() = %v, want %v", got, expected)
@@ -110,59 +104,4 @@ func TestFileStore_GetEnvFilePathFor(t *testing.T) {
 	if got != expected {
 		t.Errorf("GetEnvFilePathFor() = %v, want %v", got, expected)
 	}
-}
-
-func TestFileStore_CheckProjectNameAvailable(t *testing.T) {
-	baseDataDir := t.TempDir()
-	baseConfigDir := t.TempDir()
-	store := &FileStore{
-		baseDataDir:   baseDataDir,
-		baseConfigDir: baseConfigDir,
-		dotfilesDir:   filepath.Join(baseConfigDir, "dotfiles"),
-		projectsDir:   filepath.Join(baseDataDir, "projects"),
-	}
-	ctx := t.Context()
-	cons := console.New(ctx, os.Stdin, io.Discard, io.Discard)
-
-	t.Run("available project name", func(t *testing.T) {
-		err := store.CheckProjectNameAvailable("newproject", cons)
-		if err != nil {
-			t.Errorf("CheckProjectNameAvailable() error = %v, want nil", err)
-		}
-	})
-
-	t.Run("unavailable - compose file exists", func(t *testing.T) {
-		projectName := "existing1"
-		composeFile := store.GetComposeFilePathFor(projectName)
-		if err := os.MkdirAll(filepath.Dir(composeFile), 0755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(composeFile, []byte("test"), 0644); err != nil {
-			t.Fatal(err)
-		}
-
-		err := store.CheckProjectNameAvailable(projectName, cons)
-		if err == nil {
-			t.Error("CheckProjectNameAvailable() error = nil, want error")
-		}
-		if !strings.Contains(err.Error(), "already exists") {
-			t.Errorf("error message should contain 'already exists', got: %v", err)
-		}
-	})
-
-	t.Run("unavailable - env file exists", func(t *testing.T) {
-		projectName := "existing2"
-		envFile := store.GetEnvFilePathFor(projectName)
-		if err := os.MkdirAll(filepath.Dir(envFile), 0755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(envFile, []byte("test"), 0644); err != nil {
-			t.Fatal(err)
-		}
-
-		err := store.CheckProjectNameAvailable(projectName, cons)
-		if err == nil {
-			t.Error("CheckProjectNameAvailable() error = nil, want error")
-		}
-	})
 }

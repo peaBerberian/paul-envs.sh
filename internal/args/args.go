@@ -239,8 +239,9 @@ func validateProjectName(name string, filestor *files.FileStore, cons *console.C
 	if err := utils.ValidateProjectName(name); err != nil {
 		return fmt.Errorf("invalid project name: %w", err)
 	}
-	if filestor.CheckProjectNameAvailable(name, cons) != nil {
-		return errors.New("project name already taken")
+	if filestor.DoesProjectExist(name) {
+		cons.Warn("Project '%s' already exists. You can have multiple configurations for the same project by calling 'create' with the '--name' flag. Hint: Use 'paul-envs list' to see all projects or 'paul-envs remove %s' to delete it", name, name)
+		return fmt.Errorf("project %s already exists", name)
 	}
 	return nil
 }

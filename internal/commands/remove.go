@@ -2,7 +2,6 @@ package commands
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/peaberberian/paul-envs/internal/console"
 	"github.com/peaberberian/paul-envs/internal/files"
@@ -34,9 +33,7 @@ func Remove(args []string, filestore *files.FileStore, console *console.Console)
 		return err
 	}
 
-	// TODO: Project dir removal should be done by the filestore
-	projectDir := filestore.GetProjectDir(name)
-	if _, err := os.Stat(projectDir); os.IsNotExist(err) {
+	if !filestore.DoesProjectExist(name) {
 		return fmt.Errorf("Project '%s' not found\nHint: Use 'paul-envs list' to see available projects", name)
 	}
 
@@ -48,7 +45,7 @@ func Remove(args []string, filestore *files.FileStore, console *console.Console)
 		return nil
 	}
 
-	if err := os.RemoveAll(projectDir); err != nil {
+	if err := filestore.DeleteProjectDirectory(name); err != nil {
 		return fmt.Errorf("Failed to remove project: %w", err)
 	}
 	console.Success("Removed project '%s'", name)

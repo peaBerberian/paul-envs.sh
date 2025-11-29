@@ -26,7 +26,7 @@ func Clean(ctx context.Context, filestore *files.FileStore, console *console.Con
 		console.WriteLn("\nSkipping container configurations")
 	} else {
 		console.WriteLn("\nRemoving projects configuration files...")
-		if err := filestore.DeleteBaseDataDirectory(); err != nil {
+		if err := filestore.DeleteDataDirectory(); err != nil {
 			return err
 		}
 	}
