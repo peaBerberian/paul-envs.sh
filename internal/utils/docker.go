@@ -1,4 +1,4 @@
-package commands
+package utils
 
 import (
 	"bytes"
@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-func checkDockerPermissions(ctx context.Context) error {
+func CheckDockerPermissions(ctx context.Context) error {
 	cmd := exec.CommandContext(ctx, "docker", "ps")
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -39,7 +39,7 @@ func getSudoCommand() string {
 	return fmt.Sprintf("  sudo %s %s", executable, args)
 }
 
-func checkDockerComposeInstallation(ctx context.Context) error {
+func CheckDockerComposeInstallation(ctx context.Context) error {
 	cmd := exec.CommandContext(ctx, "docker", "compose", "version")
 	return cmd.Run()
 }

@@ -18,10 +18,10 @@ func Run(ctx context.Context, args []string, filestore *files.FileStore, console
 	default:
 	}
 
-	if err := checkDockerComposeInstallation(ctx); err != nil {
+	if err := utils.CheckDockerComposeInstallation(ctx); err != nil {
 		return fmt.Errorf("docker compose not found, is it installed: %w", err)
 	}
-	if err := checkDockerPermissions(ctx); err != nil {
+	if err := utils.CheckDockerPermissions(ctx); err != nil {
 		return err
 	}
 

@@ -20,7 +20,7 @@ import (
 	"github.com/peaberberian/paul-envs/internal/utils"
 )
 
-//go:embed assets/*
+//go:embed embeds/*
 var assets embed.FS
 
 type EnvTemplateData struct {
@@ -76,7 +76,7 @@ func (f *FileStore) CreateProjectFiles(
 
 	// For env
 
-	envTplCtnt, err := assets.ReadFile("assets/env.tmpl")
+	envTplCtnt, err := assets.ReadFile("embeds/env.tmpl")
 	if err != nil {
 		return fmt.Errorf("read env template: %w", err)
 	}
@@ -103,7 +103,7 @@ func (f *FileStore) CreateProjectFiles(
 
 	// Now for compose
 
-	composeTplCtnt, err := assets.ReadFile("assets/compose.tmpl")
+	composeTplCtnt, err := assets.ReadFile("embeds/compose.tmpl")
 	if err != nil {
 		return fmt.Errorf("read compose template: %w", err)
 	}
@@ -258,7 +258,7 @@ func (f *FileStore) ensureCreatedBaseFiles() error {
 	baseDockerfilePath := filepath.Join(f.baseDataDir, "Dockerfile")
 	_, err := os.Stat(baseDockerfilePath)
 	if os.IsNotExist(err) {
-		dockerfileData, err := assets.ReadFile("assets/Dockerfile")
+		dockerfileData, err := assets.ReadFile("embeds/Dockerfile")
 		if err != nil {
 			return err
 		}
@@ -276,7 +276,7 @@ func (f *FileStore) ensureCreatedBaseFiles() error {
 	baseEntryPointPath := filepath.Join(f.baseDataDir, "docker-entrypoint.sh")
 	_, err = os.Stat(baseEntryPointPath)
 	if os.IsNotExist(err) {
-		entrypointData, err := assets.ReadFile("assets/docker-entrypoint.sh")
+		entrypointData, err := assets.ReadFile("embeds/docker-entrypoint.sh")
 		if err != nil {
 			return err
 		}
@@ -295,7 +295,7 @@ func (f *FileStore) ensureCreatedBaseFiles() error {
 	baseComposePath := filepath.Join(f.baseDataDir, "Compose")
 	_, err = os.Stat(baseComposePath)
 	if os.IsNotExist(err) {
-		composeData, err := assets.ReadFile("assets/compose.yaml")
+		composeData, err := assets.ReadFile("embeds/compose.yaml")
 		if err != nil {
 			return err
 		}

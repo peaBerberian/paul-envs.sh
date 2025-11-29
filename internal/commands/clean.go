@@ -9,10 +9,11 @@ import (
 
 	"github.com/peaberberian/paul-envs/internal/console"
 	"github.com/peaberberian/paul-envs/internal/files"
+	"github.com/peaberberian/paul-envs/internal/utils"
 )
 
 func Clean(ctx context.Context, filestore *files.FileStore, console *console.Console) error {
-	if err := checkDockerPermissions(ctx); err != nil {
+	if err := utils.CheckDockerPermissions(ctx); err != nil {
 		return err
 	}
 
