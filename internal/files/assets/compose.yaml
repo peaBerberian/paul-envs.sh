@@ -1,5 +1,5 @@
-# compose.yaml - Version: 1.0
-# ===========================
+# compose.yaml - Version: 1.0.0
+# =============================
 #
 # If you plan to just set-up a single container for a single project,
 # you can just create a .env file locally setting the env variables needed by

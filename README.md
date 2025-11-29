@@ -411,13 +411,15 @@ Along the mounted project, those are the only directories which are persisted.
 
 ## TODO:
 
-- lockfile versionning
+- implement lockfile reading
+- help flag per commands
 - Check if already built on run
 - executable in github release on tag
 - update project name
 - fix CI
 - => Go can be merged I think
-- Does remove also remove networks?
+- SHould remove also remove networks?
+- SHould remove also remove volume directly?
 - ci tests for clean command?
 - on Remove, propose to call docker ourselve to remove the volume
 - flags for clean: --no-prompt, --no-config, --no-image, --no-cache

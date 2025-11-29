@@ -34,6 +34,7 @@ func Remove(args []string, filestore *files.FileStore, console *console.Console)
 		return err
 	}
 
+	// TODO: Project dir removal should be done by the filestore
 	projectDir := filestore.GetProjectDir(name)
 	if _, err := os.Stat(projectDir); os.IsNotExist(err) {
 		return fmt.Errorf("Project '%s' not found\nHint: Use 'paul-envs list' to see available projects", name)

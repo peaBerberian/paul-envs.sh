@@ -108,7 +108,7 @@ Full Configuration Example:
     --volume ~/.git-credentials:/home/dev/.git-credentials:ro
 
 Location of stored files created by this tool:
-  Base compose       : ` + filestore.GetBaseComposeFilename() + `
+  Base compose       : ` + filestore.GetBaseComposeFilePath() + `
   Projects directory : ` + filestore.GetProjectDirBase() + `
 
 NOTE: To start a guided prompt, you can also just run:

@@ -1,5 +1,5 @@
-# Dockerfile - Version: 1.0
-# =========================
+# Dockerfile - Version: 1.0.0
+# ===========================
 #
 # This "Dockerfile" sets a basic Ubuntu LTS environment with a shell, the wanted
 # node.js version and some CLI tools installed and configured depending on your

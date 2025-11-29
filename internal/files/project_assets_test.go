@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	constants "github.com/peaberberian/paul-envs/internal"
 )
 
 func TestFileStore_CreateProjectFiles(t *testing.T) {
@@ -22,30 +24,29 @@ func TestFileStore_CreateProjectFiles(t *testing.T) {
 	}
 
 	envTplData := EnvTemplateData{
-		ProjectComposeFilename: "compose.yaml",
-		ProjectID:              "test-id",
-		ProjectDestPath:        "myproject",
-		ProjectHostPath:        "/host/path",
-		HostUID:                "1000",
-		HostGID:                "1000",
-		Username:               "testuser",
-		Shell:                  "bash",
-		InstallNode:            "latest",
-		InstallRust:            "none",
-		InstallPython:          "3.12.0",
-		InstallGo:              "none",
-		EnableWasm:             "false",
-		EnableSSH:              "true",
-		EnableSudo:             "true",
-		Packages:               "git vim",
-		InstallNeovim:          "true",
-		InstallStarship:        "true",
-		InstallAtuin:           "false",
-		InstallMise:            "true",
-		InstallZellij:          "false",
-		InstallJujutsu:         "false",
-		GitName:                "Test User",
-		GitEmail:               "test@example.com",
+		ProjectID:       "test-id",
+		ProjectDestPath: "myproject",
+		ProjectHostPath: "/host/path",
+		HostUID:         "1000",
+		HostGID:         "1000",
+		Username:        "testuser",
+		Shell:           "bash",
+		InstallNode:     "latest",
+		InstallRust:     "none",
+		InstallPython:   "3.12.0",
+		InstallGo:       "none",
+		EnableWasm:      "false",
+		EnableSSH:       "true",
+		EnableSudo:      "true",
+		Packages:        "git vim",
+		InstallNeovim:   "true",
+		InstallStarship: "true",
+		InstallAtuin:    "false",
+		InstallMise:     "true",
+		InstallZellij:   "false",
+		InstallJujutsu:  "false",
+		GitName:         "Test User",
+		GitEmail:        "test@example.com",
 	}
 
 	composeTplData := ComposeTemplateData{
@@ -69,6 +70,11 @@ func TestFileStore_CreateProjectFiles(t *testing.T) {
 	composeFile := store.GetComposeFilePathFor("testproject")
 	if _, err := os.Stat(composeFile); os.IsNotExist(err) {
 		t.Fatal("compose file was not created")
+	}
+
+	projectInfoFile := store.getProjectInfoFilePathFor("testproject")
+	if _, err := os.Stat(projectInfoFile); os.IsNotExist(err) {
+		t.Fatal("project.info file was not created")
 	}
 
 	// Read and verify content
@@ -120,6 +126,25 @@ func TestFileStore_CreateProjectFiles(t *testing.T) {
 			t.Errorf("compose file missing expected content: %s", check)
 		}
 	}
+
+	pInfoCtnt, err := os.ReadFile(projectInfoFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pInfoCtntStr := string(pInfoCtnt)
+	pInfoChecks := []string{
+		`VERSION=` + constants.FileVersion,
+		`DOCKERFILE_VERSION=` + constants.FileVersion,
+		`BUILD_ENV=`,
+		`BUILD_COMPOSE`,
+	}
+
+	for _, check := range pInfoChecks {
+		if !strings.Contains(pInfoCtntStr, check) {
+			t.Errorf("project.info file missing expected content: %s", check)
+		}
+	}
 }
 
 func TestFileStore_CreateProjectComposeFiles(t *testing.T) {
@@ -137,30 +162,29 @@ func TestFileStore_CreateProjectComposeFiles(t *testing.T) {
 	}
 
 	envTplData := EnvTemplateData{
-		ProjectComposeFilename: "compose.yaml",
-		ProjectID:              "test-id",
-		ProjectDestPath:        "myproject",
-		ProjectHostPath:        "/host/path",
-		HostUID:                "1000",
-		HostGID:                "1000",
-		Username:               "testuser",
-		Shell:                  "bash",
-		InstallNode:            "latest",
-		InstallRust:            "none",
-		InstallPython:          "3.12.0",
-		InstallGo:              "none",
-		EnableWasm:             "false",
-		EnableSSH:              "false",
-		EnableSudo:             "true",
-		Packages:               "git vim",
-		InstallNeovim:          "true",
-		InstallStarship:        "true",
-		InstallAtuin:           "false",
-		InstallMise:            "true",
-		InstallZellij:          "false",
-		InstallJujutsu:         "false",
-		GitName:                "Test User",
-		GitEmail:               "test@example.com",
+		ProjectID:       "test-id",
+		ProjectDestPath: "myproject",
+		ProjectHostPath: "/host/path",
+		HostUID:         "1000",
+		HostGID:         "1000",
+		Username:        "testuser",
+		Shell:           "bash",
+		InstallNode:     "latest",
+		InstallRust:     "none",
+		InstallPython:   "3.12.0",
+		InstallGo:       "none",
+		EnableWasm:      "false",
+		EnableSSH:       "false",
+		EnableSudo:      "true",
+		Packages:        "git vim",
+		InstallNeovim:   "true",
+		InstallStarship: "true",
+		InstallAtuin:    "false",
+		InstallMise:     "true",
+		InstallZellij:   "false",
+		InstallJujutsu:  "false",
+		GitName:         "Test User",
+		GitEmail:        "test@example.com",
 	}
 
 	composeTplData := ComposeTemplateData{

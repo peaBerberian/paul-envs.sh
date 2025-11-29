@@ -34,6 +34,7 @@ func Build(ctx context.Context, args []string, filestore *files.FileStore, conso
 		return err
 	}
 
+	// TODO: nextdotfiles creation should probably be done by the filestore
 	tmpDotfilesDir := filepath.Join(filestore.GetProjectDir(name), "nextdotfiles")
 	console.Info("Preparing dotfiles...")
 	if err := filestore.CopyDotfilesTo(ctx, tmpDotfilesDir); err != nil {
@@ -56,8 +57,8 @@ func Build(ctx context.Context, args []string, filestore *files.FileStore, conso
 }
 
 func ensureBaseComposeExists(filestore *files.FileStore) error {
-	if _, err := os.Stat(filestore.GetBaseComposeFilename()); os.IsNotExist(err) {
-		return fmt.Errorf("base compose.yaml not found at %s\nCreate a configuration through the 'create' command first.", filestore.GetBaseComposeFilename())
+	if _, err := os.Stat(filestore.GetBaseComposeFilePath()); os.IsNotExist(err) {
+		return fmt.Errorf("base compose.yaml not found at %s\nCreate a configuration through the 'create' command first.", filestore.GetBaseComposeFilePath())
 	}
 	return nil
 }
@@ -103,7 +104,7 @@ func createSharedCacheVolume(ctx context.Context) error {
 }
 
 func dockerComposeBuild(ctx context.Context, filestore *files.FileStore, name string, dotfilesDir string) error {
-	base := filestore.GetBaseComposeFilename()
+	base := filestore.GetBaseComposeFilePath()
 	compose := filestore.GetComposeFilePathFor(name)
 	env := filestore.GetEnvFilePathFor(name)
 
