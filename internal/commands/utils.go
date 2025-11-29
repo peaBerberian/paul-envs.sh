@@ -40,6 +40,6 @@ func getSudoCommand() string {
 }
 
 func checkDockerComposeInstallation(ctx context.Context) error {
-	cmd := exec.CommandContext(ctx, "docker", "ps")
+	cmd := exec.CommandContext(ctx, "docker", "compose", "version")
 	return cmd.Run()
 }
