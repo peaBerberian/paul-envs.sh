@@ -35,20 +35,22 @@ func Build(ctx context.Context, args []string, filestore *files.FileStore, conso
 	}
 
 	tmpDotfilesDir := filepath.Join(filestore.GetProjectDir(name), "nextdotfiles")
+	console.Info("Preparing dotfiles...")
 	if err := filestore.CopyDotfilesTo(ctx, tmpDotfilesDir); err != nil {
 		os.RemoveAll(tmpDotfilesDir)
 		return fmt.Errorf("failed to prepare dotfiles for the container: %w", err)
 	}
 	defer os.RemoveAll(tmpDotfilesDir)
 
+	console.Info("Ensuring that the shared cache volume is created...")
 	if err := createSharedCacheVolume(ctx); err != nil {
 		return err
 	}
 
+	console.Info("Building project '%s'...", name)
 	if err := dockerComposeBuild(ctx, filestore, name, tmpDotfilesDir); err != nil {
 		return err
 	}
-
 	console.Success("Built project '%s'", name)
 	return nil
 }
@@ -93,8 +95,6 @@ func validateProjectFiles(filestore *files.FileStore, name string) error {
 
 func createSharedCacheVolume(ctx context.Context) error {
 	cmd := exec.CommandContext(ctx, "docker", "volume", "create", "paulenv-shared-cache")
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("Failed to create shared volume: %w.", err)

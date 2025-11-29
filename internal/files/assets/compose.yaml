@@ -126,6 +126,11 @@ services:
         # Will be mounted in `$HOME/projects/<PROJECT_DIRNAME>` inside that container.
         PROJECT_PATH: ${PROJECT_PATH}
 
+        # Path of where the dotfiles to mount inside the container are located.
+        # Defaults to a "placeholder" directory that **must** exist in the same
+        # directory than the Dockerfile.
+        DOTFILES_DIR: ${DOTFILES_DIR:-./placeholder}
+
     # Persistent volumes mounted. Those three are necessary, but you can add
     # supplementary ones with different access rules if you want.
     volumes:
