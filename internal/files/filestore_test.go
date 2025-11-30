@@ -36,11 +36,6 @@ func TestFileStore_PathHelpers(t *testing.T) {
 		expected string
 	}{
 		{
-			name:     "GetBaseComposeFile",
-			fn:       store.GetBaseComposeFilePath,
-			expected: "/test/base/compose.yaml",
-		},
-		{
 			name:     "getProjectDirBase",
 			fn:       store.getProjectDirBase,
 			expected: "/test/base/projects",

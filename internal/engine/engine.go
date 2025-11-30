@@ -21,8 +21,8 @@ const (
 
 type ContainerEngine interface {
 	CheckPermissions(ctx context.Context) error
-	BuildContainer(ctx context.Context, baseCompose string, project files.ProjectEntry, dotfilesDir string) error
-	RunContainer(ctx context.Context, baseCompose string, project files.ProjectEntry, args []string) error
+	BuildContainer(ctx context.Context, project files.ProjectEntry, dotfilesDir string) error
+	RunContainer(ctx context.Context, project files.ProjectEntry, args []string) error
 	Info(ctx context.Context) (ContainerInfo, error)
 	CreateVolume(ctx context.Context, name string) error
 }

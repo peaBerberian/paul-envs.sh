@@ -12,7 +12,8 @@
 # `$HOME/.container-cache` directory and tools' user data (e.g. shell history
 # neovim plugins, tools database etc.) to a `$HOME/.container-local` directory.
 # It does both to simplify the possibility of persisting those two, but it
-# doesn't persist them by itself (this is performed by the `compose.yaml` file).
+# doesn't persist them by itself (this is performed by the `compose.yaml` file
+# associated to each project).
 
 FROM ubuntu:24.04 AS ubuntu-base
 
@@ -355,7 +356,7 @@ RUN if [ -n "$INSTALL_NODE" ] && [ "$INSTALL_NODE" != "none" ]; then \
 # Done before file copying to ensure that it can be overwritten
 RUN git config --global merge.conflictstyle zdiff3
 
-# Copy config files (may overwrite shell configs with tool init lines)
+# Copy dotfiles (may overwrite shell configs with tool init lines)
 RUN --mount=type=bind,source=${DOTFILES_DIR},target=/tmp/configs \
   if [ -d /tmp/configs ] && [ "$(ls -A /tmp/configs 2>/dev/null)" ]; then \
     cp -r /tmp/configs/. /home/${USERNAME}/; \

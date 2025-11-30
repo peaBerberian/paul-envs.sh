@@ -10,7 +10,6 @@ import (
 )
 
 const (
-	baseComposeFilename    = "compose.yaml"
 	projectComposeFilename = "compose.yaml"
 	projectEnvFilename     = ".env"
 	projectInfoFilename    = "project.info"
@@ -19,7 +18,7 @@ const (
 // Struct allowing to create, read and obtain the path of all files created by
 // this project:
 // -  project-specific configuration
-// -  base Dockerfile and compose.yaml files
+// -  base Dockerfile file
 // -  the user's dotfiles directory
 type FileStore struct {
 	userFS        *UserFS
@@ -80,14 +79,6 @@ func (f *FileStore) DeleteConfigDirectory() error {
 // Delete files associated to the named project.
 func (f *FileStore) DeleteProjectDirectory(name string) error {
 	return os.RemoveAll(f.getProjectDir(name))
-}
-
-// Get the path to the "base" compose.yaml file on which all projects depend on.
-//
-// /!\ The file might not be yet created. It will be created automatically by
-// the FileStore once the first project is created.
-func (f *FileStore) GetBaseComposeFilePath() string {
-	return filepath.Join(f.baseDataDir, baseComposeFilename)
 }
 
 // Returns true if the given project name currently exists on disk.
@@ -156,8 +147,9 @@ func (f *FileStore) InitGlobalDotfilesDir() (string, error) {
 // Copy the content of the "dotfiles" directory of paul-envs to the given
 // `destDir` path.
 //
-// Returns the path of the created project-specific dotfiles dir (should be
-// removed) when finished, or an error if it failed.
+// Returns the relative path (from the Dockerfile base) of the created
+// project-specific dotfiles dir (should be removed) when finished, or an error
+// if it failed.
 func (f *FileStore) CreateProjectDotfilesDir(ctx context.Context, projectName string) (string, error) {
 	if !f.DoesProjectExist(projectName) {
 		return "", fmt.Errorf("cannot copy dotfiles for project '%s': this project does not exist", projectName)
@@ -173,7 +165,12 @@ func (f *FileStore) CreateProjectDotfilesDir(ctx context.Context, projectName st
 	if err := f.userFS.CopyDirAsUser(ctx, dotfilesDir, destDir); err != nil {
 		return "", fmt.Errorf("cannot copy dotfiles to '%s': %w", destDir, err)
 	}
-	return destDir, nil
+	relativeDotfilesDir, err := filepath.Rel(f.baseDataDir, destDir)
+	if err != nil {
+		return "", fmt.Errorf("failed to construct dotfiles relative path: %w", err)
+	}
+
+	return relativeDotfilesDir, nil
 }
 
 // Get path to the given project's compose file.

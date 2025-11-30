@@ -355,18 +355,10 @@ container is ran (it should be persisted thereafter if going the
 
 ### compose.yaml
 
-The `compose.yaml` file (`./internal/files/assets/compose.yaml`) allows
+The `compose.yaml` file (`./internal/files/assets/compose.tmpl`) allows
 `docker compose` to build a container with the right arguments for your project.
 More importantly, it also mount the right "volumes" so that some changes
 (project changes, cache, tools data, shell history etc.) are persisted.
-
-In simple single-projects scenarios, it can also be relied on directly.
-Just set the right env variables listed in there (.e.g in an `env` file) and
-rely on `docker compose` directly (e.g. `docker compose build`). It works!
-
-If you just want to do that, refer to the `compose.yaml` file. It contains
-documentation on how to exploit `docker compose` directly instead of going
-through my `paul-envs` binary.
 
 ### The paul-envs binary
 
@@ -424,9 +416,6 @@ Along the mounted project, those are the only directories which are persisted.
 - on Remove, propose to call docker ourselve to remove the volume
 - flags for clean: --no-prompt, --no-config, --no-image, --no-cache
 - `run` should propose to `build` if not already done
-- we should hash the last version of the .env and compose.yaml to propose a
-  re-build when it changed.
-- Merge base compose with child compose.yaml to simplify portability?
 - `update` command?
 - Shell completions under specific command?
 - Commands work even if a subset is written
@@ -435,3 +424,5 @@ Along the mounted project, those are the only directories which are persisted.
 - support rootless
 - Add Kakoune and Helix as potential tools
 - less gh-action, more scripts (in-docker for local tests?)
+- issues when calling `create` with `sudo`
+- BAD project name clean up

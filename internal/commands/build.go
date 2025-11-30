@@ -21,11 +21,6 @@ func Build(ctx context.Context, args []string, filestore *files.FileStore, conso
 		return err
 	}
 
-	// TODO: Remove this check, should not be needed with a proper `getProjectName`
-	if err := ensureBaseComposeExists(filestore); err != nil {
-		return err
-	}
-
 	name, err := getProjectName(args, filestore, console, "build")
 	if err != nil {
 		return err
@@ -51,22 +46,14 @@ func Build(ctx context.Context, args []string, filestore *files.FileStore, conso
 	}
 
 	console.Info("Building project '%s'...", name)
-	base := filestore.GetBaseComposeFilePath()
 	project, err := filestore.GetProject(name)
 	if err != nil {
 		return fmt.Errorf("failed to obtain information on project '%s': %w", name, err)
 	}
-	if err := containerEngine.BuildContainer(ctx, base, project, tmpDotfilesDir); err != nil {
+	if err := containerEngine.BuildContainer(ctx, project, tmpDotfilesDir); err != nil {
 		return err
 	}
 	console.Success("Built project '%s'", name)
-	return nil
-}
-
-func ensureBaseComposeExists(filestore *files.FileStore) error {
-	if _, err := os.Stat(filestore.GetBaseComposeFilePath()); os.IsNotExist(err) {
-		return fmt.Errorf("base compose.yaml not found at %s\nCreate a configuration through the 'create' command first.", filestore.GetBaseComposeFilePath())
-	}
 	return nil
 }
 

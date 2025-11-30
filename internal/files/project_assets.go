@@ -1,6 +1,6 @@
 // # project_assets.go
 // This file creates all files associated to a given project:
-// -  Its `compose.yaml` file (which is on top of the base compose.yaml file)
+// -  Its `compose.yaml` file
 // -  Its `.env` file
 // -  Its `project.info` lockfile
 
@@ -166,8 +166,7 @@ func (f *FileStore) CreateProjectFiles(
 	return nil
 }
 
-// Write the base Dockerfile and compose.yaml file in the base directory if not
-// already done
+// Write the base Dockerfile file in the base directory if not already done
 func (f *FileStore) ensureCreatedBaseFiles() error {
 	// Write Dockerfile if needed
 	baseDockerfilePath := filepath.Join(f.baseDataDir, "Dockerfile")
@@ -178,10 +177,12 @@ func (f *FileStore) ensureCreatedBaseFiles() error {
 			return err
 		}
 
-		err = f.userFS.WriteFileAsUser(
+		if err = f.userFS.MkdirAsUser(f.baseDataDir, 0755); err != nil {
+			return err
+		}
+		if err = f.userFS.WriteFileAsUser(
 			filepath.Join(f.baseDataDir, "Dockerfile"),
-			dockerfileData, 0644)
-		if err != nil {
+			dockerfileData, 0644); err != nil {
 			return err
 		}
 	} else if err != nil {
@@ -206,26 +207,7 @@ func (f *FileStore) ensureCreatedBaseFiles() error {
 		return err
 	}
 
-	// Then write base compose if needed
-	baseComposePath := filepath.Join(f.baseDataDir, "Compose")
-	_, err = os.Stat(baseComposePath)
-	if os.IsNotExist(err) {
-		composeData, err := assets.ReadFile("embeds/compose.yaml")
-		if err != nil {
-			return err
-		}
-
-		err = f.userFS.WriteFileAsUser(
-			filepath.Join(f.baseDataDir, "compose.yaml"),
-			composeData, 0644)
-		if err != nil {
-			return err
-		}
-	} else if err != nil {
-		return err
-	}
-
-	// Last, the placeholder file
+	// Now, the placeholder directory
 	if err := f.userFS.MkdirAsUser(filepath.Join(f.baseDataDir, "placeholder"), 0755); err != nil {
 		return fmt.Errorf("create empty dotfiles placeholder: %w", err)
 	}

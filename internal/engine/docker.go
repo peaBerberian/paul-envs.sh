@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -44,13 +43,8 @@ func (c *DockerEngine) CheckPermissions(ctx context.Context) error {
 	return nil
 }
 
-func (c *DockerEngine) BuildContainer(ctx context.Context, baseCompose string, project files.ProjectEntry, dotfilesDir string) error {
-	relativeDotfilesDir, err := filepath.Rel(filepath.Dir(baseCompose), dotfilesDir)
-	if err != nil {
-		return fmt.Errorf("failed to construct dotfiles relative path: %w", err)
-	}
-
-	cmd := exec.CommandContext(ctx, "docker", "compose", "-f", baseCompose, "-f", project.ComposeFilePath, "--env-file", project.EnvFilePath, "build")
+func (c *DockerEngine) BuildContainer(ctx context.Context, project files.ProjectEntry, relativeDotfilesDir string) error {
+	cmd := exec.CommandContext(ctx, "docker", "compose", "-f", project.ComposeFilePath, "--env-file", project.EnvFilePath, "build")
 	envVars := append(os.Environ(),
 		"COMPOSE_PROJECT_NAME=paulenv-"+project.ProjectName,
 		"DOTFILES_DIR="+relativeDotfilesDir,
@@ -61,8 +55,8 @@ func (c *DockerEngine) BuildContainer(ctx context.Context, baseCompose string, p
 	return cmd.Run()
 }
 
-func (c *DockerEngine) RunContainer(ctx context.Context, baseCompose string, project files.ProjectEntry, args []string) error {
-	cmdArgs := []string{"compose", "-f", baseCompose, "-f", project.ComposeFilePath, "--env-file", project.EnvFilePath, "run", "--rm", "paulenv"}
+func (c *DockerEngine) RunContainer(ctx context.Context, project files.ProjectEntry, args []string) error {
+	cmdArgs := []string{"compose", "-f", project.ComposeFilePath, "--env-file", project.EnvFilePath, "run", "--rm", "paulenv"}
 	cmdArgs = append(cmdArgs, args...)
 	cmd := exec.CommandContext(ctx, "docker", cmdArgs...)
 	cmd.Env = append(os.Environ(), "COMPOSE_PROJECT_NAME=paulenv-"+project.ProjectName)
