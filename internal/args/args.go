@@ -216,6 +216,11 @@ func buildConfig(projectPath string, p *parsedFlags) (config.Config, error) {
 	// Project name
 	if p.name == "" {
 		p.name = filepath.Base(projectPath)
+	} else {
+		err := utils.ValidateProjectName(p.name)
+		if err != nil {
+			return config.Config{}, fmt.Errorf("invalid set project name '%s': %w", p.name, err)
+		}
 	}
 	projectName, err := utils.SanitizeProjectName(p.name)
 	if err != nil {
