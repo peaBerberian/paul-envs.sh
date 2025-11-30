@@ -42,6 +42,26 @@ type ContainerEngine interface {
 	// Returns information on the given project from the point of view of the container
 	// engine.
 	GetImageInfo(ctx context.Context, projectName string) (*ImageInfo, error)
+	// List containers currently known by this container engine
+	ListContainers(ctx context.Context) ([]ContainerInfo, error)
+	// Remove container listed from this container engine
+	RemoveContainer(ctx context.Context, container ContainerInfo) error
+	// TODO:
+	// // List images currently known by this container engine
+	// ListImages(ctx context.Context) ([]ImageInfo, error)
+	// // Remove image listed from this container engine
+	// RemoveImage(ctx context.Context, image ImageInfo) error
+	// // List volumes currently known by this container engine
+	// ListVolumes(ctx context.Context) ([]VolumeInfo, error)
+	// // Remove volume listed from this container engine
+	// RemoveVolume(ctx context.Context, volume VolumeInfo) error
+	// // List networks currently known by this container engine
+	// ListNetworks(ctx context.Context) ([]NetworkInfo, error)
+	// // Remove network listed from this container engine
+	// RemoveNetwork(ctx context.Context, network NetworkInfo) error
+	// // Remove the `ContainerEngine`'s build cache from metadata linked to this
+	// // executable
+	// PruneBuildCache(ctx context.Context) error
 }
 
 // Returns information on a specific "engine" able to create images and run containers
@@ -59,6 +79,14 @@ type ImageInfo struct {
 	// The timestamp at which it has last been built.
 	// `nil` if it never has been built.
 	BuiltAt *time.Time
+}
+
+// Information on a particular container as stored by the container engine
+type ContainerInfo struct {
+	// The name it is actually refered to by the container engine.
+	ContainerName string
+	// Its Id with which it can also be refered to
+	ContainerId string
 }
 
 // Create a new `ContainerEngine`, based on what's available right now.
