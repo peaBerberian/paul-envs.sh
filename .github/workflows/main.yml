@@ -235,46 +235,57 @@ jobs:
         run: |
           ./paul-envs list
 
+      - name: Set projects path
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            echo "PROJECTS_PATH=$LOCALAPPDATA/paul-envs/projects" >> $GITHUB_ENV
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            echo "PROJECTS_PATH=$HOME/Library/Application Support/paul-envs/projects" >> $GITHUB_ENV
+          else
+            echo "PROJECTS_PATH=${XDG_DATA_HOME:-$HOME/.local/share}/paul-envs/projects" >> $GITHUB_ENV
+          fi
+
       - name: Verify project files
         shell: bash
         run: |
-          test -f projects/test-minimal/compose.yaml || exit 1
-          test -f projects/test-minimal/.env || exit 1
-          test -f projects/test-node/compose.yaml || exit 1
-          test -f projects/test-multi-lang/compose.yaml || exit 1
+          test -f "$PROJECTS_PATH"/test-minimal/compose.yaml || exit 1
+          test -f "$PROJECTS_PATH"/test-minimal/.env || exit 1
+          test -f "$PROJECTS_PATH"/test-node/compose.yaml || exit 1
+          test -f "$PROJECTS_PATH"/test-multi-lang/compose.yaml || exit 1
           echo "All project files created successfully"
 
       - name: Verify .env content
         shell: bash
         run: |
-          grep "PROJECT_DIRNAME=" projects/test-minimal/.env || exit 1
-          grep "PROJECT_PATH=" projects/test-minimal/.env || exit 1
-          grep "HOST_UID=" projects/test-minimal/.env || exit 1
-          grep "HOST_GID=" projects/test-minimal/.env || exit 1
-          grep "USERNAME=" projects/test-minimal/.env || exit 1
-          grep "USER_SHELL=" projects/test-minimal/.env || exit 1
+          grep "PROJECT_DIRNAME=" "$PROJECTS_PATH"/test-minimal/.env || exit 1
+          grep "PROJECT_PATH=" "$PROJECTS_PATH"/test-minimal/.env || exit 1
+          grep "HOST_UID=" "$PROJECTS_PATH"/test-minimal/.env || exit 1
+          grep "HOST_GID=" "$PROJECTS_PATH"/test-minimal/.env || exit 1
+          grep "USERNAME=" "$PROJECTS_PATH"/test-minimal/.env || exit 1
+          grep "USER_SHELL=" "$PROJECTS_PATH"/test-minimal/.env || exit 1
           echo ".env file structure verified"
 
       - name: Verify compose.yaml structure
         shell: bash
         run: |
-          grep "services:" projects/test-minimal/compose.yaml || exit 1
-          grep "paulenv:" projects/test-minimal/compose.yaml || exit 1
-          grep "build:" projects/test-minimal/compose.yaml || exit 1
+          grep "services:" "$PROJECTS_PATH"/test-minimal/compose.yaml || exit 1
+          grep "paulenv:" "$PROJECTS_PATH"/test-minimal/compose.yaml || exit 1
+          grep "build:" "$PROJECTS_PATH"/test-minimal/compose.yaml || exit 1
           echo "compose.yaml structure verified"
 
       - name: Verify ports in compose.yaml
         shell: bash
         run: |
-          grep "3000:3000" projects/test-ports/compose.yaml || exit 1
-          grep "8080:8080" projects/test-ports/compose.yaml || exit 1
+          grep "3000:3000" "$PROJECTS_PATH"/test-ports/compose.yaml || exit 1
+          grep "8080:8080" "$PROJECTS_PATH"/test-ports/compose.yaml || exit 1
           echo "Ports configuration verified"
 
       - name: Test remove command
         shell: bash
         run: |
           echo "y" | ./paul-envs remove test-minimal
-          test ! -d projects/test-minimal || exit 1
+          test ! -d "$PROJECTS_PATH"/test-minimal || exit 1
           echo "Remove command verified"
 
       - name: Test error handling - invalid project name
@@ -328,7 +339,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-projects-${{ matrix.os }}
-          path: projects/
+          path: $PROJECTS_PATH/
           retention-days: 7
 
   build-and-run:
