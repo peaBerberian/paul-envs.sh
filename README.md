@@ -426,10 +426,12 @@ Along the mounted project, those are the only directories which are persisted.
 - `run` should propose to `build` if not already done
 - we should hash the last version of the .env and compose.yaml to propose a
   re-build when it changed.
+- Merge base compose with child compose.yaml to simplify portability?
 - `update` command?
 - Shell completions under specific command?
 - Commands work even if a subset is written
 - Only max a single instance of each project-container?
 - something like `up` / `down` commands make now much more sense with ssh
+- support rootless
 - Add Kakoune and Helix as potential tools
 - less gh-action, more scripts (in-docker for local tests?)
