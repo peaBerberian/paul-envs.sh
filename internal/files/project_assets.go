@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"text/template"
 
@@ -72,8 +71,6 @@ type projectInfo struct {
 	buildEnvHash string
 	// The hash of the `compose.yaml` file the last time the project has been built
 	buildComposeHash string
-	lastBuildTs      *uint32
-	lastRunTs        *uint32
 }
 
 // Create the directory and all files needed for the given project name, with
@@ -156,8 +153,6 @@ func (f *FileStore) CreateProjectFiles(
 		dockerfileVersion: dockerfileVersion,
 		buildEnvHash:      "",
 		buildComposeHash:  "",
-		lastRunTs:         nil,
-		lastBuildTs:       nil,
 	}
 
 	if err := f.writeProjectInfo(projectName, pInfo); err != nil {
@@ -225,27 +220,15 @@ func (f *FileStore) writeProjectInfo(projectName string, pInfo projectInfo) erro
 
 func formatProjectInfo(pInfo projectInfo) ([]byte, error) {
 	var buf bytes.Buffer
-	lastBuildTs := ""
-	if pInfo.lastBuildTs != nil {
-		lastBuildTs = fmt.Sprint(*pInfo.lastBuildTs)
-	}
-	lastRunTs := ""
-	if pInfo.lastRunTs != nil {
-		lastRunTs = fmt.Sprint(*pInfo.lastRunTs)
-	}
 	_, err := fmt.Fprintf(&buf,
 		"VERSION=%s\n"+
 			"DOCKERFILE_VERSION=%s\n"+
 			"BUILD_ENV=%s\n"+
-			"BUILD_COMPOSE=%s\n"+
-			"LAST_BUILD_TS=%s\n"+
-			"LAST_RUN_TS=%s\n",
+			"BUILD_COMPOSE=%s\n",
 		pInfo.version.ToString(),
 		pInfo.dockerfileVersion.ToString(),
 		pInfo.buildEnvHash,
 		pInfo.buildComposeHash,
-		lastBuildTs,
-		lastRunTs,
 	)
 
 	if err != nil {
@@ -293,32 +276,6 @@ func (filestore *FileStore) ReadProjectInfo(projectName string) (projectInfo, er
 		}
 		if v, ok := strings.CutPrefix(line, "BUILD_COMPOSE="); ok {
 			pInfo.buildComposeHash = v
-			continue
-		}
-		if v, ok := strings.CutPrefix(line, "LAST_BUILD_TS="); ok {
-			if v == "" {
-				pInfo.lastBuildTs = nil
-			} else {
-				u, err := strconv.ParseUint(v, 10, 32)
-				if err != nil {
-					return projectInfo{}, fmt.Errorf("failed to parse LAST_BUILD_TS: %w", err)
-				}
-				result := uint32(u)
-				pInfo.lastBuildTs = &result
-			}
-			continue
-		}
-		if v, ok := strings.CutPrefix(line, "LAST_RUN_TS="); ok {
-			if v == "" {
-				pInfo.lastBuildTs = nil
-			} else {
-				u, err := strconv.ParseUint(v, 10, 32)
-				if err != nil {
-					return projectInfo{}, fmt.Errorf("failed to parse LAST_RUN_TS: %w", err)
-				}
-				result := uint32(u)
-				pInfo.lastRunTs = &result
-			}
 			continue
 		}
 	}
