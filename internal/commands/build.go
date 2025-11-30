@@ -46,7 +46,7 @@ func Build(ctx context.Context, args []string, filestore *files.FileStore, conso
 	if err != nil {
 		return fmt.Errorf("failed to obtain information on project '%s': %w", name, err)
 	}
-	if err := containerEngine.BuildContainer(ctx, project, tmpDotfilesDir); err != nil {
+	if err := containerEngine.BuildImage(ctx, project, tmpDotfilesDir); err != nil {
 		return err
 	}
 	console.Success("Built project '%s'", name)

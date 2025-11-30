@@ -21,7 +21,7 @@ const (
 )
 
 type ContainerEngine interface {
-	BuildContainer(ctx context.Context, project files.ProjectEntry, dotfilesDir string) error
+	BuildImage(ctx context.Context, project files.ProjectEntry, dotfilesDir string) error
 	RunContainer(ctx context.Context, project files.ProjectEntry, args []string) error
 	Info(ctx context.Context) (EngineInfo, error)
 	CreateVolume(ctx context.Context, name string) error

@@ -24,7 +24,7 @@ func newDocker(ctx context.Context) (*DockerEngine, error) {
 	return &DockerEngine{}, nil
 }
 
-func (c *DockerEngine) BuildContainer(ctx context.Context, project files.ProjectEntry, relativeDotfilesDir string) error {
+func (c *DockerEngine) BuildImage(ctx context.Context, project files.ProjectEntry, relativeDotfilesDir string) error {
 	cmd := exec.CommandContext(ctx, "docker", "compose", "-f", project.ComposeFilePath, "--env-file", project.EnvFilePath, "build")
 	envVars := append(os.Environ(),
 		"COMPOSE_PROJECT_NAME=paulenv-"+project.ProjectName,
