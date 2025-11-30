@@ -255,6 +255,15 @@ respectively:
 
 # Remove the configuration file for the `myApp` container
 ./paul-envs remove myApp
+
+# Get version information
+./paul-envs version
+
+# Start an interactive session
+./paul-envs interactive
+
+# Display global help
+./paul-envs help
 ```
 
 ## What gets preserved vs. ephemeral
