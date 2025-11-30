@@ -418,7 +418,6 @@ jobs:
             --shell bash
 
           echo "✓ Created minimal project"
-          ls -la projects/build-minimal/
 
       - name: Build minimal project
         shell: bash
