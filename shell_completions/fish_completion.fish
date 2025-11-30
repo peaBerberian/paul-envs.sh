@@ -2,6 +2,7 @@
 
 # Helper function to get container names from paul-envs ls
 function __paul_envs_containers
+    # XXX TODO: Update
     paul-envs ls 2>/dev/null | grep -E '^\s+-\s+' | sed 's/^\s*-\s*//'
 end
 

@@ -16,6 +16,7 @@ _paulenvs() {
 
     # Get list of existing containers from paul-envs ls
     local -a containers
+		# XXX TODO: Update
     containers=(${(f)"$(paul-envs ls 2>/dev/null | grep -E '^\s+-\s+' | sed 's/^\s*-\s*//')"})
 
 

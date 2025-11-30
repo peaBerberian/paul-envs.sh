@@ -12,6 +12,7 @@ _paulenvs()
     local create_flags="--name --uid --gid --username --shell --nodejs --rust --python --go --git-name --git-email --package --enable-ssh --enable-sudo --neovim --starship --atuin --mise --zellij --jujutsu --port --volume"
 
     # Get list of existing containers from paul-envs ls
+		# XXX TODO: Update
     _get_containers() {
         paul-envs ls 2>/dev/null | grep -E '^\s+-\s+' | sed 's/^\s*-\s*//'
     }
