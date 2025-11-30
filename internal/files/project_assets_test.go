@@ -117,7 +117,7 @@ func TestFileStore_CreateProjectFiles(t *testing.T) {
 		`"22:22"`,
 		`./data:/app/data`,
 		`./config:/app/config`,
-		`/home/user/.ssh/id_ed25519.pub:/etc/ssh/authorized_keys/${USERNAME}:ro`,
+		`/home/user/.ssh/id_ed25519.pub:/etc/ssh/authorized_keys/${USERNAME:-dev}:ro`,
 	}
 
 	for _, check := range composeChecks {

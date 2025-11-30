@@ -3,7 +3,6 @@ package commands
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/peaberberian/paul-envs/internal/console"
 	"github.com/peaberberian/paul-envs/internal/engine"
@@ -24,11 +23,6 @@ func Run(ctx context.Context, args []string, filestore *files.FileStore, console
 	}
 	if err := containerEngine.CheckPermissions(ctx); err != nil {
 		return err
-	}
-
-	baseCompose := filestore.GetBaseComposeFilePath()
-	if _, err := os.Stat(baseCompose); os.IsNotExist(err) {
-		return fmt.Errorf("Base compose.yaml not found at %s", baseCompose)
 	}
 
 	var name string
@@ -68,7 +62,7 @@ func Run(ctx context.Context, args []string, filestore *files.FileStore, console
 		return fmt.Errorf("failed to obtain information on project '%s': %w", name, err)
 	}
 
-	err = containerEngine.RunContainer(ctx, baseCompose, project, cmdArgs)
+	err = containerEngine.RunContainer(ctx, project, cmdArgs)
 	if err != nil {
 		return err
 	}
