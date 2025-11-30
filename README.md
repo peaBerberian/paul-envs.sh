@@ -425,4 +425,3 @@ Along the mounted project, those are the only directories which are persisted.
 - Add Kakoune and Helix as potential tools
 - less gh-action, more scripts (in-docker for local tests?)
 - issues when calling `create` with `sudo`
-- BAD project name clean up

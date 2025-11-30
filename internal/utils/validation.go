@@ -25,8 +25,12 @@ var (
 	// Debian/Ubuntu package name regex:
 	// ^[a-z0-9]          → must start with letter or digit
 	// [a-z0-9+.-]{1,254}$ → remaining allowed chars
-	pkgNameRe        = regexp.MustCompile(`^[a-z0-9][a-z0-9+.-]{1,254}$`)
-	projectNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_][a-zA-Z0-9_-]{0,127}$`)
+	pkgNameRe = regexp.MustCompile(`^[a-z0-9][a-z0-9+.-]{1,254}$`)
+	// Docker image name component rules (reference component):
+	// - Lowercase letters, digits, hyphens, underscores only
+	// - Must start/end with alphanumeric
+	// - Max 128 chars per component
+	projectNameRegex = regexp.MustCompile(`^[a-z0-9]([a-z0-9_-]*[a-z0-9])?$`)
 	versionRegex     = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
 	usernameRegex    = regexp.MustCompile(`^[a-z_][a-z0-9_-]*$`)
 	gitEmailRegex    = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
@@ -36,16 +40,101 @@ func ValidateProjectName(name string) error {
 	if name == "" {
 		return errors.New("project name cannot be empty")
 	}
-	if !projectNameRegex.MatchString(name) {
-		return fmt.Errorf("invalid project name '%s'. Must be 1-128 characters, start with alphanumeric or underscore, and contain only alphanumeric, hyphens, and underscores", name)
+
+	// Length constraints
+	if len(name) > 128 {
+		return fmt.Errorf("project name '%s' is too long (max 128 characters)", name)
 	}
+
+	// Docker image name rules (most restrictive)
+	// Must be lowercase for image names
+	if !projectNameRegex.MatchString(name) {
+		return fmt.Errorf("invalid project name '%s': must be lowercase, start and end with alphanumeric, and contain only lowercase letters, digits, hyphens, and underscores", name)
+	}
+
+	// Filesystem restrictions - no path separators
+	if strings.ContainsAny(name, "/\\") {
+		return fmt.Errorf("invalid project name '%s': cannot contain path separators", name)
+	}
+
+	// No special filesystem names
+	if name == "." || name == ".." {
+		return fmt.Errorf("invalid project name '%s': reserved filesystem name", name)
+	}
+
+	// Windows reserved names
 	if runtime.GOOS == "windows" {
-		if _, reserved := reservedWin[strings.ToUpper(name)]; reserved {
+		// Check base name (without extension)
+		baseName := name
+		if idx := strings.IndexByte(name, '.'); idx != -1 {
+			baseName = name[:idx]
+		}
+		if _, reserved := reservedWin[strings.ToUpper(baseName)]; reserved {
 			return fmt.Errorf("invalid project name '%s': reserved by Windows", name)
+		}
+
+		// Windows forbidden characters
+		if strings.ContainsAny(name, `<>:"|?*`) {
+			return fmt.Errorf("invalid project name '%s': contains Windows forbidden characters", name)
+		}
+
+		// No trailing dots or spaces on Windows
+		if strings.HasSuffix(name, ".") || strings.HasSuffix(name, " ") {
+			return fmt.Errorf("invalid project name '%s': cannot end with dot or space on Windows", name)
 		}
 	}
 
+	// Docker Compose project name restrictions
+	// Project names become container names as: <project>-<service>-<replica>
+	// Container names have additional restrictions
+	if strings.HasPrefix(name, "-") || strings.HasSuffix(name, "-") {
+		return fmt.Errorf("invalid project name '%s': cannot start or end with hyphen", name)
+	}
+
+	// Consecutive separators can cause issues
+	if strings.Contains(name, "--") || strings.Contains(name, "__") {
+		return fmt.Errorf("invalid project name '%s': cannot contain consecutive separators", name)
+	}
+
+	// Shell variable safety (for .env usage)
+	// While PROJECT_ID is quoted, avoid potential issues
+	if strings.ContainsAny(name, "$`\"'\\!") {
+		return fmt.Errorf("invalid project name '%s': contains shell metacharacters", name)
+	}
+
 	return nil
+}
+
+// SanitizeProjectName attempts to convert a directory name to a valid project name
+func SanitizeProjectName(dirName string) (string, error) {
+	if dirName == "" {
+		return "", errors.New("directory name cannot be empty")
+	}
+
+	// Convert to lowercase
+	name := strings.ToLower(dirName)
+
+	// Replace invalid characters with hyphens
+	name = regexp.MustCompile(`[^a-z0-9_-]+`).ReplaceAllString(name, "-")
+
+	// Remove leading/trailing separators
+	name = strings.Trim(name, "-_")
+
+	// Collapse consecutive separators
+	name = regexp.MustCompile(`[-_]{2,}`).ReplaceAllString(name, "-")
+
+	// Truncate if too long
+	if len(name) > 128 {
+		name = name[:128]
+		name = strings.TrimRight(name, "-_")
+	}
+
+	// Validate the result
+	if err := ValidateProjectName(name); err != nil {
+		return "", fmt.Errorf("unable to sanitize '%s': %w", dirName, err)
+	}
+
+	return name, nil
 }
 
 func ValidateVersionArg(version string) error {

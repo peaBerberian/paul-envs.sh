@@ -8,7 +8,7 @@ func TestValidateProjectName(t *testing.T) {
 		ok   bool
 	}{
 		{"proj", true},
-		{"_proj-123", true},
+		{"proj-123", true},
 		{"", false},
 		{"-bad", false},
 		{"a" + string(make([]byte, 128)), false}, // too long

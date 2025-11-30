@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -215,12 +214,15 @@ func buildConfig(projectPath string, p *parsedFlags) (config.Config, error) {
 	cfg.InstallJujutsu = p.installJujutsu
 
 	// Project name
-	projectName := p.name
-	if projectName == "" {
-		projectName = filepath.Base(projectPath)
+	if p.name == "" {
+		p.name = filepath.Base(projectPath)
+	}
+	projectName, err := utils.SanitizeProjectName(p.name)
+	if err != nil {
+		return config.Config{}, fmt.Errorf("did not succeed to sanitize project name '%s': %w", p.name, err)
 	}
 	cfg.ProjectName = projectName
-	cfg.ProjectDestPath = sanitizeProjectName(projectName)
+	cfg.ProjectDestPath = projectName
 
 	// Ports and volumes
 	validPorts, invalidPorts := filterValidPorts(p.ports)
@@ -372,33 +374,6 @@ func parseShell(s string) (config.Shell, error) {
 	default:
 		return config.ShellBash, fmt.Errorf("invalid shell '%s'. Must be one of: bash, zsh, fish", s)
 	}
-}
-
-func sanitizeProjectName(input string) string {
-	s := strings.ToLower(input)
-	s = regexp.MustCompile(`[^a-z0-9_-]`).ReplaceAllString(s, "-")
-
-	// Remove leading non-alphanumeric
-	s = strings.TrimLeftFunc(s, func(r rune) bool {
-		return !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9')
-	})
-
-	// Collapse consecutive hyphens
-	for strings.Contains(s, "--") {
-		s = strings.ReplaceAll(s, "--", "-")
-	}
-
-	// Truncate and trim
-	if len(s) > 128 {
-		s = s[:128]
-	}
-	s = strings.TrimRight(s, "-")
-
-	if s == "" {
-		s = "project"
-	}
-
-	return s
 }
 
 func filterValidPorts(ports []string) ([]uint16, []string) {
