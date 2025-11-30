@@ -51,8 +51,6 @@ func (c *DockerEngine) RunContainer(ctx context.Context, project files.ProjectEn
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-	}
-	if err := cmd.Run(); err != nil {
 		if pErr := c.checkPermissions(ctx); pErr != nil {
 			return pErr
 		}
