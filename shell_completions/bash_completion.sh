@@ -6,14 +6,14 @@ _paulenvs()
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     # Main commands
-    local commands="create list build run remove"
+    local commands="create list build run remove version interactive help clean"
 
     # Options for create command
-    local create_flags="--name --uid --gid --username --shell --nodejs --rust --python --go --git-name --git-email --packages --enable-ssh --enable-sudo --neovim --starship --atuin --mise --zellij --jujutsu --port --volume"
+    local create_flags="--name --uid --gid --username --shell --nodejs --rust --python --go --git-name --git-email --package --enable-ssh --enable-sudo --neovim --starship --atuin --mise --zellij --jujutsu --port --volume"
 
-    # Get list of existing containers from paul-envs.sh ls
+    # Get list of existing containers from paul-envs ls
     _get_containers() {
-        paul-envs.sh ls 2>/dev/null | grep -E '^\s+-\s+' | sed 's/^\s*-\s*//'
+        paul-envs ls 2>/dev/null | grep -E '^\s+-\s+' | sed 's/^\s*-\s*//'
     }
 
     # First argument (command)
@@ -25,6 +25,10 @@ _paulenvs()
     local command="${COMP_WORDS[1]}"
 
     case "${command}" in
+        interactive)
+            # No further completion
+            return 0
+            ;;
         create)
             case "${prev}" in
                 --uid|--gid)
@@ -32,7 +36,7 @@ _paulenvs()
                     COMPREPLY=( $(compgen -W "$(id -u) $(id -g)" -- ${cur}) )
                     return 0
                     ;;
-                --username|--git-name|--git-email|--packages|--nodejs|--rust|--python|--go|--port)
+                --username|--git-name|--git-email|--package|--nodejs|--rust|--python|--go|--port)
                     # Let user type freely
                     COMPREPLY=()
                     return 0
@@ -72,11 +76,11 @@ _paulenvs()
             fi
             return 0
             ;;
-        list)
+        list|help|version|clean)
             # No further completion
             return 0
             ;;
     esac
 }
 
-complete -F _paulenvs paul-envs.sh
+complete -F _paulenvs paul-envs

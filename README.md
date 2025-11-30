@@ -1,6 +1,6 @@
-# paul-envs.sh
+# paul-envs
 
-`paul-envs.sh` allows me to manage development containers so I can easily work
+`paul-envs` allows me to manage development containers so I can easily work
 on multiple large projects with rapidly changing dependencies in isolated and
 minimal containers.
 
@@ -42,7 +42,8 @@ Key features:
 -  **Easy to use**: I made it compatible with MacOS, Linux and Windows, with
    automatic x86_64 or arm64 container creation depending on the host.
 
-   The script also guides you when you call any command without argument.
+   The `paul-envs` binary also guides you when you call any command without
+   argument.
 
 
 ## Comparison with other similar tools
@@ -75,30 +76,32 @@ isolation (same issue than with `devbox`).
 1. Clone this repository, `cd` to it, and ensure `docker compose` is installed
    locally and accessible in path.
 
-2. Run `./paul-envs.sh create <path/to/your/project> --name myApp`.
+2. Run `./paul-envs create <path/to/your/project>`
 
    This will just create a compose and env file in a new `projects/` directory
-   with the right preset properties and name the project `myApp`. If no
-   `--name` flag is provided, the choosen name will be the name of the project's
-   directory.
+   with the right preset properties depending on your answers on what it
+   prompted you (default shell, packages to install, languages etc.).
 
-3. Optionally, put the "dotfiles" that you want to retrieve in the container's
-   home directory in `configs`. They will be copied to the container when it is
-   build (next step).
+3. The `create` command you ran at the previous step should have finished by
+   listing what you can do now. You may review the created configuration to see
+   if it seems right (and you can update those files at any time).
 
-   Note that you shouldn't put your credentials/secrets in there (`~/.ssh`,
-   `~/.aws`, `~/.git-credentials` etc.) as those could have issues being
-   copied (due to restrictive permissions).
+   More importantly, it will also invite you to put the "dotfiles" (e.g. your
+   `.zshrc`) that you want to retrieve in the container's home directory in a
+   specific folder.
 
-   If you want to copy some of those, see `./paul-envs.sh create` flags.
+   They will be copied to the container when it is build (next step).
 
-4. Run `./paul-envs.sh build myApp`.
+4. Run `./paul-envs build <name>`
+
+   With the `<name>` being the name given at the end of step `2`.
 
    It will build the container through the right `docker compose build`
-   invokation and initialize persistent volumes.
+   invokation and initialize persistent volumes. You can call again `build` any
+   time you update the config or want to update the installed tools.
 
 5. Then launch the container each time you want to work on the project:
-   `./paul-envs.sh run myApp`.
+   `./paul-envs run <name>`.
 
    The mounted project is available in that container at `~/projects/myApp`.
 
@@ -149,14 +152,14 @@ through persistent volumes.
 First you need to clone this repository and make it your current working
 directory:
 ```sh
-git clone https://github.com/peaBerberian/paul-envs.sh.git
-cd paul-envs.sh
+git clone https://github.com/peaBerberian/paul-envs.git
+cd paul-envs
 ```
 
-Running `./paul-envs.sh` without any argument will list all available operations
+Running `./paul-envs` without any argument will list all available operations
 and corresponding flags:
 ```sh
-./paul-envs.sh
+./paul-envs
 ```
 
 ### 1. Create a new container's config
@@ -166,11 +169,11 @@ same base with variations).
 
 This container first need to be configured to point to your project and have the
 right arguments (e.g. the right tools and git configuration). This is done
-through the `paul-envs.sh create` "command".
+through the `paul-envs create` "command".
 
 First ensure the target project is present locally in your host, then run:
 ```sh
-./paul-envs.sh create <path/to/your/project>
+./paul-envs create <path/to/your/project>
 ```
 
 Optionally, you may add a lot of flags to better configure that container.
@@ -178,7 +181,7 @@ Here's an example of a real-life usage:
 ```sh
 # Will create a container named `myapp` with a default `zsh` shell and many
 # configurations. Also mount your `.git-credentials` readonly to the container.
-./paul-envs.sh create myapp ~/work/api \
+./paul-envs create myapp ~/work/api \
   --name myProject
   --shell zsh \
   --node-version 22.11.0 \
@@ -190,7 +193,7 @@ Here's an example of a real-life usage:
   --volume ~/.git-credentials:/home/dev/.git-credentials:ro
 ```
 
-Without the corresponding flags, prompts will be proposed by `paul-envs.sh` for
+Without the corresponding flags, prompts will be proposed by `paul-envs` for
 important parameters (choosen shell, wanted pre-mounted volumes etc.).
 
 What this step does is just to create both a `yaml` and a `.env` file containing
@@ -207,10 +210,10 @@ configuration to define the container we want to build.
 
 This step relies on `docker compose`, which you should have locally installed.
 
-To build a container, just run the `paul-envs.sh build <NAME>` command.
+To build a container, just run the `paul-envs build <NAME>` command.
 For example, with a container named `myApp`, you would just do:
 ```sh
-./paul-envs.sh build myApp
+./paul-envs build myApp
 ```
 
 This will take some time as the initialization of the container is going on:
@@ -219,10 +222,10 @@ packages are loaded, tools are set-up etc.
 ### 3. Run the container
 
 Now that the container is built. It can be run at any time, with the
-`./paul-envs.sh run` command.
+`./paul-envs run` command.
 For example, with a container named `myApp`, you would do:
 ```sh
-./paul-envs.sh build myApp
+./paul-envs build myApp
 ```
 
 You will directly switch to that container's `$HOME/projects/<NAME>` directory
@@ -242,16 +245,16 @@ rebuild just to update some base tools).
 
 ### Other commands
 
-`paul-envs.sh` also proposes the `list` and `remove` commands, respectively to
+`paul-envs` also proposes the `list` and `remove` commands, respectively to
 list "created" configurations (what's in the `projects` directory basically) and
 to easily remove one of them (basically a `rm` command for that configuration)
 respectively:
 ```sh
 # List all created configurations, built or not
-./paul-envs.sh list
+./paul-envs list
 
 # Remove the configuration file for the `myApp` container
-./paul-envs.sh remove myApp
+./paul-envs remove myApp
 ```
 
 ## What gets preserved vs. ephemeral
@@ -271,25 +274,26 @@ will be removed when the container is exited).
 ## Deep dive on how it works
 
 Much like container applications, this repository is organized in separate
-layers: `Dockerfile`, `compose.yaml` and `paul-envs.sh` script, from the core
-layer to the most outer one, each inner layer being able to run independently
-of its outer layers (just losing some features in the process).
+layers: `Dockerfile`, `compose.yaml` and `paul-envs`, from the core layer to the
+most outer one, each inner layer being able to run independently of its outer
+layers (just losing some features in the process).
 
 The following chapters explain each layer and how to run them independently if
 wanted. If you just want to [run this without understanding every little
-details](https://www.youtube.com/watch?v=bJHPfpOnDzg) just run `paul-envs.sh`
+details](https://www.youtube.com/watch?v=bJHPfpOnDzg) just run `paul-envs`
 and performs the operations it advertises.
 
 ### Dockerfile
 
-The `Dockerfile` sets a simple Ubuntu LTS environment with a shell of your
-preference (either `bash` as default or `zsh` or `fish`) and optional popular
-CLI tools (`neovim`, `starship`, `atuin`, `zellij`, `jujutsu` and `mise`).
+The `Dockerfile` (`./internal/files/assets/Dockerfile`) sets a simple Ubuntu
+LTS environment with a shell of your preference (either `bash` as default or
+`zsh` or `fish`) and optional popular CLI tools (`neovim`, `starship`, `atuin`,
+`zellij`, `jujutsu` and `mise`).
 
-It also copies the content of the `configs` directory inside of that container
-and sets-up `$HOME/.container-cache` and `$HOME/.container-local` directories
-for cache and tools' local data (including shell history, `atuin` database,
-`mise` environments) respectively.
+It also copies your dotfiles directory inside of that container and sets-up
+`$HOME/.container-cache` and `$HOME/.container-local` directories for cache and
+tools' local data (including shell history, `atuin` database, `mise`
+environments) respectively.
 
 You can rely on this `Dockerfile` without anything else, as a standalone, e.g.
 via `docker`. Note that if you do that, you won't have persistent volumes for
@@ -297,17 +301,15 @@ cache, tools data and the project code, which would have to be re-populated each
 time the container is run. Adding persistence is the main point of the
 `compose.yaml` file.
 
-### The configs directory
+### The dotfiles directory
 
-The `configs` directory in this repository helps with the initialization of
-so-called "dotfiles" in the created containers.
-
-Its content will be merged with the home directory of the container. As such you
-can put a `.bashrc` directly in there at its root, and the config for the tools
-you planned to install (e.g. the `starship` configuration file: `starship.toml`,
-a `nvim` directory for `neovim` etc.):
+The "dotfiles directory" is a special location that will be merged with the home
+directory of an image once built. As such you can put a `.bashrc` directly in
+there at its root, and the config for the tools you planned to install (e.g. the
+`starship` configuration file: `starship.toml`, a `nvim` directory for `neovim`
+etc.):
 ```
-configs/
+dotfiles_dir/
 ├── .bashrc
 └── .config/
     ├── starship.toml (config for the starship tool)
@@ -315,7 +317,7 @@ configs/
         └── ... (your neovim config)
 ```
 
-All files in `configs` will be copied as is unmodified, with two exceptions:
+All its content will be copied as is unmodified, with two exceptions:
 
 1.  shell files  (`.bashrc`, `.zshrc` and/or `.config/fish/config.fish` files)
     may still be updated after being copied in the dockerfile to redirect their
@@ -334,9 +336,13 @@ If you're not overwriting those files however, the default provided one will
 already contain the initialization code for all the tools explicitely listed in
 the dockerfile.
 
-The job of copying the `configs` directory's content is taken by the
+The job of copying the dotfiles directory's content is taken by the
 `Dockerfile`. Meaning that you'll profit from this even if you're not relying on
-`docker compose` or `paul-envs.sh`.
+`docker compose` or `paul-envs`.
+
+If you don't go through `paul-envs`, you will have to set the `DOTFILES_DIR` env
+variable yourself so it points to the dotfiles directory you defined yourself.
+When relying on `paul-envs`, a directory will be created for you.
 
 #### Note about neovim
 
@@ -345,24 +351,16 @@ container is built if you rely on the `lazy.nvim` plugin manager.
 
 With other solutions, the installation will need to be done the first time the
 container is ran (it should be persisted thereafter if going the
-`compose.yaml` or `paul-envs.sh` route).
+`compose.yaml` or `paul-envs` route).
 
 ### compose.yaml
 
-The `compose.yaml` file allows `docker compose` to build a container with
-the right arguments for your project. More importantly, it also mount the
-right "volumes" so that some changes (project changes, cache, tools data,
-shell history etc.) are persisted.
+The `compose.yaml` file (`./internal/files/assets/compose.tmpl`) allows
+`docker compose` to build a container with the right arguments for your project.
+More importantly, it also mount the right "volumes" so that some changes
+(project changes, cache, tools data, shell history etc.) are persisted.
 
-In simple single-projects scenarios, it can also be relied on directly.
-Just set the right env variables listed in there (.e.g in an `env` file) and
-rely on `docker compose` directly (e.g. `docker compose build`). It works!
-
-If you just want to do that, refer to the `compose.yaml` file. It contains
-documentation on how to exploit `docker compose` directly instead of going
-through my `paul-envs.sh` script.
-
-### The paul-envs.sh script
+### The paul-envs binary
 
 Managing very dynamic configurations for multiple projects just with
 `docker compose` is not as straightforward as I would have liked: depending on
@@ -370,14 +368,14 @@ what you want to do, the idiomatic ways to configure it are through either
 environment variables or new compose files.
 
 Instead of doing both, which would have been difficult to maintain (and to
-remember what goes where and why), I thus decided to create a `paul-envs.sh`
-script whose job is to wrap both compose files creation and `docker compose`
+remember what goes where and why), I thus decided to create a `paul-envs`
+tool whose job is to wrap both compose files creation and `docker compose`
 calls.
 
 Through a small list of commands and a high number of flags, it is now possible
 to easily create configurations, build containers, run them, list them etc.
 
-That script actually just writes `compose.yaml` files and wraps `docker compose`
+That binary actually just writes `compose.yaml` files and wraps `docker compose`
 calls, with also some input validation and the printing of helpful information
 on top.
 
@@ -405,6 +403,26 @@ Along the mounted project, those are the only directories which are persisted.
 
 ## TODO:
 
-- something like `up` / `down` commands make now much more sense with ssh
-- Add Kakoune and Helix as potential tools
+- implement lockfile reading
+- help flag per commands
+- Check if already built on run
+- executable in github release on tag
+- update project name
+- fix CI
+- => Go can be merged I think
+- SHould remove also remove networks?
+- SHould remove also remove volume directly?
+- ci tests for clean command?
+- on Remove, propose to call docker ourselve to remove the volume
+- flags for clean: --no-prompt, --no-config, --no-image, --no-cache
+- `run` should propose to `build` if not already done
+- `update` command?
+- Shell completions under specific command?
+- Commands work even if a subset is written
 - Only max a single instance of each project-container?
+- something like `up` / `down` commands make now much more sense with ssh
+- support rootless
+- Add Kakoune and Helix as potential tools
+- less gh-action, more scripts (in-docker for local tests?)
+- issues when calling `create` with `sudo`
+- BAD project name clean up
