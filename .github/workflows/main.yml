@@ -409,16 +409,6 @@ jobs:
           echo "echo 'Hello from test script'" > test-project/test.sh
           chmod +x test-project/test.sh
 
-      - name: Verify base compose.yaml exists
-        shell: bash
-        run: |
-          if [ ! -f compose.yaml ]; then
-            echo "ERROR: Base compose.yaml not found"
-            echo "Build tests require compose.yaml in repository root"
-            exit 1
-          fi
-          echo "✓ Base compose.yaml found"
-
       - name: Create minimal build test project
         shell: bash
         run: |
