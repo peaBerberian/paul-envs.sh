@@ -162,27 +162,42 @@ func buildConfig(projectPath string, p *parsedFlags) (config.Config, error) {
 		cfg.GID = p.gid
 	}
 	if p.username != "" {
-		if err := utils.ValidateUsername(p.username); err == nil {
-			cfg.Username = p.username
+		if err := utils.ValidateUsername(p.username); err != nil {
+			return config.Config{}, fmt.Errorf("invalid username '%s': %w", p.gid, err)
 		}
+		cfg.Username = p.username
 	}
 	if p.shell != "" {
-		if shell, err := parseShell(p.shell); err == nil {
-			cfg.Shell = shell
+		shell, err := parseShell(p.shell)
+		if err != nil {
+			return config.Config{}, fmt.Errorf("invalid shell '%s': %w", p.gid, err)
 		}
+		cfg.Shell = shell
 	}
 
 	// Language versions
-	if p.nodeVersion != "" && utils.ValidateVersionArg(p.nodeVersion) == nil {
+	if p.nodeVersion != "" {
+		if err := utils.ValidateVersionArg(p.nodeVersion); err != nil {
+			return config.Config{}, fmt.Errorf("invalid node version '%s': %w", p.nodeVersion, err)
+		}
 		cfg.InstallNode = p.nodeVersion
 	}
-	if p.rustVersion != "" && utils.ValidateVersionArg(p.rustVersion) == nil {
+	if p.rustVersion != "" {
+		if err := utils.ValidateVersionArg(p.rustVersion); err != nil {
+			return config.Config{}, fmt.Errorf("invalid rust version '%s': %w", p.rustVersion, err)
+		}
 		cfg.InstallRust = p.rustVersion
 	}
-	if p.pythonVersion != "" && utils.ValidateVersionArg(p.pythonVersion) == nil {
+	if p.pythonVersion != "" {
+		if err := utils.ValidateVersionArg(p.pythonVersion); err != nil {
+			return config.Config{}, fmt.Errorf("invalid python version '%s': %w", p.pythonVersion, err)
+		}
 		cfg.InstallPython = p.pythonVersion
 	}
-	if p.goVersion != "" && utils.ValidateVersionArg(p.goVersion) == nil {
+	if p.goVersion != "" {
+		if err := utils.ValidateVersionArg(p.goVersion); err != nil {
+			return config.Config{}, fmt.Errorf("invalid go version '%s': %w", p.goVersion, err)
+		}
 		cfg.InstallGo = p.goVersion
 	}
 
@@ -191,10 +206,16 @@ func buildConfig(projectPath string, p *parsedFlags) (config.Config, error) {
 	cfg.EnableSudo = p.enableSudo
 
 	// Git config
-	if p.gitName != "" && utils.ValidateGitName(p.gitName) == nil {
+	if p.gitName != "" {
+		if err := utils.ValidateGitName(p.gitName); err != nil {
+			return config.Config{}, fmt.Errorf("invalid git name '%s': %w", p.gitName, err)
+		}
 		cfg.GitName = p.gitName
 	}
-	if p.gitEmail != "" && utils.ValidateGitEmail(p.gitEmail) == nil {
+	if p.gitEmail != "" {
+		if err := utils.ValidateGitEmail(p.gitEmail); err != nil {
+			return config.Config{}, fmt.Errorf("invalid git e-mail '%s': %w", p.gitEmail, err)
+		}
 		cfg.GitEmail = p.gitEmail
 	}
 
