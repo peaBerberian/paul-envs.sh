@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/peaberberian/paul-envs/internal/console"
@@ -11,12 +12,21 @@ import (
 func Remove(args []string, filestore *files.FileStore, console *console.Console) error {
 	var name string
 	if len(args) == 0 {
-		var err error
-		err = List(filestore, console)
-		if err != nil {
-			return fmt.Errorf("no project name given, and failed to list other projects: %w", err)
-		}
 		console.WriteLn("No project name given, listing projects...")
+		entries, err := filestore.GetAllProjects()
+		if err != nil {
+			return fmt.Errorf("could not list all projects: %w", err)
+		}
+		if len(entries) == 0 {
+			console.WriteLn("  (no project found)")
+			console.WriteLn("Hint: Create one with 'paul-envs create <path>'")
+			return errors.New("no existing project")
+		}
+		for _, entry := range entries {
+			console.WriteLn("")
+			console.WriteLn(entry.ProjectName)
+			console.WriteLn("  Project path: %s", entry.ProjectPath)
+		}
 		console.WriteLn("")
 		name, err = console.AskString("Enter project name to remove", "")
 		if err != nil {

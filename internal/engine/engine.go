@@ -9,6 +9,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/peaberberian/paul-envs/internal/files"
 )
@@ -20,17 +21,22 @@ const (
 )
 
 type ContainerEngine interface {
-	CheckPermissions(ctx context.Context) error
 	BuildContainer(ctx context.Context, project files.ProjectEntry, dotfilesDir string) error
 	RunContainer(ctx context.Context, project files.ProjectEntry, args []string) error
-	Info(ctx context.Context) (ContainerInfo, error)
+	Info(ctx context.Context) (EngineInfo, error)
 	CreateVolume(ctx context.Context, name string) error
 	HasBeenBuilt(ctx context.Context, projectName string) (bool, error)
+	GetImageInfo(ctx context.Context, projectName string) (*ImageInfo, error)
 }
 
-type ContainerInfo struct {
+type EngineInfo struct {
 	Name    string
 	Version string
+}
+
+type ImageInfo struct {
+	ImageName string
+	BuiltAt   *time.Time
 }
 
 func New(ctx context.Context) (ContainerEngine, error) {

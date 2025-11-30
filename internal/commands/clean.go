@@ -8,19 +8,10 @@ import (
 	"strings"
 
 	"github.com/peaberberian/paul-envs/internal/console"
-	"github.com/peaberberian/paul-envs/internal/engine"
 	"github.com/peaberberian/paul-envs/internal/files"
 )
 
 func Clean(ctx context.Context, filestore *files.FileStore, console *console.Console) error {
-	containerEngine, err := engine.New(ctx)
-	if err != nil {
-		return err
-	}
-	if err := containerEngine.CheckPermissions(ctx); err != nil {
-		return err
-	}
-
 	console.Info("\n1. Projects' configuration")
 	console.WriteLn("This will clean-up the container configurations you created with the 'create' command.")
 	choice, err := console.AskYesNo("Remove projects configuration files?", true)

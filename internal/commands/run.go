@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/peaberberian/paul-envs/internal/console"
@@ -21,21 +22,26 @@ func Run(ctx context.Context, args []string, filestore *files.FileStore, console
 	if err != nil {
 		return err
 	}
-	if err := containerEngine.CheckPermissions(ctx); err != nil {
-		return err
-	}
 
 	var name string
 	var cmdArgs []string
 
 	if len(args) == 0 {
-		var err error
-		// TODO: don't use list here
-		err = List(filestore, console)
-		if err != nil {
-			return fmt.Errorf("no project name given, and failed to list other projects: %w", err)
-		}
 		console.WriteLn("No project name given, listing projects...")
+		entries, err := filestore.GetAllProjects()
+		if err != nil {
+			return fmt.Errorf("could not list all projects: %w", err)
+		}
+		if len(entries) == 0 {
+			console.WriteLn("  (no project found)")
+			console.WriteLn("Hint: Create one with 'paul-envs create <path>'")
+			return errors.New("no existing project")
+		}
+		for _, entry := range entries {
+			console.WriteLn("")
+			console.WriteLn(entry.ProjectName)
+			console.WriteLn("  Project path: %s", entry.ProjectPath)
+		}
 		console.WriteLn("")
 		name, err = console.AskString("Enter project name to run", "")
 		if err != nil {
@@ -63,7 +69,10 @@ func Run(ctx context.Context, args []string, filestore *files.FileStore, console
 		return fmt.Errorf("failed to obtain information on project '%s': %w", name, err)
 	}
 
-	hasBeenBuilt, _ := containerEngine.HasBeenBuilt(ctx, project.ProjectName)
+	hasBeenBuilt, err := containerEngine.HasBeenBuilt(ctx, project.ProjectName)
+	if err != nil {
+		return fmt.Errorf("failed to get the status of the '%s' project: %w", project.ProjectName, err)
+	}
 	if !hasBeenBuilt {
 		console.WriteLn("The '%s' project has not been built yet", project.ProjectName)
 		choice, err := console.AskYesNo("Do you want to build it?", true)

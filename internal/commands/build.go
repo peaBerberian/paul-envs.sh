@@ -17,10 +17,6 @@ func Build(ctx context.Context, args []string, filestore *files.FileStore, conso
 	if err != nil {
 		return err
 	}
-	if err := containerEngine.CheckPermissions(ctx); err != nil {
-		return err
-	}
-
 	name, err := getProjectName(args, filestore, console, "build")
 	if err != nil {
 		return err
@@ -61,12 +57,21 @@ func getProjectName(args []string, filestore *files.FileStore, console *console.
 	if len(args) > 0 {
 		return args[0], nil
 	}
-
-	// TODO: Re-using list here is bad
-	if err := List(filestore, console); err != nil {
-		return "", fmt.Errorf("failed to list projects: %w", err)
+	entries, err := filestore.GetAllProjects()
+	if err != nil {
+		return "", fmt.Errorf("could not list all projects: %w", err)
 	}
-
+	if len(entries) == 0 {
+		console.WriteLn("  (no project found)")
+		console.WriteLn("Hint: Create one with 'paul-envs create <path>'")
+		return "", errors.New("no existing project")
+	}
+	for _, entry := range entries {
+		console.WriteLn("")
+		console.WriteLn(entry.ProjectName)
+		console.WriteLn("  Project path: %s", entry.ProjectPath)
+	}
+	console.WriteLn("")
 	name, err := console.AskString(fmt.Sprintf("Enter project name to %s", action), "")
 	if err != nil {
 		return "", err
