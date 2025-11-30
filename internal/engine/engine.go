@@ -25,6 +25,7 @@ type ContainerEngine interface {
 	RunContainer(ctx context.Context, project files.ProjectEntry, args []string) error
 	Info(ctx context.Context) (ContainerInfo, error)
 	CreateVolume(ctx context.Context, name string) error
+	HasBeenBuilt(ctx context.Context, projectName string) (bool, error)
 }
 
 type ContainerInfo struct {

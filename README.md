@@ -404,12 +404,11 @@ Along the mounted project, those are the only directories which are persisted.
 ## TODO:
 
 - implement lockfile reading
-- help flag per commands
-- Check if already built on run
 - executable in github release on tag
 - update project name
 - fix CI
 - => Go can be merged I think
+- help flag per commands
 - SHould remove also remove networks?
 - SHould remove also remove volume directly?
 - ci tests for clean command?

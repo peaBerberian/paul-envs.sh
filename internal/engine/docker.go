@@ -70,6 +70,26 @@ func (c *DockerEngine) RunContainer(ctx context.Context, project files.ProjectEn
 	return nil
 }
 
+func (c *DockerEngine) HasBeenBuilt(ctx context.Context, projectName string) (bool, error) {
+	imageName := fmt.Sprintf("paulenv:%s", projectName)
+	cmd := exec.CommandContext(ctx, "docker", "image", "inspect", imageName)
+	err := cmd.Run()
+
+	if err != nil {
+		// Check if it's a "not found" error vs other error
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			if exitErr.ExitCode() == 1 {
+				// Image doesn't exist
+				return false, nil
+			}
+		}
+		// Other error
+		return false, err
+	}
+
+	return true, nil
+}
+
 func (c *DockerEngine) Info(ctx context.Context) (ContainerInfo, error) {
 	cmd := exec.CommandContext(ctx, "docker", "--version")
 	output, err := cmd.Output()
