@@ -40,7 +40,7 @@ func main() {
 	case "create", "c", "--create", "-c":
 		cmdErr = commands.Create(args, filestore, console)
 	case "list", "ls", "l", "--list", "-l":
-		cmdErr = commands.List(ctx, filestore, console)
+		cmdErr = commands.List(ctx, args, filestore, console)
 	case "build", "b", "--build", "-b":
 		cmdErr = commands.Build(ctx, args, filestore, console)
 	case "run", "e", "--run", "-e":

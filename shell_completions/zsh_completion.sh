@@ -3,7 +3,7 @@
 _paulenvs() {
     local -a commands
     commands=(
-			  'interactive:Start interactive mode'
+        'interactive:Start interactive mode'
         'create:Create a container configuration'
         'list:List all available containers'
         'build:Build a container'
@@ -16,8 +16,7 @@ _paulenvs() {
 
     # Get list of existing containers from paul-envs ls
     local -a containers
-		# XXX TODO: Update
-    containers=(${(f)"$(paul-envs ls 2>/dev/null | grep -E '^\s+-\s+' | sed 's/^\s*-\s*//')"})
+    containers=(${(f)"$(paul-envs list --names 2>/dev/null)"})
 
 
     _arguments -C \
@@ -59,6 +58,10 @@ _paulenvs() {
                         '*--port[Expose port]:port:' \
                         '*--volume[Add volume]:volume:_files'
                     ;;
+                list)
+                    _arguments \
+                        '--names[Only display names]' \
+                    ;;
                 build)
                     _arguments \
                         "2:container name:(${containers[@]})"
@@ -71,9 +74,6 @@ _paulenvs() {
                 remove)
                     _arguments \
                         "2:container name:(${containers[@]})"
-                    ;;
-                list)
-                    # No additional arguments
                     ;;
                 help)
                     # No additional arguments

@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"flag"
 	"fmt"
 
 	"github.com/peaberberian/paul-envs/internal/console"
@@ -9,7 +10,14 @@ import (
 	"github.com/peaberberian/paul-envs/internal/files"
 )
 
-func List(ctx context.Context, filestore *files.FileStore, console *console.Console) error {
+func List(ctx context.Context, args []string, filestore *files.FileStore, console *console.Console) error {
+	nameOnly := false
+	flagset := flag.NewFlagSet("list", flag.ContinueOnError)
+	flagset.BoolVar(&nameOnly, "names", false, "Only display names")
+	if err := flagset.Parse(args); err != nil {
+		return err
+	}
+
 	entries, err := filestore.GetAllProjects()
 	if err != nil {
 		return fmt.Errorf("could not list all projects: %w", err)
@@ -24,6 +32,10 @@ func List(ctx context.Context, filestore *files.FileStore, console *console.Cons
 	if len(entries) == 0 {
 		console.WriteLn("  (no project found)")
 		console.WriteLn("Hint: Create one with 'paul-envs create <path>'")
+	} else if nameOnly {
+		for _, entry := range entries {
+			console.WriteLn(entry.ProjectName)
+		}
 	} else {
 		for _, entry := range entries {
 			var imageInfo *engine.ImageInfo

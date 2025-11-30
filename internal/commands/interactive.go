@@ -38,7 +38,7 @@ func Interactive(ctx context.Context, fs *files.FileStore, c *console.Console) e
 			}
 			cmdErr = Create([]string{path}, fs, c)
 		case "2", "list", "ls":
-			cmdErr = List(ctx, fs, c)
+			cmdErr = List(ctx, []string{}, fs, c)
 		case "3", "build":
 			cmdErr = Build(ctx, []string{}, fs, c)
 		case "4", "run":

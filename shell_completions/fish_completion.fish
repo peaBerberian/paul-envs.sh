@@ -2,8 +2,7 @@
 
 # Helper function to get container names from paul-envs ls
 function __paul_envs_containers
-    # XXX TODO: Update
-    paul-envs ls 2>/dev/null | grep -E '^\s+-\s+' | sed 's/^\s*-\s*//'
+    paul-envs list --names 2>/dev/null
 end
 
 # Main commands
@@ -40,6 +39,8 @@ complete -c paul-envs -n "__fish_seen_subcommand_from create" -l zellij -d "Inst
 complete -c paul-envs -n "__fish_seen_subcommand_from create" -l jujutsu -d "Install Jujutsu" -f
 complete -c paul-envs -n "__fish_seen_subcommand_from create" -l port -d 'Expose port' -x
 complete -c paul-envs -n "__fish_seen_subcommand_from create" -l volume -d 'Add volume' -r
+
+complete -c paul-envs -n "__fish_seen_subcommand_from list" -l names -d "Only display names" -f
 
 # Container name completion for build, run, remove
 complete -c paul-envs -f -n "__fish_seen_subcommand_from build" -a '(__paul_envs_containers)'
