@@ -169,7 +169,7 @@ func (f *FileStore) CreateProjectFiles(
 // Write the base Dockerfile and compose.yaml file in the base directory if not
 // already done
 func (f *FileStore) ensureCreatedBaseFiles() error {
-	// Write docker file if needed
+	// Write Dockerfile if needed
 	baseDockerfilePath := filepath.Join(f.baseDataDir, "Dockerfile")
 	_, err := os.Stat(baseDockerfilePath)
 	if os.IsNotExist(err) {
@@ -188,16 +188,16 @@ func (f *FileStore) ensureCreatedBaseFiles() error {
 		return err
 	}
 
-	baseEntryPointPath := filepath.Join(f.baseDataDir, "docker-entrypoint.sh")
+	baseEntryPointPath := filepath.Join(f.baseDataDir, "entrypoint.sh")
 	_, err = os.Stat(baseEntryPointPath)
 	if os.IsNotExist(err) {
-		entrypointData, err := assets.ReadFile("embeds/docker-entrypoint.sh")
+		entrypointData, err := assets.ReadFile("embeds/entrypoint.sh")
 		if err != nil {
 			return err
 		}
 
 		err = f.userFS.WriteFileAsUser(
-			filepath.Join(f.baseDataDir, "docker-entrypoint.sh"),
+			filepath.Join(f.baseDataDir, "entrypoint.sh"),
 			entrypointData, 0644)
 		if err != nil {
 			return err

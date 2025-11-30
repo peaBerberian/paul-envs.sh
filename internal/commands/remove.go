@@ -49,7 +49,8 @@ func Remove(args []string, filestore *files.FileStore, console *console.Console)
 		return fmt.Errorf("Failed to remove project: %w", err)
 	}
 	console.Success("Removed project '%s'", name)
-	console.WriteLn("Note: Docker volumes are preserved. To remove them, run:")
+	// TODO: propose to do it
+	console.WriteLn("Note: Volumes are preserved. To remove them, run:")
 	console.WriteLn("  docker volume rm paulenv-%s-local", name)
 	return nil
 }

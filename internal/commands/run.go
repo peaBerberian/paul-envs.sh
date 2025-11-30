@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 
 	"github.com/peaberberian/paul-envs/internal/console"
+	"github.com/peaberberian/paul-envs/internal/engine"
 	"github.com/peaberberian/paul-envs/internal/files"
 	"github.com/peaberberian/paul-envs/internal/utils"
 )
@@ -18,10 +18,11 @@ func Run(ctx context.Context, args []string, filestore *files.FileStore, console
 	default:
 	}
 
-	if err := utils.CheckDockerComposeInstallation(ctx); err != nil {
-		return fmt.Errorf("docker compose not found, is it installed: %w", err)
+	containerEngine, err := engine.New(ctx)
+	if err != nil {
+		return err
 	}
-	if err := utils.CheckDockerPermissions(ctx); err != nil {
+	if err := containerEngine.CheckPermissions(ctx); err != nil {
 		return err
 	}
 
@@ -66,15 +67,10 @@ func Run(ctx context.Context, args []string, filestore *files.FileStore, console
 		}
 		return fmt.Errorf("failed to obtain information on project '%s': %w", name, err)
 	}
-	args = []string{"compose", "-f", baseCompose, "-f", project.ComposeFilePath, "--env-file", project.EnvFilePath, "run", "--rm", "paulenv"}
-	args = append(args, cmdArgs...)
-	cmd := exec.CommandContext(ctx, "docker", args...)
-	cmd.Env = append(os.Environ(), "COMPOSE_PROJECT_NAME=paulenv-"+name)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("Run failed: %w", err)
+
+	err = containerEngine.RunContainer(ctx, baseCompose, project, cmdArgs)
+	if err != nil {
+		return err
 	}
 
 	return nil

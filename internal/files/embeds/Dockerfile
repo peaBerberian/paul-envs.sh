@@ -434,12 +434,12 @@ RUN cp -a /home/${USERNAME}/.container-local/. /home/${USERNAME}/.initial-local/
 # ENV needed by the entrypoint
 ENV INITIAL_CACHE_DIR=/home/${USERNAME}/.initial-cache
 ENV INITIAL_LOCAL_DIR=/home/${USERNAME}/.initial-local
-ENV DOCKER_USERNAME=${USERNAME}
+ENV CONTAINER_USERNAME=${USERNAME}
 ENV USER_SHELL=${SHELL}
-ENV DOCKER_CACHE_DIR=/home/${USERNAME}/.container-cache/
-ENV DOCKER_LOCAL_DIR=/home/${USERNAME}/.container-local/
+ENV CONTAINER_CACHE_DIR=/home/${USERNAME}/.container-cache/
+ENV CONTAINER_LOCAL_DIR=/home/${USERNAME}/.container-local/
 
 # Add entrypoint script (conditionally starts SSH, init cache etc.)
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

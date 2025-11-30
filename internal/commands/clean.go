@@ -8,12 +8,16 @@ import (
 	"strings"
 
 	"github.com/peaberberian/paul-envs/internal/console"
+	"github.com/peaberberian/paul-envs/internal/engine"
 	"github.com/peaberberian/paul-envs/internal/files"
-	"github.com/peaberberian/paul-envs/internal/utils"
 )
 
 func Clean(ctx context.Context, filestore *files.FileStore, console *console.Console) error {
-	if err := utils.CheckDockerPermissions(ctx); err != nil {
+	containerEngine, err := engine.New(ctx)
+	if err != nil {
+		return err
+	}
+	if err := containerEngine.CheckPermissions(ctx); err != nil {
 		return err
 	}
 
@@ -67,7 +71,7 @@ func Clean(ctx context.Context, filestore *files.FileStore, console *console.Con
 		}
 	}
 
-	console.Info("\n4. Docker build cache?")
+	console.Info("\n4. Image build cache?")
 	console.WriteLn("This will free up disk space but slow down future rebuilds.")
 	choice, err = console.AskYesNo("Remove cache?", false)
 	if err != nil {
@@ -89,6 +93,7 @@ func removeContainers(ctx context.Context, console *console.Console) error {
 	console.WriteLn("\nStopping and removing containers...")
 
 	// List containers
+	// TODO: move to engine code
 	cmd := exec.CommandContext(ctx, "docker", "ps", "-a", "--filter", "name=paulenv-", "--format", "{{.ID}} {{.Names}}")
 	output, err := cmd.Output()
 	if err != nil {
@@ -113,6 +118,7 @@ func removeContainers(ctx context.Context, console *console.Console) error {
 		}
 
 		console.WriteLn("  • Removing container: %s", name)
+		// TODO: move to engine code
 		cmd := exec.CommandContext(ctx, "docker", "rm", "-f", id)
 		if err := cmd.Run(); err != nil {
 			console.Warn("    WARNING: failed to remove %s: %v", name, err)
@@ -125,6 +131,7 @@ func removeContainers(ctx context.Context, console *console.Console) error {
 func removeImages(ctx context.Context, console *console.Console) error {
 	console.WriteLn("\nRemoving images...")
 
+	// TODO: move to engine code
 	cmd := exec.CommandContext(ctx, "docker", "images", "--filter", "reference=paulenv:*", "--format", "{{.ID}} {{.Repository}}:{{.Tag}}")
 	output, err := cmd.Output()
 	if err != nil {
@@ -149,6 +156,7 @@ func removeImages(ctx context.Context, console *console.Console) error {
 		}
 
 		console.WriteLn("  • Removing image: %s", tag)
+		// TODO: move to engine code
 		cmd := exec.CommandContext(ctx, "docker", "rmi", "-f", id)
 		if err := cmd.Run(); err != nil {
 			console.Warn("    WARNING: failed to remove %s: %v", tag, err)
@@ -161,6 +169,7 @@ func removeImages(ctx context.Context, console *console.Console) error {
 func removeVolumes(ctx context.Context, console *console.Console) error {
 	console.WriteLn("\nRemoving volumes...")
 
+	// TODO: move to engine code
 	cmd := exec.CommandContext(ctx, "docker", "volume", "ls", "--filter", "name=paulenv-", "--format", "{{.Name}}")
 	output, err := cmd.Output()
 	if err != nil {
@@ -180,6 +189,7 @@ func removeVolumes(ctx context.Context, console *console.Console) error {
 		name := strings.TrimSpace(line)
 
 		console.WriteLn("  • Removing volume: %s", name)
+		// TODO: move to engine code
 		cmd := exec.CommandContext(ctx, "docker", "volume", "rm", "-f", name)
 		if err := cmd.Run(); err != nil {
 			console.Warn("    WARNING: failed to remove %s: %v", name, err)
@@ -192,6 +202,7 @@ func removeVolumes(ctx context.Context, console *console.Console) error {
 func removeNetworks(ctx context.Context, console *console.Console) error {
 	console.WriteLn("\nRemoving networks...")
 
+	// TODO: move to engine code
 	cmd := exec.CommandContext(ctx, "docker", "network", "ls", "--filter", "name=paulenv-", "--format", "{{.ID}} {{.Name}}")
 	output, err := cmd.Output()
 	if err != nil {
@@ -216,6 +227,7 @@ func removeNetworks(ctx context.Context, console *console.Console) error {
 		}
 
 		console.WriteLn("  • Removing network: %s", name)
+		// TODO: move to engine code
 		cmd := exec.CommandContext(ctx, "docker", "network", "rm", id)
 		if err := cmd.Run(); err != nil {
 			console.Warn("    WARNING: failed to remove %s: %v", name, err)
@@ -228,24 +240,14 @@ func removeNetworks(ctx context.Context, console *console.Console) error {
 func pruneBuildCache(ctx context.Context, console *console.Console) error {
 	console.WriteLn("\nPruning build cache...")
 
-	cmd := exec.CommandContext(ctx, "docker", "buildx", "prune", "--filter", "label=paulenv=true", "-f")
+	// TODO: move to engine code
+	cmd := exec.CommandContext(ctx, "docker", "builder", "prune", "--filter", "label=paulenv=true", "-f")
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		// Check if buildx is not available
-		if strings.Contains(stderr.String(), "buildx") {
-			console.Warn("  WARNING: buildx not available, using standard builder prune")
-			cmd = exec.CommandContext(ctx, "docker", "builder", "prune", "--filter", "label=paulenv=true", "-f")
-			cmd.Stdout = &stdout
-			cmd.Stderr = &stderr
-			if err := cmd.Run(); err != nil {
-				return fmt.Errorf("failed to prune build cache: %w\n%s", err, stderr.String())
-			}
-		} else {
-			return fmt.Errorf("failed to prune build cache: %w\n%s", err, stderr.String())
-		}
+		return fmt.Errorf("failed to prune build cache: %w\n%s", err, stderr.String())
 	}
 
 	// Try to extract space reclaimed from output
