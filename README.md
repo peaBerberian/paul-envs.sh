@@ -413,13 +413,12 @@ Along the mounted project, those are the only directories which are persisted.
 ## TODO:
 
 - implement lockfile reading
-- executable in github release on tag
 - update project name
-- fix CI
 - => Go can be merged I think
 - help flag per commands
 - SHould remove also remove networks?
 - SHould remove also remove volume directly?
+- Add "init bash / zsh /fish" commands to simplify auto-completion
 - ci tests for clean command?
 - on Remove, propose to call docker ourselve to remove the volume
 - flags for clean: --no-prompt, --no-config, --no-image, --no-cache

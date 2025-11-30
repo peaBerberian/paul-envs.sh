@@ -27,10 +27,11 @@ release:
 		GOOS=$$os GOARCH=$$arch \
 			go build -ldflags "$(LDFLAGS)" -trimpath \
 			-o $(RELEASE)/$$out $(CMD); \
-		(cd $(RELEASE) && zip -q "$${out%.exe}.zip" "$$out"); \
-		rm $(RELEASE)/$$out; \
+		# (cd $(RELEASE) && zip -q "$${out%.exe}.zip" "$$out"); \
+		# rm $(RELEASE)/$$out; \
 	done
-	@echo "done → $(RELEASE)/*.zip"
+	@echo "done → $(RELEASE)/*"
+# @echo "done → $(RELEASE)/*.zip"
 
 clean:
 	rm -rf $(DIST)
