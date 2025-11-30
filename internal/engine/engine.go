@@ -14,31 +14,54 @@ import (
 	"github.com/peaberberian/paul-envs/internal/files"
 )
 
-type EngineType int
-
-const (
-	Docker EngineType = iota
-)
-
+// Abstraction allowing to create images and run containers regardless of the softwared
+// used (docker, podman...)
 type ContainerEngine interface {
-	BuildImage(ctx context.Context, project files.ProjectEntry, dotfilesDir string) error
-	RunContainer(ctx context.Context, project files.ProjectEntry, args []string) error
+	// Return information on the current chosen "container engine" (its name, its version...)
 	Info(ctx context.Context) (EngineInfo, error)
+	// Build the image associated to the given project, also copying the given
+	// `relDotfilesDir` in the container's $HOME. `relDotfilesDir` must be a relative path
+	// from paul-envs' Dockerfile and reachable from its context.
+	BuildImage(ctx context.Context, project files.ProjectEntry, relDotfilesDir string) error
+	// Run the container whose image has previously been built with `BuildImage`.
+	//
+	// If `args` is empty, will start an interactive tty session with the project's shell of
+	// choice.
+	//
+	// If `args` is not empty, the container will just execute the given commands and then
+	// exit.
+	RunContainer(ctx context.Context, project files.ProjectEntry, args []string) error
+	// Create the persistent volume whose name is given as argument.
 	CreateVolume(ctx context.Context, name string) error
+	// Check if the project in argument has been built succesfully before and return
+	// `true` if that's the case.
+	//
+	// Return an `error` if we could not do the check, in which case we don't know if the
+	// project has been built.
 	HasBeenBuilt(ctx context.Context, projectName string) (bool, error)
+	// Returns information on the given project from the point of view of the container
+	// engine.
 	GetImageInfo(ctx context.Context, projectName string) (*ImageInfo, error)
 }
 
+// Returns information on a specific "engine" able to create images and run containers
 type EngineInfo struct {
-	Name    string
+	// The name to which it is refered to, e.g. "docker"
+	Name string
+	// The version of that software that is currently used.
 	Version string
 }
 
+// Information on a particular built image
 type ImageInfo struct {
+	// The name it is actually refered to by the container engine.
 	ImageName string
-	BuiltAt   *time.Time
+	// The timestamp at which it has last been built.
+	// `nil` if it never has been built.
+	BuiltAt *time.Time
 }
 
+// Create a new `ContainerEngine`, based on what's available right now.
 func New(ctx context.Context) (ContainerEngine, error) {
 	// For now only docker is handled
 	// TODO: other engines
