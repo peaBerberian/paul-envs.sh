@@ -443,7 +443,7 @@ func formatBuildInfo(bInfo buildState) ([]byte, error) {
 		bInfo.builtBy,
 		bInfo.buildEnvHash,
 		bInfo.buildComposeHash,
-		bInfo.builtAt,
+		bInfo.builtAt.Format(time.RFC3339),
 	)
 
 	if err != nil {

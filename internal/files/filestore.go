@@ -172,6 +172,10 @@ func (f *FileStore) CreateProjectDotfilesDir(ctx context.Context, projectName st
 
 	return relativeDotfilesDir, nil
 }
+func (f *FileStore) RemoveProjectDotfilesDir(projectName string) error {
+	expectedDir := filepath.Join(f.getProjectDir(projectName), "nextdotfiles")
+	return os.RemoveAll(expectedDir)
+}
 
 // Get path to the given project's compose file.
 // TODO: make private

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/peaberberian/paul-envs/internal/console"
 	"github.com/peaberberian/paul-envs/internal/engine"
@@ -31,10 +30,10 @@ func Build(ctx context.Context, args []string, filestore *files.FileStore, conso
 	console.Info("Preparing dotfiles...")
 	tmpDotfilesDir, err := filestore.CreateProjectDotfilesDir(ctx, name)
 	if err != nil {
-		os.RemoveAll(tmpDotfilesDir)
+		filestore.RemoveProjectDotfilesDir(name)
 		return fmt.Errorf("failed to prepare dotfiles for the container: %w", err)
 	}
-	defer os.RemoveAll(tmpDotfilesDir)
+	defer filestore.RemoveProjectDotfilesDir(name)
 
 	console.Info("Ensuring that the shared cache volume is created...")
 	if err := containerEngine.CreateVolume(ctx, "paulenv-shared-cache"); err != nil {
