@@ -59,6 +59,21 @@ func (c *DockerEngine) RunContainer(ctx context.Context, project files.ProjectEn
 	}
 	return nil
 }
+func (c *DockerEngine) JoinContainer(ctx context.Context, containerInfo ContainerInfo, args []string) error {
+	cmdArgs := []string{"exec", "-it", containerInfo.ContainerId, "/usr/local/bin/entrypoint.sh"}
+	cmdArgs = append(cmdArgs, args...)
+	cmd := exec.CommandContext(ctx, "docker", cmdArgs...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		if pErr := c.checkPermissions(ctx); pErr != nil {
+			return pErr
+		}
+		return fmt.Errorf("join exited: %w", err)
+	}
+	return nil
+}
 
 func (c *DockerEngine) HasBeenBuilt(ctx context.Context, projectName string) (bool, error) {
 	imageName := fmt.Sprintf("paulenv:%s", projectName)
@@ -115,7 +130,7 @@ func (c *DockerEngine) CreateVolume(ctx context.Context, name string) error {
 
 func (c *DockerEngine) GetImageInfo(ctx context.Context, projectName string) (*ImageInfo, error) {
 	imageName := fmt.Sprintf("paulenv:%s", projectName)
-	info := &ImageInfo{ImageName: imageName}
+	info := &ImageInfo{ImageName: imageName, ProjectName: &projectName}
 
 	// Check if image exists and get build time
 	cmd := exec.CommandContext(ctx, "docker", "image", "inspect", imageName, "--format", "{{.Created}}")
@@ -135,7 +150,7 @@ func (c *DockerEngine) GetImageInfo(ctx context.Context, projectName string) (*I
 }
 
 func (c *DockerEngine) ListContainers(ctx context.Context) ([]ContainerInfo, error) {
-	cmd := exec.CommandContext(ctx, "docker", "ps", "-a", "--filter", "name=paulenv-", "--format", "{{.ID}} {{.Names}}")
+	cmd := exec.CommandContext(ctx, "docker", "ps", "-a", "--filter", "name=paulenv-", "--format", "{{.ID}}\t{{.Image}}\t{{.Names}}")
 	output, err := cmd.Output()
 	if err != nil {
 		if pErr := c.checkPermissions(ctx); pErr != nil {
@@ -148,16 +163,29 @@ func (c *DockerEngine) ListContainers(ctx context.Context) ([]ContainerInfo, err
 	result := make([]ContainerInfo, 0, len(lines))
 	for _, s := range lines {
 		if s != "" {
-			parts := strings.SplitN(s, " ", 2)
+			parts := strings.SplitN(s, "\t", 3)
 			id := parts[0]
-			name := ""
+			var image *string
+			var name *string
+			var projectName *string
+
 			if len(parts) > 1 {
-				name = parts[1]
+				image = &parts[1]
+			}
+			if len(parts) > 2 {
+				name = &parts[2]
+			}
+
+			if image != nil && strings.HasPrefix(*image, "paulenv:") && len(*image) > len("paulenv:") {
+				sliced := (*image)[len("paulenv:"):]
+				projectName = &sliced
 			}
 
 			result = append(result, ContainerInfo{
+				ProjectName:   projectName,
 				ContainerName: name,
 				ContainerId:   id,
+				ImageName:     image,
 			})
 		}
 	}

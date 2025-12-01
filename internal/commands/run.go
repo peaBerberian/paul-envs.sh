@@ -84,10 +84,23 @@ func Run(ctx context.Context, args []string, filestore *files.FileStore, console
 		}
 	}
 
+	containerList, err := containerEngine.ListContainers(ctx)
+	if err != nil {
+		console.Warn("Could not list already launched containers: %s", err)
+	} else {
+		for _, container := range containerList {
+			if *container.ProjectName == name {
+				console.Info("Container already created, joining it.")
+				return containerEngine.JoinContainer(ctx, container, cmdArgs)
+			}
+		}
+	}
+
+	console.Info("Creating \"leader\" container for the project '%s', other 'run' calls will join it.", name)
 	err = containerEngine.RunContainer(ctx, project, cmdArgs)
 	if err != nil {
 		return err
 	}
-
+	console.Info("Exiting leader container for that project, those that have joined it will also exit.")
 	return nil
 }

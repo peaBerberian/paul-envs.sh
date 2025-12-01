@@ -31,6 +31,7 @@ type ContainerEngine interface {
 	// If `args` is not empty, the container will just execute the given commands and then
 	// exit.
 	RunContainer(ctx context.Context, project files.ProjectEntry, args []string) error
+	JoinContainer(ctx context.Context, containerInfo ContainerInfo, args []string) error
 	// Create the persistent volume whose name is given as argument.
 	CreateVolume(ctx context.Context, name string) error
 	// Check if the project in argument has been built succesfully before and return
@@ -75,6 +76,8 @@ type EngineInfo struct {
 
 // Information on a particular built image
 type ImageInfo struct {
+	// The name of the corresponding paulenv project, if one
+	ProjectName *string
 	// The name it is actually refered to by the container engine.
 	ImageName string
 	// The timestamp at which it has last been built.
@@ -84,9 +87,13 @@ type ImageInfo struct {
 
 // Information on a particular container as stored by the container engine
 type ContainerInfo struct {
+	// The name of the corresponding paulenv project, if one
+	ProjectName *string
 	// The name it is actually refered to by the container engine.
-	ContainerName string
-	// Its Id with which it can also be refered to
+	ContainerName *string
+	// The name of the corresponding image
+	ImageName *string
+	// Its Id with which it can be refered to
 	ContainerId string
 }
 

@@ -424,9 +424,10 @@ Along the mounted project, those are the only directories which are persisted.
 - flags for clean: --no-prompt, --no-config, --no-image, --no-cache
 - `run` should propose to `build` if not already done
 - `update` command?
-- Only max a single instance of each project-container?
 - something like `up` / `down` commands make now much more sense with ssh
 - support rootless
 - Add Kakoune and Helix as potential tools
 - less gh-action, more scripts (in-docker for local tests?)
 - issues when calling `create` with `sudo`
+- Kill containers on same image on build?
+- Reference counted container instead of master/slaves
