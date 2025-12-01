@@ -2,7 +2,7 @@
 // This file creates all files associated to a given project:
 // -  Its `compose.yaml` file
 // -  Its `.env` file
-// -  Its `project.info` lockfile
+// -  Its `project.lock` lockfile
 
 package files
 
@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+	"time"
 
 	constants "github.com/peaberberian/paul-envs/internal"
 	"github.com/peaberberian/paul-envs/internal/utils"
@@ -61,16 +62,26 @@ type ComposeTemplateData struct {
 	Volumes     []string
 }
 
-// Holds the parsed values from the `project.info` file associated to each project
-type projectInfo struct {
-	// The version of the `project.info` file
+// Holds the parsed values from the `project.lock` file associated to each project
+type projectLockInfo struct {
+	// The version of the `project.lock` file
 	version utils.Version
 	// The Dockerfile version it has been created for.
 	dockerfileVersion utils.Version
+}
+
+// Hols
+type buildState struct {
+	// The version of the `build.info` file
+	version utils.Version
+	// A unique identifier for the machine that perform the build
+	builtBy string
 	// The hash of the `.env` file the last time the project has been built
 	buildEnvHash string
 	// The hash of the `compose.yaml` file the last time the project has been built
 	buildComposeHash string
+	// The last time it was built according to this tool
+	builtAt time.Time
 }
 
 // Create the directory and all files needed for the given project name, with
@@ -136,27 +147,25 @@ func (f *FileStore) CreateProjectFiles(
 		return fmt.Errorf("write compose file: %w", err)
 	}
 
-	// Now create project.info file
+	// Now create project.lock file
 
-	projectInfoVersion, err := utils.ParseVersion(constants.ProjectInfoVersion)
+	projectInfoVersion, err := utils.ParseVersion(constants.ProjectLockVersion)
 	if err != nil {
 		return fmt.Errorf("impossibility to parse embedded file version: %w", err)
 	}
 
-	dockerfileVersion, err := utils.ParseVersion(constants.FileVersion)
+	dockerfileVersion, err := utils.ParseVersion(constants.DockerfileVersion)
 	if err != nil {
 		return fmt.Errorf("impossibility to parse embedded file version: %w", err)
 	}
 
-	pInfo := projectInfo{
+	pInfo := projectLockInfo{
 		version:           projectInfoVersion,
 		dockerfileVersion: dockerfileVersion,
-		buildEnvHash:      "",
-		buildComposeHash:  "",
 	}
 
 	if err := f.writeProjectInfo(projectName, pInfo); err != nil {
-		return fmt.Errorf("impossibility to write 'project.info' file: %w", err)
+		return fmt.Errorf("impossibility to write 'project.lock' file: %w", err)
 	}
 	return nil
 }
@@ -209,44 +218,40 @@ func (f *FileStore) ensureCreatedBaseFiles() error {
 	return nil
 }
 
-// writeProjectInfo writes the given projectInfo to a project.info file
-func (f *FileStore) writeProjectInfo(projectName string, pInfo projectInfo) error {
+// writeProjectInfo writes the given projectLockInfo to a project.lock file
+func (f *FileStore) writeProjectInfo(projectName string, pInfo projectLockInfo) error {
 	bytes, err := formatProjectInfo(pInfo)
 	if err != nil {
-		return fmt.Errorf("could not format 'project.info' file: %v", err)
+		return fmt.Errorf("could not format 'project.lock' file: %v", err)
 	}
 	return f.userFS.WriteFileAsUser(f.getProjectInfoFilePathFor(projectName), bytes, 0644)
 }
 
-func formatProjectInfo(pInfo projectInfo) ([]byte, error) {
+func formatProjectInfo(pInfo projectLockInfo) ([]byte, error) {
 	var buf bytes.Buffer
 	_, err := fmt.Fprintf(&buf,
 		"VERSION=%s\n"+
-			"DOCKERFILE_VERSION=%s\n"+
-			"BUILD_ENV=%s\n"+
-			"BUILD_COMPOSE=%s\n",
+			"DOCKERFILE_VERSION=%s\n",
 		pInfo.version.ToString(),
 		pInfo.dockerfileVersion.ToString(),
-		pInfo.buildEnvHash,
-		pInfo.buildComposeHash,
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("error formatting project.info content: %w", err)
+		return nil, fmt.Errorf("error formatting project.lock content: %w", err)
 	}
 
 	return buf.Bytes(), nil
 }
 
-// ReadProjectInfo reads the project.info file and returns a populated projectInfo struct.
-func (filestore *FileStore) ReadProjectInfo(projectName string) (projectInfo, error) {
+// ReadProjectInfo reads the project.lock file and returns a populated projectLockInfo struct.
+func (filestore *FileStore) ReadProjectInfo(projectName string) (projectLockInfo, error) {
 	file, err := os.Open(filestore.getProjectInfoFilePathFor(projectName))
 	if err != nil {
-		return projectInfo{}, fmt.Errorf("could not open project.info: %w", err)
+		return projectLockInfo{}, fmt.Errorf("could not open project.lock: %w", err)
 	}
 	defer file.Close()
 
-	var pInfo projectInfo
+	var pInfo projectLockInfo
 	scanner := bufio.NewScanner(file)
 
 	for scanner.Scan() {
@@ -255,7 +260,7 @@ func (filestore *FileStore) ReadProjectInfo(projectName string) (projectInfo, er
 		if vStr, ok := strings.CutPrefix(line, "VERSION="); ok {
 			v, err := utils.ParseVersion(vStr)
 			if err != nil {
-				return projectInfo{}, fmt.Errorf("invalid 'project.info' version '%s': %w", vStr, err)
+				return projectLockInfo{}, fmt.Errorf("invalid 'project.lock' version '%s': %w", vStr, err)
 			}
 
 			pInfo.version = v
@@ -264,34 +269,26 @@ func (filestore *FileStore) ReadProjectInfo(projectName string) (projectInfo, er
 		if vStr, ok := strings.CutPrefix(line, "DOCKERFILE_VERSION="); ok {
 			v, err := utils.ParseVersion(vStr)
 			if err != nil {
-				return projectInfo{}, fmt.Errorf("invalid 'project.info' Dockerfile version '%s': %w", vStr, err)
+				return projectLockInfo{}, fmt.Errorf("invalid 'project.lock' Dockerfile version '%s': %w", vStr, err)
 			}
 
 			pInfo.dockerfileVersion = v
 			continue
 		}
-		if v, ok := strings.CutPrefix(line, "BUILD_ENV="); ok {
-			pInfo.buildEnvHash = v
-			continue
-		}
-		if v, ok := strings.CutPrefix(line, "BUILD_COMPOSE="); ok {
-			pInfo.buildComposeHash = v
-			continue
-		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		return projectInfo{}, fmt.Errorf("error reading project.info: %w", err)
+		return projectLockInfo{}, fmt.Errorf("error reading project.lock: %w", err)
 	}
 
 	return pInfo, nil
 }
 
 // TODO:
-func (filestore *FileStore) CheckProject(projectName string) error {
+func (filestore *FileStore) CheckProjectLock(projectName string) error {
 	file, err := os.Open(filestore.getProjectInfoFilePathFor(projectName))
 	if err != nil {
-		return fmt.Errorf("could not open project.info: %w", err)
+		return fmt.Errorf("could not open project.lock: %w", err)
 	}
 	defer file.Close()
 
@@ -307,12 +304,12 @@ func (filestore *FileStore) CheckProject(projectName string) error {
 		if vStr, ok := strings.CutPrefix(line, "VERSION="); ok {
 			v, err := utils.ParseVersion(vStr)
 			if err != nil {
-				return fmt.Errorf("invalid 'project.info' version '%s': %w", vStr, err)
+				return fmt.Errorf("invalid 'project.lock' version '%s': %w", vStr, err)
 			}
 
-			piVersion, err := utils.ParseVersion(constants.ProjectInfoVersion)
+			piVersion, err := utils.ParseVersion(constants.ProjectLockVersion)
 			if err != nil {
-				return fmt.Errorf("embedded project.info version is wrong '%s': %w", constants.ProjectInfoVersion, err)
+				return fmt.Errorf("embedded project.lock version is wrong '%s': %w", constants.ProjectLockVersion, err)
 			}
 			if !v.IsCompatibleWithBase(piVersion) {
 				return fmt.Errorf("this project is incompatible with the current version of paul-envs")
@@ -323,12 +320,12 @@ func (filestore *FileStore) CheckProject(projectName string) error {
 		if vStr, ok := strings.CutPrefix(line, "DOCKERFILE_VERSION="); ok {
 			v, err := utils.ParseVersion(vStr)
 			if err != nil {
-				return fmt.Errorf("invalid 'project.info' Dockerfile version '%s': %w", vStr, err)
+				return fmt.Errorf("invalid 'project.lock' Dockerfile version '%s': %w", vStr, err)
 			}
 
-			currBaseVersion, err := utils.ParseVersion(constants.FileVersion)
+			currBaseVersion, err := utils.ParseVersion(constants.DockerfileVersion)
 			if err != nil {
-				return fmt.Errorf("embedded file version is wrong '%s': %w", constants.FileVersion, err)
+				return fmt.Errorf("embedded file version is wrong '%s': %w", constants.DockerfileVersion, err)
 			}
 			if !v.IsCompatibleWithBase(currBaseVersion) {
 				return fmt.Errorf("this project is incompatible with our Dockerfile")
@@ -366,24 +363,116 @@ func (filestore *FileStore) CheckProject(projectName string) error {
 	}
 
 	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("error reading project.info: %w", err)
+		return fmt.Errorf("error reading project.lock: %w", err)
 	}
 
 	if fileVersion == nil {
-		return fmt.Errorf("error reading project.info: no VERSION key")
+		return fmt.Errorf("error reading project.lock: no VERSION key")
 	}
 
 	if dockerfileVersion == nil {
-		return fmt.Errorf("error reading project.info: no DOCKERFILE_VERSION key")
+		return fmt.Errorf("error reading project.lock: no DOCKERFILE_VERSION key")
 	}
 
 	if buildEnvHash == "" {
-		return fmt.Errorf("error reading project.info: no BUILD_ENV key")
+		return fmt.Errorf("error reading project.lock: no BUILD_ENV key")
 	}
 
 	if buildComposeHash == "" {
-		return fmt.Errorf("error reading project.info: no BUILD_COMPOSE key")
+		return fmt.Errorf("error reading project.lock: no BUILD_COMPOSE key")
 	}
 
 	return nil
+}
+
+// Update the file which stores information on the last performed build, mainly
+// to detect if we should re-build an image.
+//
+// Should be called after each build.
+func (f *FileStore) RefreshBuildInfoFile(projectName string) error {
+	machineId, err := f.getMachineID()
+	if err != nil {
+		return fmt.Errorf("failed to create 'build.info' file: %w", err)
+	}
+	version, err := utils.ParseVersion(constants.BuildInfoVersion)
+	if err != nil {
+		return fmt.Errorf("failed to create 'build.info' file due to invalid embedded version: %w", err)
+	}
+	envFilePath := f.GetProjectEnvFilePath(projectName)
+	envBytes, err := os.ReadFile(envFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to create 'build.info' file due to impossibility to read file '%s': %w", envFilePath, err)
+	}
+	envHash := utils.BufferHash(envBytes)
+	composeFilePath := f.GetProjectComposeFilePath(projectName)
+	composeBytes, err := os.ReadFile(composeFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to create 'build.info' file due to impossibility to read file '%s': %w", composeFilePath, err)
+	}
+	composeHash := utils.BufferHash(composeBytes)
+	now := time.Now()
+	buildInfoBytes, err := formatBuildInfo(buildState{
+		version:          version,
+		builtBy:          machineId,
+		buildEnvHash:     envHash,
+		buildComposeHash: composeHash,
+		builtAt:          now,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create 'build.info' due to impossibility to format it: %w", err)
+	}
+	buildInfoPath := filepath.Join(f.getProjectDir(projectName), "build.info")
+	err = f.userFS.WriteFileAsUser(buildInfoPath, buildInfoBytes, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to create 'build.info' due to impossibility to write '%s': %w", buildInfoPath, err)
+	}
+	return nil
+}
+
+// Returns the format of the "build.info" file which contains information on
+// the last build of a project.
+func formatBuildInfo(bInfo buildState) ([]byte, error) {
+	var buf bytes.Buffer
+	_, err := fmt.Fprintf(&buf,
+		"VERSION=%s\n"+
+			"BUILT_BY=%s\n"+
+			"BUILD_ENV=%s\n"+
+			"BUILD_COMPOSE=%s\n"+
+			"LAST_BUILT_AT=%s\n",
+		bInfo.version.ToString(),
+		bInfo.builtBy,
+		bInfo.buildEnvHash,
+		bInfo.buildComposeHash,
+		bInfo.builtAt,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("error formatting build.info content: %w", err)
+	}
+
+	return buf.Bytes(), nil
+}
+
+// GetMachineID returns a persistent per-machine UUID stored in DATA_DIR/machine-id.
+// If the file doesn't exist, it creates one.
+func (f *FileStore) getMachineID() (string, error) {
+	machineIdPath := filepath.Join(f.baseDataDir, "machine-id")
+	if err := os.MkdirAll(filepath.Dir(machineIdPath), 0o700); err != nil {
+		return "", fmt.Errorf("cannot create directory: %w", err)
+	}
+	if data, err := os.ReadFile(machineIdPath); err == nil {
+		return string(data), nil
+	}
+
+	// Generate a new one
+	id, err := utils.GenerateUUIDv4()
+	if err != nil {
+		return "", fmt.Errorf("cannot generate machine-id: %w", err)
+	}
+
+	if err := f.userFS.WriteFileAsUser(machineIdPath, []byte(id), 0o600); err != nil {
+		return "", fmt.Errorf("cannot write machine-id: %w", err)
+	}
+
+	return id, nil
 }

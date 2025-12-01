@@ -73,7 +73,7 @@ func TestFileStore_CreateProjectFiles(t *testing.T) {
 
 	projectInfoFile := store.getProjectInfoFilePathFor("testproject")
 	if _, err := os.Stat(projectInfoFile); os.IsNotExist(err) {
-		t.Fatal("project.info file was not created")
+		t.Fatal("project.lock file was not created")
 	}
 
 	// Read and verify content
@@ -133,15 +133,13 @@ func TestFileStore_CreateProjectFiles(t *testing.T) {
 
 	pInfoCtntStr := string(pInfoCtnt)
 	pInfoChecks := []string{
-		`VERSION=` + constants.FileVersion,
-		`DOCKERFILE_VERSION=` + constants.FileVersion,
-		`BUILD_ENV=`,
-		`BUILD_COMPOSE`,
+		`VERSION=` + constants.Version,
+		`DOCKERFILE_VERSION=` + constants.DockerfileVersion,
 	}
 
 	for _, check := range pInfoChecks {
 		if !strings.Contains(pInfoCtntStr, check) {
-			t.Errorf("project.info file missing expected content: %s", check)
+			t.Errorf("project.lock file missing expected content: %s", check)
 		}
 	}
 }

@@ -12,7 +12,7 @@ import (
 const (
 	projectComposeFilename = "compose.yaml"
 	projectEnvFilename     = ".env"
-	projectInfoFilename    = "project.info"
+	projectInfoFilename    = "project.lock"
 )
 
 // Struct allowing to create, read and obtain the path of all files created by
@@ -193,7 +193,7 @@ func (f *FileStore) getProjectDirBase() string {
 	return f.projectsDir
 }
 
-// Get path to the 'project.info' file associated to a project.
+// Get path to the 'project.lock' file associated to a project.
 func (f *FileStore) getProjectInfoFilePathFor(projectName string) string {
 	return filepath.Join(f.projectsDir, projectName, projectInfoFilename)
 }

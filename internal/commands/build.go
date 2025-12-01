@@ -49,6 +49,10 @@ func Build(ctx context.Context, args []string, filestore *files.FileStore, conso
 	if err := containerEngine.BuildImage(ctx, project, tmpDotfilesDir); err != nil {
 		return err
 	}
+	err = filestore.RefreshBuildInfoFile(name)
+	if err != nil {
+		console.Warn("Could not refresh 'build.info' file for this project: %s", err)
+	}
 	console.Success("Built project '%s'", name)
 	return nil
 }

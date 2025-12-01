@@ -9,7 +9,10 @@ const Version = "1.0.0"
 // Dockerfile + compose.yaml file. As such a new minor for base files is
 // still compatible to older project files with the same major, but not
 // vice-versa.
-const FileVersion = "1.0.0"
+const DockerfileVersion = "1.0.0"
 
-// Format of the "project.info" files: the lockfiles of the various projects.
-const ProjectInfoVersion = "1.0.0"
+// Format of the "project.lock" files: the lockfiles of the various projects.
+const ProjectLockVersion = "1.0.0"
+
+// Format of the "build.info" files: Information on the last build performed for a project
+const BuildInfoVersion = "1.0.0"
