@@ -69,6 +69,7 @@ type EngineInfo struct {
 	// The name to which it is refered to, e.g. "docker"
 	Name string
 	// The version of that software that is currently used.
+	// /!\ Should fit on a single line
 	Version string
 }
 

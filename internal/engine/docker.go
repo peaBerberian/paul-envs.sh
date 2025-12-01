@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"time"
 
@@ -88,10 +89,16 @@ func (c *DockerEngine) Info(ctx context.Context) (EngineInfo, error) {
 	cmd := exec.CommandContext(ctx, "docker", "--version")
 	output, err := cmd.Output()
 	if err != nil {
-		return EngineInfo{}, fmt.Errorf("Failed to obtain docker version: %w", err)
+		return EngineInfo{}, fmt.Errorf("failed to obtain docker version: %w", err)
 	}
-	version := strings.TrimSpace(fmt.Sprintf("%s", output))
-	return EngineInfo{Version: version, Name: "docker"}, nil
+	parsed := strings.TrimSpace(fmt.Sprintf("%s", output))
+	re := regexp.MustCompile(`Docker version ([0-9]+\.[0-9]+\.[0-9]+)`)
+	matches := re.FindStringSubmatch(string(parsed))
+	if len(matches) > 1 {
+		version := matches[1] // "24.0.7"
+		return EngineInfo{Version: version, Name: "docker"}, nil
+	}
+	return EngineInfo{}, fmt.Errorf("failed to obtain docker version, unknown version format: %s", parsed)
 }
 
 func (c *DockerEngine) CreateVolume(ctx context.Context, name string) error {

@@ -48,9 +48,14 @@ func Build(ctx context.Context, args []string, filestore *files.FileStore, conso
 	if err := containerEngine.BuildImage(ctx, project, tmpDotfilesDir); err != nil {
 		return err
 	}
-	err = filestore.RefreshBuildInfoFile(name)
+	engineInfo, err := containerEngine.Info(ctx)
 	if err != nil {
-		console.Warn("Could not refresh 'project.buildinfo' file for this project: %s", err)
+		console.Warn("Could not refresh 'project.buildinfo' file for this project: impossible to get container engine version: %s", err)
+	} else {
+		err = filestore.RefreshBuildInfoFile(name, engineInfo.Name, engineInfo.Version)
+		if err != nil {
+			console.Warn("Could not refresh 'project.buildinfo' file for this project: %s", err)
+		}
 	}
 	console.Success("Built project '%s'", name)
 	return nil

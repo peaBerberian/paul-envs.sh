@@ -82,6 +82,10 @@ type buildState struct {
 	buildComposeHash string
 	// The last time it was built according to this tool
 	builtAt time.Time
+	// The name of the container engine which produced the last build (e.g. "docker")
+	containerEngine string
+	// The version of the container engine which produced the last build
+	containerEngineVersion string
 }
 
 // Create the directory and all files needed for the given project name, with
@@ -389,7 +393,7 @@ func (filestore *FileStore) CheckProjectLock(projectName string) error {
 // to detect if we should re-build an image.
 //
 // Should be called after each build.
-func (f *FileStore) RefreshBuildInfoFile(projectName string) error {
+func (f *FileStore) RefreshBuildInfoFile(projectName string, engineName string, engineVersion string) error {
 	machineId, err := f.getMachineID()
 	if err != nil {
 		return fmt.Errorf("failed to create 'project.buildinfo' file: %w", err)
@@ -412,11 +416,13 @@ func (f *FileStore) RefreshBuildInfoFile(projectName string) error {
 	composeHash := utils.BufferHash(composeBytes)
 	now := time.Now()
 	buildInfoBytes, err := formatBuildInfo(buildState{
-		version:          version,
-		builtBy:          machineId,
-		buildEnvHash:     envHash,
-		buildComposeHash: composeHash,
-		builtAt:          now,
+		version:                version,
+		builtBy:                machineId,
+		buildEnvHash:           envHash,
+		buildComposeHash:       composeHash,
+		builtAt:                now,
+		containerEngine:        engineName,
+		containerEngineVersion: engineVersion,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create 'project.buildinfo' due to impossibility to format it: %w", err)
@@ -438,12 +444,16 @@ func formatBuildInfo(bInfo buildState) ([]byte, error) {
 			"BUILT_BY=%s\n"+
 			"BUILD_ENV=%s\n"+
 			"BUILD_COMPOSE=%s\n"+
-			"LAST_BUILT_AT=%s\n",
+			"LAST_BUILT_AT=%s\n"+
+			"CONTAINER_ENGINE=%s\n"+
+			"CONTAINER_ENGINE_VERSION=%s\n",
 		bInfo.version.ToString(),
 		bInfo.builtBy,
 		bInfo.buildEnvHash,
 		bInfo.buildComposeHash,
 		bInfo.builtAt.Format(time.RFC3339),
+		bInfo.containerEngine,
+		bInfo.containerEngineVersion,
 	)
 
 	if err != nil {
