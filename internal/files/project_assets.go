@@ -72,7 +72,7 @@ type projectLockInfo struct {
 
 // Hols
 type buildState struct {
-	// The version of the `build.info` file
+	// The version of the `project.buildinfo` file
 	version utils.Version
 	// A unique identifier for the machine that perform the build
 	builtBy string
@@ -392,22 +392,22 @@ func (filestore *FileStore) CheckProjectLock(projectName string) error {
 func (f *FileStore) RefreshBuildInfoFile(projectName string) error {
 	machineId, err := f.getMachineID()
 	if err != nil {
-		return fmt.Errorf("failed to create 'build.info' file: %w", err)
+		return fmt.Errorf("failed to create 'project.buildinfo' file: %w", err)
 	}
 	version, err := utils.ParseVersion(constants.BuildInfoVersion)
 	if err != nil {
-		return fmt.Errorf("failed to create 'build.info' file due to invalid embedded version: %w", err)
+		return fmt.Errorf("failed to create 'project.buildinfo' file due to invalid embedded version: %w", err)
 	}
 	envFilePath := f.GetProjectEnvFilePath(projectName)
 	envBytes, err := os.ReadFile(envFilePath)
 	if err != nil {
-		return fmt.Errorf("failed to create 'build.info' file due to impossibility to read file '%s': %w", envFilePath, err)
+		return fmt.Errorf("failed to create 'project.buildinfo' file due to impossibility to read file '%s': %w", envFilePath, err)
 	}
 	envHash := utils.BufferHash(envBytes)
 	composeFilePath := f.GetProjectComposeFilePath(projectName)
 	composeBytes, err := os.ReadFile(composeFilePath)
 	if err != nil {
-		return fmt.Errorf("failed to create 'build.info' file due to impossibility to read file '%s': %w", composeFilePath, err)
+		return fmt.Errorf("failed to create 'project.buildinfo' file due to impossibility to read file '%s': %w", composeFilePath, err)
 	}
 	composeHash := utils.BufferHash(composeBytes)
 	now := time.Now()
@@ -419,17 +419,17 @@ func (f *FileStore) RefreshBuildInfoFile(projectName string) error {
 		builtAt:          now,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create 'build.info' due to impossibility to format it: %w", err)
+		return fmt.Errorf("failed to create 'project.buildinfo' due to impossibility to format it: %w", err)
 	}
-	buildInfoPath := filepath.Join(f.getProjectDir(projectName), "build.info")
+	buildInfoPath := filepath.Join(f.getProjectDir(projectName), "project.buildinfo")
 	err = f.userFS.WriteFileAsUser(buildInfoPath, buildInfoBytes, 0644)
 	if err != nil {
-		return fmt.Errorf("failed to create 'build.info' due to impossibility to write '%s': %w", buildInfoPath, err)
+		return fmt.Errorf("failed to create 'project.buildinfo' due to impossibility to write '%s': %w", buildInfoPath, err)
 	}
 	return nil
 }
 
-// Returns the format of the "build.info" file which contains information on
+// Returns the format of the "project.buildinfo" file which contains information on
 // the last build of a project.
 func formatBuildInfo(bInfo buildState) ([]byte, error) {
 	var buf bytes.Buffer
@@ -447,7 +447,7 @@ func formatBuildInfo(bInfo buildState) ([]byte, error) {
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("error formatting build.info content: %w", err)
+		return nil, fmt.Errorf("error formatting 'project.buildinfo' content: %w", err)
 	}
 
 	return buf.Bytes(), nil

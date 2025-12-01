@@ -50,7 +50,7 @@ func Build(ctx context.Context, args []string, filestore *files.FileStore, conso
 	}
 	err = filestore.RefreshBuildInfoFile(name)
 	if err != nil {
-		console.Warn("Could not refresh 'build.info' file for this project: %s", err)
+		console.Warn("Could not refresh 'project.buildinfo' file for this project: %s", err)
 	}
 	console.Success("Built project '%s'", name)
 	return nil

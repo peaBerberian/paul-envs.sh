@@ -14,5 +14,5 @@ const DockerfileVersion = "1.0.0"
 // Format of the "project.lock" files: the lockfiles of the various projects.
 const ProjectLockVersion = "1.0.0"
 
-// Format of the "build.info" files: Information on the last build performed for a project
+// Format of the "project.buildinfo" files: Information on the last build performed for a project
 const BuildInfoVersion = "1.0.0"
