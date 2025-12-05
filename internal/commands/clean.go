@@ -1,11 +1,8 @@
 package commands
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"os/exec"
-	"strings"
 
 	"github.com/peaberberian/paul-envs/internal/console"
 	"github.com/peaberberian/paul-envs/internal/engine"
@@ -57,13 +54,13 @@ func Clean(ctx context.Context, filestore *files.FileStore, console *console.Con
 		if err := removeContainers(ctx, containerEngine, console); err != nil {
 			return err
 		}
-		if err := removeImages(ctx, console); err != nil {
+		if err := removeImages(ctx, containerEngine, console); err != nil {
 			return err
 		}
-		if err := removeVolumes(ctx, console); err != nil {
+		if err := removeVolumes(ctx, containerEngine, console); err != nil {
 			return err
 		}
-		if err := removeNetworks(ctx, console); err != nil {
+		if err := removeNetworks(ctx, containerEngine, console); err != nil {
 			return err
 		}
 	}
@@ -75,7 +72,7 @@ func Clean(ctx context.Context, filestore *files.FileStore, console *console.Con
 		return err
 	} else if !choice {
 		console.WriteLn("\nSkipping build cache removal")
-	} else if err := pruneBuildCache(ctx, console); err != nil {
+	} else if err := pruneBuildCache(ctx, containerEngine, console); err != nil {
 		return err
 	}
 
@@ -86,7 +83,6 @@ func Clean(ctx context.Context, filestore *files.FileStore, console *console.Con
 func removeContainers(ctx context.Context, containerEngine engine.ContainerEngine, console *console.Console) error {
 	console.WriteLn("\nStopping and removing containers...")
 
-	// List containers
 	containers, err := containerEngine.ListContainers(ctx)
 	if err != nil {
 		return fmt.Errorf("cannot list current containers: %w", err)
@@ -104,135 +100,53 @@ func removeContainers(ctx context.Context, containerEngine engine.ContainerEngin
 	return nil
 }
 
-func removeImages(ctx context.Context, console *console.Console) error {
+func removeImages(ctx context.Context, containerEngine engine.ContainerEngine, console *console.Console) error {
 	console.WriteLn("\nRemoving images...")
 
-	// TODO: move to engine code
-	cmd := exec.CommandContext(ctx, "docker", "images", "--filter", "reference=paulenv:*", "--format", "{{.ID}} {{.Repository}}:{{.Tag}}")
-	output, err := cmd.Output()
+	images, err := containerEngine.ListImages(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to list images: %w", err)
+		return fmt.Errorf("cannot list current images: %w", err)
 	}
-
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	if len(lines) == 1 && lines[0] == "" {
-		console.WriteLn("  • No images found")
-		return nil
-	}
-
-	for _, line := range lines {
-		if line == "" {
-			continue
-		}
-		parts := strings.SplitN(line, " ", 2)
-		id := parts[0]
-		tag := ""
-		if len(parts) > 1 {
-			tag = parts[1]
-		}
-
-		console.WriteLn("  • Removing image: %s", tag)
-		// TODO: move to engine code
-		cmd := exec.CommandContext(ctx, "docker", "rmi", "-f", id)
-		if err := cmd.Run(); err != nil {
-			console.Warn("    WARNING: failed to remove %s: %v", tag, err)
+	for _, image := range images {
+		console.WriteLn("  • Removing image: %s", image.ImageName)
+		if err := containerEngine.RemoveImage(ctx, image); err != nil {
+			console.Warn("    WARNING: failed to remove image: %v", err)
 		}
 	}
-
 	return nil
 }
 
-func removeVolumes(ctx context.Context, console *console.Console) error {
+func removeVolumes(ctx context.Context, containerEngine engine.ContainerEngine, console *console.Console) error {
 	console.WriteLn("\nRemoving volumes...")
-
-	// TODO: move to engine code
-	cmd := exec.CommandContext(ctx, "docker", "volume", "ls", "--filter", "name=paulenv-", "--format", "{{.Name}}")
-	output, err := cmd.Output()
+	volumes, err := containerEngine.ListVolumes(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to list volumes: %w", err)
+		return fmt.Errorf("cannot list current volumes: %w", err)
 	}
-
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	if len(lines) == 1 && lines[0] == "" {
-		console.WriteLn("  • No volumes found")
-		return nil
-	}
-
-	for _, line := range lines {
-		if line == "" {
-			continue
-		}
-		name := strings.TrimSpace(line)
-
-		console.WriteLn("  • Removing volume: %s", name)
-		// TODO: move to engine code
-		cmd := exec.CommandContext(ctx, "docker", "volume", "rm", "-f", name)
-		if err := cmd.Run(); err != nil {
-			console.Warn("    WARNING: failed to remove %s: %v", name, err)
+	for _, volume := range volumes {
+		console.WriteLn("  • Removing volume: %s", volume.VolumeName)
+		if err := containerEngine.RemoveVolume(ctx, volume); err != nil {
+			console.Warn("    WARNING: failed to remove volume: %v", err)
 		}
 	}
-
 	return nil
 }
 
-func removeNetworks(ctx context.Context, console *console.Console) error {
+func removeNetworks(ctx context.Context, containerEngine engine.ContainerEngine, console *console.Console) error {
 	console.WriteLn("\nRemoving networks...")
-
-	// TODO: move to engine code
-	cmd := exec.CommandContext(ctx, "docker", "network", "ls", "--filter", "name=paulenv-", "--format", "{{.ID}} {{.Name}}")
-	output, err := cmd.Output()
+	networks, err := containerEngine.ListNetworks(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to list networks: %w", err)
+		return fmt.Errorf("cannot list current networks: %w", err)
 	}
-
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	if len(lines) == 1 && lines[0] == "" {
-		console.WriteLn("  • No networks found")
-		return nil
-	}
-
-	for _, line := range lines {
-		if line == "" {
-			continue
-		}
-		parts := strings.SplitN(line, " ", 2)
-		id := parts[0]
-		name := ""
-		if len(parts) > 1 {
-			name = parts[1]
-		}
-
-		console.WriteLn("  • Removing network: %s", name)
-		// TODO: move to engine code
-		cmd := exec.CommandContext(ctx, "docker", "network", "rm", id)
-		if err := cmd.Run(); err != nil {
-			console.Warn("    WARNING: failed to remove %s: %v", name, err)
+	for _, network := range networks {
+		console.WriteLn("  • Removing network: %s", network.NetworkName)
+		if err := containerEngine.RemoveNetwork(ctx, network); err != nil {
+			console.Warn("    WARNING: failed to remove network: %v", err)
 		}
 	}
-
 	return nil
 }
 
-func pruneBuildCache(ctx context.Context, console *console.Console) error {
+func pruneBuildCache(ctx context.Context, containerEngine engine.ContainerEngine, console *console.Console) error {
 	console.WriteLn("\nPruning build cache...")
-
-	// TODO: move to engine code
-	cmd := exec.CommandContext(ctx, "docker", "builder", "prune", "--filter", "label=paulenv=true", "-f")
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to prune build cache: %w\n%s", err, stderr.String())
-	}
-
-	// Try to extract space reclaimed from output
-	output := stdout.String()
-	if strings.Contains(output, "Total:") || strings.Contains(output, "reclaimed") {
-		console.WriteLn("  • %s", strings.TrimSpace(output))
-	} else {
-		console.Success("  • Build cache pruned")
-	}
-
-	return nil
+	return containerEngine.PruneBuildCache(ctx)
 }

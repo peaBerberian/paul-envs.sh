@@ -81,10 +81,8 @@ func (c *DockerEngine) HasBeenBuilt(ctx context.Context, projectName string) (bo
 	err := cmd.Run()
 
 	if err != nil {
-		if err := cmd.Run(); err != nil {
-			if pErr := c.checkPermissions(ctx); pErr != nil {
-				return false, pErr
-			}
+		if pErr := c.checkPermissions(ctx); pErr != nil {
+			return false, pErr
 		}
 		// Check if it's a "not found" error vs other error
 		if exitErr, ok := err.(*exec.ExitError); ok {
@@ -216,6 +214,183 @@ func (c *DockerEngine) checkPermissions(ctx context.Context) error {
 			return errors.New("permission denied. Please run with elevated privileges")
 		}
 		return fmt.Errorf("failed to connect to Docker: %w\n%s", err, stderrStr)
+	}
+	return nil
+}
+
+// List volumes currently known by this container engine
+func (c *DockerEngine) ListVolumes(ctx context.Context) ([]VolumeInfo, error) {
+	cmd := exec.CommandContext(ctx, "docker", "volume", "ls", "--filter", "name=paulenv-", "--format", "{{.Name}}")
+	output, err := cmd.Output()
+	if err != nil {
+		if pErr := c.checkPermissions(ctx); pErr != nil {
+			return []VolumeInfo{}, pErr
+		}
+		return []VolumeInfo{}, fmt.Errorf("failed to list volumes: %w", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	result := make([]VolumeInfo, 0, len(lines))
+	for _, volumeName := range lines {
+		if volumeName != "" {
+			var projectName *string
+			// Extract project name from volume name if it follows the pattern "paulenv-{project}"
+			if strings.HasPrefix(volumeName, "paulenv-") && len(volumeName) > len("paulenv-") {
+				sliced := volumeName[len("paulenv-"):]
+				projectName = &sliced
+			}
+			result = append(result, VolumeInfo{
+				VolumeName:  volumeName,
+				ProjectName: projectName,
+			})
+		}
+	}
+	return result, nil
+}
+
+func (c *DockerEngine) RemoveVolume(ctx context.Context, volume VolumeInfo) error {
+	cmd := exec.CommandContext(ctx, "docker", "volume", "rm", volume.VolumeName)
+	if err := cmd.Run(); err != nil {
+		if pErr := c.checkPermissions(ctx); pErr != nil {
+			return pErr
+		}
+		return fmt.Errorf("failed to remove volume %s: %w", volume.VolumeName, err)
+	}
+	return nil
+}
+
+// List networks currently known by this container engine
+func (c *DockerEngine) ListNetworks(ctx context.Context) ([]NetworkInfo, error) {
+	cmd := exec.CommandContext(ctx, "docker", "network", "ls", "--filter", "name=paulenv-", "--format", "{{.ID}}\t{{.Name}}")
+	output, err := cmd.Output()
+	if err != nil {
+		if pErr := c.checkPermissions(ctx); pErr != nil {
+			return []NetworkInfo{}, pErr
+		}
+		return []NetworkInfo{}, fmt.Errorf("failed to list networks: %w", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	result := make([]NetworkInfo, 0, len(lines))
+	for _, line := range lines {
+		if line != "" {
+			parts := strings.SplitN(line, "\t", 2)
+			if len(parts) >= 2 {
+				networkId := parts[0]
+				networkName := parts[1]
+				var projectName *string
+
+				// Extract project name from network name if it follows the pattern "paulenv-{project}_default"
+				if strings.HasPrefix(networkName, "paulenv-") {
+					// Remove "paulenv-" prefix
+					withoutPrefix := networkName[len("paulenv-"):]
+					// Remove "_default" suffix if present
+					if strings.HasSuffix(withoutPrefix, "_default") {
+						sliced := withoutPrefix[:len(withoutPrefix)-len("_default")]
+						projectName = &sliced
+					} else {
+						projectName = &withoutPrefix
+					}
+				}
+
+				result = append(result, NetworkInfo{
+					NetworkId:   networkId,
+					NetworkName: networkName,
+					ProjectName: projectName,
+				})
+			}
+		}
+	}
+	return result, nil
+}
+
+// Remove network listed from this container engine
+func (c *DockerEngine) RemoveNetwork(ctx context.Context, network NetworkInfo) error {
+	cmd := exec.CommandContext(ctx, "docker", "network", "rm", network.NetworkId)
+	if err := cmd.Run(); err != nil {
+		if pErr := c.checkPermissions(ctx); pErr != nil {
+			return pErr
+		}
+		return fmt.Errorf("failed to remove network %s: %w", network.NetworkName, err)
+	}
+	return nil
+}
+
+// Remove the `ContainerEngine`'s build cache from metadata linked to this
+// executable
+func (c *DockerEngine) PruneBuildCache(ctx context.Context) error {
+	// Prune build cache for paulenv images specifically
+	cmd := exec.CommandContext(ctx, "docker", "builder", "prune", "-f", "--filter", "label=paulenv=true", "-f")
+	if err := cmd.Run(); err != nil {
+		if pErr := c.checkPermissions(ctx); pErr != nil {
+			return pErr
+		}
+		return fmt.Errorf("failed to prun build cache: %w", err)
+	}
+	return nil
+}
+
+// List images currently known by this container engine
+func (c *DockerEngine) ListImages(ctx context.Context) ([]ImageInfo, error) {
+	cmd := exec.CommandContext(ctx, "docker", "images", "--filter", "reference=paulenv:*", "--format", "{{.Repository}}:{{.Tag}}\t{{.CreatedAt}}")
+	output, err := cmd.Output()
+	if err != nil {
+		if pErr := c.checkPermissions(ctx); pErr != nil {
+			return []ImageInfo{}, pErr
+		}
+		return []ImageInfo{}, fmt.Errorf("failed to list images: %w", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	result := make([]ImageInfo, 0, len(lines))
+	for _, line := range lines {
+		if line != "" {
+			parts := strings.SplitN(line, "\t", 2)
+			imageName := parts[0]
+			var projectName *string
+			var builtAt *time.Time
+
+			// Extract project name from image name if it follows the pattern "paulenv:{project}"
+			if strings.HasPrefix(imageName, "paulenv:") && len(imageName) > len("paulenv:") {
+				sliced := imageName[len("paulenv:"):]
+				projectName = &sliced
+			}
+
+			// Parse build time if available
+			if len(parts) > 1 {
+				timeStr := strings.TrimSpace(parts[1])
+				// Docker's CreatedAt format can vary, try common formats
+				formats := []string{
+					"2006-01-02 15:04:05 -0700 MST",
+					time.RFC3339,
+					time.RFC3339Nano,
+				}
+				for _, format := range formats {
+					if parsedTime, err := time.Parse(format, timeStr); err == nil {
+						builtAt = &parsedTime
+						break
+					}
+				}
+			}
+
+			result = append(result, ImageInfo{
+				ImageName:   imageName,
+				ProjectName: projectName,
+				BuiltAt:     builtAt,
+			})
+		}
+	}
+	return result, nil
+}
+
+// Remove image from this container engine
+func (c *DockerEngine) RemoveImage(ctx context.Context, image ImageInfo) error {
+	cmd := exec.CommandContext(ctx, "docker", "rmi", "-f", image.ImageName)
+	if err := cmd.Run(); err != nil {
+		if pErr := c.checkPermissions(ctx); pErr != nil {
+			return pErr
+		}
+		return fmt.Errorf("failed to remove image %s: %w", image.ImageName, err)
 	}
 	return nil
 }

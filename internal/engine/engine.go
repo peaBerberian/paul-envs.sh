@@ -47,22 +47,21 @@ type ContainerEngine interface {
 	ListContainers(ctx context.Context) ([]ContainerInfo, error)
 	// Remove container listed from this container engine
 	RemoveContainer(ctx context.Context, container ContainerInfo) error
-	// TODO:
-	// // List images currently known by this container engine
-	// ListImages(ctx context.Context) ([]ImageInfo, error)
-	// // Remove image listed from this container engine
-	// RemoveImage(ctx context.Context, image ImageInfo) error
-	// // List volumes currently known by this container engine
-	// ListVolumes(ctx context.Context) ([]VolumeInfo, error)
-	// // Remove volume listed from this container engine
-	// RemoveVolume(ctx context.Context, volume VolumeInfo) error
-	// // List networks currently known by this container engine
-	// ListNetworks(ctx context.Context) ([]NetworkInfo, error)
-	// // Remove network listed from this container engine
-	// RemoveNetwork(ctx context.Context, network NetworkInfo) error
-	// // Remove the `ContainerEngine`'s build cache from metadata linked to this
-	// // executable
-	// PruneBuildCache(ctx context.Context) error
+	// List images currently known by this container engine
+	ListImages(ctx context.Context) ([]ImageInfo, error)
+	// Remove image listed from this container engine
+	RemoveImage(ctx context.Context, image ImageInfo) error
+	// List volumes currently known by this container engine
+	ListVolumes(ctx context.Context) ([]VolumeInfo, error)
+	// Remove volume listed from this container engine
+	RemoveVolume(ctx context.Context, volume VolumeInfo) error
+	// List networks currently known by this container engine
+	ListNetworks(ctx context.Context) ([]NetworkInfo, error)
+	// Remove network listed from this container engine
+	RemoveNetwork(ctx context.Context, network NetworkInfo) error
+	// Remove the `ContainerEngine`'s build cache from metadata linked to this
+	// executable
+	PruneBuildCache(ctx context.Context) error
 }
 
 // Returns information on a specific "engine" able to create images and run containers
@@ -95,6 +94,26 @@ type ContainerInfo struct {
 	ImageName *string
 	// Its Id with which it can be refered to
 	ContainerId string
+}
+
+// Information on a particular container Network interface
+type NetworkInfo struct {
+	// Its Id with which it can be refered to
+	NetworkId string
+	// The name of the corresponding paulenv project, if one
+	ProjectName *string
+	// The name it is actually refered to by the container engine.
+	NetworkName string
+}
+
+// Information on a particular container Network interface
+type VolumeInfo struct {
+	// Its Id with which it can be refered to
+	VolumeId string
+	// The name of the corresponding paulenv project, if one
+	ProjectName *string
+	// The name it is actually refered to by the container engine.
+	VolumeName string
 }
 
 // Create a new `ContainerEngine`, based on what's available right now.
