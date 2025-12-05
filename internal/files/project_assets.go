@@ -17,7 +17,7 @@ import (
 	"text/template"
 	"time"
 
-	constants "github.com/peaberberian/paul-envs/internal"
+	versions "github.com/peaberberian/paul-envs/internal"
 	"github.com/peaberberian/paul-envs/internal/utils"
 )
 
@@ -147,24 +147,7 @@ func (f *FileStore) CreateProjectFiles(
 		return fmt.Errorf("write compose file: %w", err)
 	}
 
-	// Now create project.lock file
-
-	projectInfoVersion, err := utils.ParseVersion(constants.ProjectLockVersion)
-	if err != nil {
-		return fmt.Errorf("impossibility to parse embedded file version: %w", err)
-	}
-
-	dockerfileVersion, err := utils.ParseVersion(constants.DockerfileVersion)
-	if err != nil {
-		return fmt.Errorf("impossibility to parse embedded file version: %w", err)
-	}
-
-	pInfo := projectLockInfo{
-		version:           projectInfoVersion,
-		dockerfileVersion: dockerfileVersion,
-	}
-
-	if err := f.writeProjectInfo(projectName, pInfo); err != nil {
+	if err := f.writeProjectInfo(projectName); err != nil {
 		return fmt.Errorf("impossibility to write 'project.lock' file: %w", err)
 	}
 	return nil
@@ -219,21 +202,21 @@ func (f *FileStore) ensureCreatedBaseFiles() error {
 }
 
 // writeProjectInfo writes the given projectLockInfo to a project.lock file
-func (f *FileStore) writeProjectInfo(projectName string, pInfo projectLockInfo) error {
-	bytes, err := formatProjectInfo(pInfo)
+func (f *FileStore) writeProjectInfo(projectName string) error {
+	bytes, err := formatProjectInfo()
 	if err != nil {
 		return fmt.Errorf("could not format 'project.lock' file: %v", err)
 	}
 	return f.userFS.WriteFileAsUser(f.getProjectInfoFilePathFor(projectName), bytes, 0644)
 }
 
-func formatProjectInfo(pInfo projectLockInfo) ([]byte, error) {
+func formatProjectInfo() ([]byte, error) {
 	var buf bytes.Buffer
 	_, err := fmt.Fprintf(&buf,
 		"VERSION=%s\n"+
 			"DOCKERFILE_VERSION=%s\n",
-		pInfo.version.ToString(),
-		pInfo.dockerfileVersion.ToString(),
+		versions.ProjectLockVersion.ToString(),
+		versions.DockerfileVersion.ToString(),
 	)
 
 	if err != nil {
@@ -307,11 +290,7 @@ func (filestore *FileStore) CheckProjectLock(projectName string) error {
 				return fmt.Errorf("invalid 'project.lock' version '%s': %w", vStr, err)
 			}
 
-			piVersion, err := utils.ParseVersion(constants.ProjectLockVersion)
-			if err != nil {
-				return fmt.Errorf("embedded project.lock version is wrong '%s': %w", constants.ProjectLockVersion, err)
-			}
-			if !v.IsCompatibleWithBase(piVersion) {
+			if !v.IsCompatibleWithBase(versions.ProjectLockVersion) {
 				return fmt.Errorf("this project is incompatible with the current version of paul-envs")
 			}
 			fileVersion = &v
@@ -323,11 +302,7 @@ func (filestore *FileStore) CheckProjectLock(projectName string) error {
 				return fmt.Errorf("invalid 'project.lock' Dockerfile version '%s': %w", vStr, err)
 			}
 
-			currBaseVersion, err := utils.ParseVersion(constants.DockerfileVersion)
-			if err != nil {
-				return fmt.Errorf("embedded file version is wrong '%s': %w", constants.DockerfileVersion, err)
-			}
-			if !v.IsCompatibleWithBase(currBaseVersion) {
+			if !v.IsCompatibleWithBase(versions.DockerfileVersion) {
 				return fmt.Errorf("this project is incompatible with our Dockerfile")
 			}
 
@@ -394,10 +369,6 @@ func (f *FileStore) RefreshBuildInfoFile(projectName string, engineName string, 
 	if err != nil {
 		return fmt.Errorf("failed to create 'project.buildinfo' file: %w", err)
 	}
-	version, err := utils.ParseVersion(constants.BuildInfoVersion)
-	if err != nil {
-		return fmt.Errorf("failed to create 'project.buildinfo' file due to invalid embedded version: %w", err)
-	}
 	envFilePath := f.GetProjectEnvFilePath(projectName)
 	envBytes, err := os.ReadFile(envFilePath)
 	if err != nil {
@@ -412,7 +383,7 @@ func (f *FileStore) RefreshBuildInfoFile(projectName string, engineName string, 
 	composeHash := utils.BufferHash(composeBytes)
 	now := time.Now()
 	buildInfoBytes, err := formatBuildInfo(buildState{
-		version:                version,
+		version:                versions.BuildInfoVersion,
 		builtBy:                machineId,
 		buildEnvHash:           envHash,
 		buildComposeHash:       composeHash,

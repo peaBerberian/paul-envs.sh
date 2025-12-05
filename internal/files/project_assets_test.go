@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	constants "github.com/peaberberian/paul-envs/internal"
+	versions "github.com/peaberberian/paul-envs/internal"
 )
 
 func TestFileStore_CreateProjectFiles(t *testing.T) {
@@ -133,8 +133,8 @@ func TestFileStore_CreateProjectFiles(t *testing.T) {
 
 	pInfoCtntStr := string(pInfoCtnt)
 	pInfoChecks := []string{
-		`VERSION=` + constants.Version,
-		`DOCKERFILE_VERSION=` + constants.DockerfileVersion,
+		`VERSION=` + versions.ProjectLockVersion.ToString(),
+		`DOCKERFILE_VERSION=` + versions.DockerfileVersion.ToString(),
 	}
 
 	for _, check := range pInfoChecks {
