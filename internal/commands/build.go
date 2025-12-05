@@ -27,6 +27,13 @@ func Build(ctx context.Context, args []string, filestore *files.FileStore, conso
 	if !filestore.DoesProjectExist(name) {
 		return fmt.Errorf("project '%s' not found\nHint: Use 'paul-envs list' to see available projects", name)
 	}
+
+	// TODO:
+	// projectInfo, err := filestore.ReadProjectInfo(name)
+	// if err != nil {
+	// 	return fmt.Errorf("impossible to parse project info file from project '%s':%w", name, err)
+	// }
+
 	console.Info("Preparing dotfiles...")
 	tmpDotfilesDir, err := filestore.CreateProjectDotfilesDir(ctx, name)
 	if err != nil {
@@ -45,9 +52,6 @@ func Build(ctx context.Context, args []string, filestore *files.FileStore, conso
 	if err != nil {
 		return fmt.Errorf("failed to obtain information on project '%s': %w", name, err)
 	}
-	if err := containerEngine.BuildImage(ctx, project, tmpDotfilesDir); err != nil {
-		return err
-	}
 	engineInfo, err := containerEngine.Info(ctx)
 	if err != nil {
 		console.Warn("Could not refresh 'project.buildinfo' file for this project: impossible to get container engine version: %s", err)
@@ -56,6 +60,9 @@ func Build(ctx context.Context, args []string, filestore *files.FileStore, conso
 		if err != nil {
 			console.Warn("Could not refresh 'project.buildinfo' file for this project: %s", err)
 		}
+	}
+	if err := containerEngine.BuildImage(ctx, project, tmpDotfilesDir); err != nil {
+		return err
 	}
 	console.Success("Built project '%s'", name)
 	return nil

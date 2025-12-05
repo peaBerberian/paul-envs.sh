@@ -121,8 +121,6 @@ func (f *FileStore) CreateProjectFiles(
 	}
 
 	envBytes := buf.Bytes()
-	// TODO: On build only
-	// envHash := utils.BufferHash(envBytes)
 	if err := f.userFS.WriteFileAsUser(f.GetProjectEnvFilePath(projectName), envBytes, 0644); err != nil {
 		return fmt.Errorf("write env file: %w", err)
 	}
@@ -145,8 +143,6 @@ func (f *FileStore) CreateProjectFiles(
 	}
 
 	composeBytes := buf.Bytes()
-	// TODO: On build only
-	// composeHash := utils.BufferHash(composeBytes)
 	if err := f.userFS.WriteFileAsUser(f.GetProjectComposeFilePath(projectName), composeBytes, 0644); err != nil {
 		return fmt.Errorf("write compose file: %w", err)
 	}

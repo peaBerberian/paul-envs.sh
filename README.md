@@ -416,8 +416,8 @@ Along the mounted project, those are the only directories which are persisted.
 - update project name
 - => Go can be merged I think
 - help flag per commands
-- SHould remove also remove networks?
-- SHould remove also remove volume directly?
+- Should remove also remove networks?
+- Should remove also remove volume directly?
 - Add "init bash / zsh /fish" commands to simplify auto-completion
 - ci tests for clean command?
 - on Remove, propose to call docker ourselve to remove the volume
@@ -431,3 +431,4 @@ Along the mounted project, those are the only directories which are persisted.
 - issues when calling `create` with `sudo`
 - Kill containers on same image on build?
 - Reference counted container instead of master/slaves
+- Does cache pruning in `clean` actually does anything?
