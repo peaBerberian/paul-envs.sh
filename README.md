@@ -1,15 +1,19 @@
 # paul-envs
 
-`paul-envs` allows me to manage development containers so I can easily work
-on multiple large projects with rapidly changing dependencies in isolated and
-minimal containers.
+`paul-envs` is a dev container manager to let me easily work on multiple large
+projects with rapidly changing dependencies in isolated and minimal
+environments.
 
 <video src="https://github.com/user-attachments/assets/0eb8bbb8-5ad4-4c8d-8d80-f92fbb0072c4"></video>
+
+_Video: Creating and running a project with `paul-envs`. Here even development
+itself can take place inside the container._
 
 ## What's this
 
 `paul-envs` is both a wrapper over the `docker compose` tool and a configuration
 generator for it.
+
 Each of the created containers is similar in a way to [dev
 containers](https://containers.dev/) in that they are targeted for development
 usages but mine is optimized for multi-projects workflows and CLI-heavy usage.
@@ -184,14 +188,15 @@ Here's an example of a real-life usage:
 # Will create a container named `myapp` with a default `zsh` shell and many
 # configurations. Also mount your `.git-credentials` readonly to the container.
 ./paul-envs create myapp ~/work/api \
-  --name myProject
+  --name myProject \
   --shell zsh \
   --node-version 22.11.0 \
   --git-name "John Doe" \
   --git-email "john@example.com" \
   --port 8000 \
   --port 5432 \
-  --packages "fzf ripgrep" \
+  --package fzf \
+  --package ripgrep \
   --volume ~/.git-credentials:/home/dev/.git-credentials:ro
 ```
 
@@ -227,7 +232,7 @@ Now that the container is built. It can be run at any time, with the
 `./paul-envs run` command.
 For example, with a container named `myApp`, you would do:
 ```sh
-./paul-envs build myApp
+./paul-envs run myApp
 ```
 
 You will directly switch to that container's `$HOME/projects/<NAME>` directory
@@ -414,8 +419,6 @@ Along the mounted project, those are the only directories which are persisted.
 
 ## TODO:
 
-- update project name
-- => Go can be merged I think
 - help flag per commands
 - Should remove also remove networks?
 - Should remove also remove volume directly?
