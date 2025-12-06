@@ -1,0 +1,88 @@
+name: Publish version
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+" # Official releases: v1.0.0, v2.3.4
+      - "v[0-9]+.[0-9]+.[0-9]+-dev.[0-9]+" # Dev releases: v1.0.0-dev....
+  workflow_dispatch: # Manual triggering for failed tag commits
+
+jobs:
+  publish-version:
+    runs-on: [ubuntu-latest]
+    permissions:
+      packages: write
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Detect prerelease
+        id: prerelease
+        run: |
+          if [[ "${GITHUB_REF_NAME}" == *"-dev."* ]]; then
+            echo "is_pre=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_pre=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      - name: Check go version
+        run: go version
+
+      - name: Run tests
+        run: make test
+
+      - name: Build in release mode
+        run: make release
+
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          version="$GITHUB_REF_NAME"
+      
+          awk -v version="$version" '
+            $0 ~ "^## " version {found=1; next}
+            found && /^## / {exit}
+            found
+          ' CHANGELOG.md > CHANGELOG_LATEST.md
+      
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          cat CHANGELOG_LATEST.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      
+          echo "Extracted changelog:"
+          cat CHANGELOG_LATEST.md
+
+      - name: Create GitHub Release
+        id: create_release
+        run: |
+          prerelease_flag=""
+          if [ "${{ steps.prerelease.outputs.is_pre }}" = "true" ]; then
+            prerelease_flag="--prerelease"
+          fi
+      
+          gh release create "$GITHUB_REF_NAME" \
+            $prerelease_flag \
+            --title "$GITHUB_REF_NAME" \
+            --notes "${{ steps.changelog.outputs.notes }}"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Upload all artifacts
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          for file in dist/release/*; do
+            name=$(basename "$file")
+            echo "Uploading $name ..."
+            gh release upload "$GITHUB_REF_NAME" "$file" \
+              --clobber \
+              --repo "$GITHUB_REPOSITORY"
+          done

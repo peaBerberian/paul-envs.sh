@@ -1,0 +1,148 @@
+package config
+
+import (
+	"fmt"
+	"os"
+	"os/user"
+	"runtime"
+	"strconv"
+
+	"github.com/peaberberian/paul-envs/internal/utils"
+)
+
+type Shell string
+
+const (
+	VersionNone   = utils.VersionNone
+	VersionLatest = utils.VersionLatest
+)
+
+const (
+	ShellBash Shell = "bash"
+	ShellZsh  Shell = "zsh"
+	ShellFish Shell = "fish"
+)
+
+func (s *Shell) Set(value string) error {
+	switch Shell(value) {
+	case ShellBash, ShellZsh, ShellFish:
+		*s = Shell(value)
+		return nil
+	default:
+		return fmt.Errorf("invalid shell: %s", value)
+	}
+}
+
+func (s Shell) String() string { return string(s) }
+
+// Bool helper for tri-state
+func Bool(v bool) *bool { return &v }
+
+type Config struct {
+	// The unique identifier, per-user, with which the corresponding image will
+	// be identified
+	ProjectName string
+
+	// Name of the container's user, inside that container (not the host)
+	Username string
+
+	// Default shell linked to the user in the container
+	Shell Shell
+
+	// UID of the container's user.
+	// It's better to synchronize it with the host to avoid permission issues when
+	// host directories are mounted inside the container, such as the project
+	// directory and dotfiles
+	UID string
+
+	// GID of the container's user.
+	// It's better to synchronize it with the host to avoid permission issues when
+	// host directories are mounted inside the container, such as the project
+	// directory and dotfiles
+	GID string
+
+	// Whether to install the following languages and their tools, and the
+	//version wanted.
+	//
+	// Values can be:
+	// - if 'none' or empty: don't install
+	// - if 'latest': Install Ubuntu's default package
+	// - If anything else: The exact version to install (e.g. "1.90.0").
+	//   That last type of value will only work if INSTALL_MISE is 'true'.
+	InstallNode   string
+	InstallRust   string
+	InstallPython string
+	InstallGo     string
+
+	// If 'true', add WebAssembly-specialized tools such as binaryen and a
+	// WebAssembly target for Rust if it is installed.
+	EnableWasm bool
+
+	// If 'true', openssh will be installed
+	EnableSsh bool
+
+	// If 'true', sudo will be installed
+	EnableSudo bool
+
+	// Tools toggle.
+	// "true" == install it
+	// anything else == don't.
+	InstallNeovim   bool
+	InstallStarship bool
+	InstallAtuin    bool
+	InstallMise     bool
+	InstallZellij   bool
+	InstallJujutsu  bool
+
+	Ports    []uint16
+	Volumes  []string
+	Packages []string
+
+	// TODO: optionals?
+	GitName         string
+	GitEmail        string
+	ProjectHostPath string
+	ProjectDestPath string
+	SshKeyPath      string
+}
+
+// New creates a config with UID/GID auto-detected.
+func New(username string, shell Shell) Config {
+	if runtime.GOOS == "windows" {
+		return Config{
+			Username: username,
+			Shell:    shell,
+			UID:      "1000",
+			GID:      "1000",
+		}
+	}
+	sudoUserEnv := os.Getenv("SUDO_USER")
+	if os.Geteuid() != 0 || sudoUserEnv == "" {
+		return Config{
+			Username: username,
+			Shell:    shell,
+			UID:      getuid(),
+			GID:      getgid(),
+		}
+	}
+	usr, err := user.Lookup(sudoUserEnv)
+	if err != nil {
+		return Config{
+			Username: username,
+			Shell:    shell,
+			UID:      getuid(),
+			GID:      getgid(),
+		}
+	}
+	uid := usr.Uid
+	gid := usr.Gid
+	return Config{Username: username, Shell: shell, UID: uid, GID: gid}
+}
+
+func getuid() string {
+	return strconv.Itoa(os.Getuid())
+}
+
+func getgid() string {
+	return strconv.Itoa(os.Getgid())
+}
