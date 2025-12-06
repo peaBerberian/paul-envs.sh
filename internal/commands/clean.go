@@ -91,7 +91,7 @@ func removeContainers(ctx context.Context, containerEngine engine.ContainerEngin
 		if container.ContainerName == nil {
 			console.WriteLn("  • Removing unknown container")
 		} else {
-			console.WriteLn("  • Removing container: %s", container.ContainerName)
+			console.WriteLn("  • Removing container: %s", *container.ContainerName)
 		}
 		if err := containerEngine.RemoveContainer(ctx, container); err != nil {
 			console.Warn("    WARNING: failed to remove container: %v", err)
