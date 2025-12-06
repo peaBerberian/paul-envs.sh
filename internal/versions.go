@@ -5,8 +5,8 @@ import "github.com/peaberberian/paul-envs/internal/utils"
 // Version of this application
 // TODO: automatize
 var Version = utils.Version{
-	Major: 1,
-	Minor: 0,
+	Major: 0,
+	Minor: 1,
 	Patch: 0,
 }
 
