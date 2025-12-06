@@ -652,6 +652,7 @@ jobs:
           FISH_OUTPUT=$(timeout 10s ./paul-envs run full-build fish -c 'echo "Fish shell loaded successfully"' 2>&1)
           FISH_EXIT=$?
           set -e
+          sleep 10
 
           echo "$FISH_OUTPUT"
 
@@ -808,6 +809,7 @@ jobs:
           " 2>&1)
           EXIT_CODE=$?
           set -e
+          sleep 10
 
           # Always print the container output
           echo "=== Bash Container Output ==="
@@ -924,6 +926,7 @@ jobs:
           ' 2>&1)
           FISH_EXIT_CODE=$?
           set -e
+          sleep 10
 
           echo "=== Fish Container Output ==="
           echo "$FISH_CONTAINER_OUTPUT"
