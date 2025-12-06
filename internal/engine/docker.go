@@ -233,15 +233,9 @@ func (c *DockerEngine) ListVolumes(ctx context.Context) ([]VolumeInfo, error) {
 	result := make([]VolumeInfo, 0, len(lines))
 	for _, volumeName := range lines {
 		if volumeName != "" {
-			var projectName *string
-			// Extract project name from volume name if it follows the pattern "paulenv-{project}"
-			if strings.HasPrefix(volumeName, "paulenv-") && len(volumeName) > len("paulenv-") {
-				sliced := volumeName[len("paulenv-"):]
-				projectName = &sliced
-			}
 			result = append(result, VolumeInfo{
-				VolumeName:  volumeName,
-				ProjectName: projectName,
+				VolumeId:   volumeName,
+				VolumeName: volumeName,
 			})
 		}
 	}

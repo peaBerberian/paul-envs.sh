@@ -110,8 +110,6 @@ type NetworkInfo struct {
 type VolumeInfo struct {
 	// Its Id with which it can be refered to
 	VolumeId string
-	// The name of the corresponding paulenv project, if one
-	ProjectName *string
 	// The name it is actually refered to by the container engine.
 	VolumeName string
 }
