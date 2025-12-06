@@ -115,7 +115,7 @@ through persistent volumes.
 
 ## How to run it
 
-First, download the latest binary [in our releases
+First, download the latest binary [in the releases
 page](https://github.com/peaBerberian/paul-envs/releases/latest).
 
 Running that executable without any argument will list all available operations
