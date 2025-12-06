@@ -77,46 +77,6 @@ It can be seen as a "convenience layer" on top of `docker compose`.
 These manipulate your environment (PATH, env vars) but don't provide container
 isolation (same issue than with `devbox`).
 
-## Quick Start
-
-1. Clone this repository, `cd` to it, and ensure `docker compose` is installed
-   locally and accessible in path.
-
-2. Run `./paul-envs create <path/to/your/project>`
-
-   This will just create a compose and env file in a new `projects/` directory
-   with the right preset properties depending on your answers on what it
-   prompted you (default shell, packages to install, languages etc.).
-
-3. The `create` command you ran at the previous step should have finished by
-   listing what you can do now. You may review the created configuration to see
-   if it seems right (and you can update those files at any time).
-
-   More importantly, it will also invite you to put the "dotfiles" (e.g. your
-   `.zshrc`) that you want to retrieve in the container's home directory in a
-   specific folder.
-
-   They will be copied to the container when it is build (next step).
-
-4. Run `./paul-envs build <name>`
-
-   With the `<name>` being the name given at the end of step `2`.
-
-   It will build the container through the right `docker compose build`
-   invokation and initialize persistent volumes. You can call again `build` any
-   time you update the config or want to update the installed tools.
-
-5. Then launch the container each time you want to work on the project:
-   `./paul-envs run <name>`.
-
-   The mounted project is available in that container at `~/projects/myApp`.
-
-   The project, caches (npm/yarn caches etc.) and the pre-installed tools'
-   storage (shell history, `mise` data etc.) are persisted, everything else is
-   automically removed when that container is exited.
-
-   Each new run thus start from a relatively clean and simple state.
-
 ## Why creating this
 
 I often have to switch between projects at work.
@@ -155,18 +115,11 @@ through persistent volumes.
 
 ## How to run it
 
-First you need to clone this repository and make it your current working
-directory:
-```sh
-git clone https://github.com/peaBerberian/paul-envs.git
-cd paul-envs
-```
+First, download the latest binary [in our releases
+page](https://github.com/peaBerberian/paul-envs/releases/latest).
 
-Running `./paul-envs` without any argument will list all available operations
-and corresponding flags:
-```sh
-./paul-envs
-```
+Running that executable without any argument will list all available operations
+and corresponding flags.
 
 ### 1. Create a new container's config
 
@@ -179,7 +132,7 @@ through the `paul-envs create` "command".
 
 First ensure the target project is present locally in your host, then run:
 ```sh
-./paul-envs create <path/to/your/project>
+paul-envs create <path/to/your/project>
 ```
 
 Optionally, you may add a lot of flags to better configure that container.
@@ -187,7 +140,7 @@ Here's an example of a real-life usage:
 ```sh
 # Will create a container named `myapp` with a default `zsh` shell and many
 # configurations. Also mount your `.git-credentials` readonly to the container.
-./paul-envs create myapp ~/work/api \
+paul-envs create myapp ~/work/api \
   --name myProject \
   --shell zsh \
   --node-version 22.11.0 \
@@ -204,11 +157,8 @@ Without the corresponding flags, prompts will be proposed by `paul-envs` for
 important parameters (choosen shell, wanted pre-mounted volumes etc.).
 
 What this step does is just to create both a `yaml` and a `.env` file containing
-your container's configuration. It doesn't build anything yet.
-
-Those files will be written in a new `./projects/<NAME>` directory, with
-`<NAME>` being the name you chose under the `--name` flag or the directory's
-name by default. Those files can be directly edited if you want.
+your container's configuration in your application data directory (advertised
+after the command succeeds). It doesn't build anything yet.
 
 ### 2. Build the container
 
@@ -220,7 +170,7 @@ This step relies on `docker compose`, which you should have locally installed.
 To build a container, just run the `paul-envs build <NAME>` command.
 For example, with a container named `myApp`, you would just do:
 ```sh
-./paul-envs build myApp
+paul-envs build myApp
 ```
 
 This will take some time as the initialization of the container is going on:
@@ -229,101 +179,50 @@ packages are loaded, tools are set-up etc.
 ### 3. Run the container
 
 Now that the container is built. It can be run at any time, with the
-`./paul-envs run` command.
+`paul-envs run` command.
 For example, with a container named `myApp`, you would do:
 ```sh
-./paul-envs run myApp
+paul-envs run myApp
 ```
 
-You will directly switch to that container's `$HOME/projects/<NAME>` directory
-(e.g. for a `myApp` project with a `dev` default username it will be
-`/home/dev/projects/myApp`) which contains the project you linked to that
-container.
+You will directly switch to the mounted project directory inside that container.
 
-You can go out of that container at any time (e.g. by calling `exit`), as you
-exit that container, everything that is not part of the "persisted volume" (see
-`What gets preserved vs. ephemeral` chapter) is reset to the state it was at
-build-time.
-
-As cache and tools' data directory are still persisted, you might also want to
-re-build the container if you feel that you need a completely fresh state. This
-should be needed extremely rarely hopefully (you more probably will want to
-rebuild just to update some base tools).
+You can go out of that container at any time (e.g. by calling `exit` or hitting
+`Ctrl+D`), as you exit that container, everything that is not part of the
+"persisted volume" (see `What gets preserved vs. ephemeral` chapter) is reset to
+the state it was at build-time.
 
 ### Other commands
 
-`paul-envs` also proposes the `list` and `remove` commands, respectively to
-list "created" configurations (what's in the `projects` directory basically) and
-to easily remove one of them (basically a `rm` command for that configuration)
-respectively:
+`paul-envs` also proposes multiple other commands:
 ```sh
 # List all created configurations, built or not
-./paul-envs list
+paul-envs list
 
-# Remove the configuration file for the `myApp` container
-./paul-envs remove myApp
+# Remove the configuration file and container data for the `myApp` project
+paul-envs remove myApp
 
 # Get version information
-./paul-envs version
+paul-envs version
 
 # Start an interactive session
-./paul-envs interactive
+paul-envs interactive
 
 # Display global help
-./paul-envs help
+paul-envs help
+
+# Uninstall paul-envs completely from your system (remove all projects, config etc.)
+paul-envs clean
 ```
 
-## What gets preserved vs. ephemeral
-
-When working inside the container, here's what you can expect to be either
-"preserved" (changes will stay from container to container) or "ephemeral" (it
-will be removed when the container is exited).
-
-- **Preserved**: the mounted project directory (`~/projects/<NAME>`), the
-  "cache" directory (mounted as `~/.container-cache`) and the "local" directory
-  (mounted as `~/.container-local`) - see the "persisted volumes" chapter for
-  those last two.
-
-- **Ephemeral**: All other changes (further installed global packages, global
-  system configurations etc.)
-
-## Deep dive on how it works
-
-Much like container applications, this repository is organized in separate
-layers: `Dockerfile`, `compose.yaml` and `paul-envs`, from the core layer to the
-most outer one, each inner layer being able to run independently of its outer
-layers (just losing some features in the process).
-
-The following chapters explain each layer and how to run them independently if
-wanted. If you just want to [run this without understanding every little
-details](https://www.youtube.com/watch?v=bJHPfpOnDzg) just run `paul-envs`
-and performs the operations it advertises.
-
-### Dockerfile
-
-The `Dockerfile` (`./internal/files/assets/Dockerfile`) sets a simple Ubuntu
-LTS environment with a shell of your preference (either `bash` as default or
-`zsh` or `fish`) and optional popular CLI tools (`neovim`, `starship`, `atuin`,
-`zellij`, `jujutsu` and `mise`).
-
-It also copies your dotfiles directory inside of that container and sets-up
-`$HOME/.container-cache` and `$HOME/.container-local` directories for cache and
-tools' local data (including shell history, `atuin` database, `mise`
-environments) respectively.
-
-You can rely on this `Dockerfile` without anything else, as a standalone, e.g.
-via `docker`. Note that if you do that, you won't have persistent volumes for
-cache, tools data and the project code, which would have to be re-populated each
-time the container is run. Adding persistence is the main point of the
-`compose.yaml` file.
-
-### The dotfiles directory
+### Note: The dotfiles directory
 
 The "dotfiles directory" is a special location that will be merged with the home
-directory of an image once built. As such you can put a `.bashrc` directly in
-there at its root, and the config for the tools you planned to install (e.g. the
-`starship` configuration file: `starship.toml`, a `nvim` directory for `neovim`
-etc.):
+directory of an image on a `build` command.
+
+As such you can put a `.bashrc` directly in there, and the config for
+the tools you planned to install (e.g. the `starship` configuration file:
+`starship.toml`, a `nvim` directory for `neovim` etc.):
 ```
 dotfiles_dir/
 ├── .bashrc
@@ -337,8 +236,7 @@ All its content will be copied as is unmodified, with two exceptions:
 
 1.  shell files  (`.bashrc`, `.zshrc` and/or `.config/fish/config.fish` files)
     may still be updated after being copied in the dockerfile to redirect their
-    history to `~/.container-local` (see next chapter) to ensure history
-    persistence.
+    history to ensure history persistence.
 
 2.  The git config file (generally `~/.gitconfig`) may also be updated after
     being copied in the container to set the name and e-mail information you
@@ -360,77 +258,33 @@ If you don't go through `paul-envs`, you will have to set the `DOTFILES_DIR` env
 variable yourself so it points to the dotfiles directory you defined yourself.
 When relying on `paul-envs`, a directory will be created for you.
 
-#### Note about neovim
+## What gets preserved vs. ephemeral
 
-If you set a `neovim` config with plugins, they will be pre-installed as the
-container is built if you rely on the `lazy.nvim` plugin manager.
+When working inside the container, here's what you can expect to be either
+"preserved" (changes will stay from container to container) or "ephemeral" (it
+will be removed when the container is exited).
 
-With other solutions, the installation will need to be done the first time the
-container is ran (it should be persisted thereafter if going the
-`compose.yaml` or `paul-envs` route).
+- **Preserved**: the mounted project directory (`~/projects/<NAME>`), the
+  "cache" directory (mounted as `~/.container-cache`) and the "local" directory
+  (mounted as `~/.container-local`) - see the "persisted volumes" chapter for
+  those last two.
 
-### compose.yaml
-
-The `compose.yaml` file (`./internal/files/assets/compose.tmpl`) allows
-`docker compose` to build a container with the right arguments for your project.
-More importantly, it also mount the right "volumes" so that some changes
-(project changes, cache, tools data, shell history etc.) are persisted.
-
-### The paul-envs binary
-
-Managing very dynamic configurations for multiple projects just with
-`docker compose` is not as straightforward as I would have liked: depending on
-what you want to do, the idiomatic ways to configure it are through either
-environment variables or new compose files.
-
-Instead of doing both, which would have been difficult to maintain (and to
-remember what goes where and why), I thus decided to create a `paul-envs`
-tool whose job is to wrap both compose files creation and `docker compose`
-calls.
-
-Through a small list of commands and a high number of flags, it is now possible
-to easily create configurations, build containers, run them, list them etc.
-
-That binary actually just writes `compose.yaml` files and wraps `docker compose`
-calls, with also some input validation and the printing of helpful information
-on top.
-
-### persisted volumes
-
-Two container "volumes", a `~/.container-cache` and a `~/.container-local`
-directory, will be present in the container.
-Their main specificity is that unlike almost anything else, their contents are
-persisted through multiple containers run (unless you went directly the
-`Dockerfile` route).
-
-The former (`.container-cache`) is configured to store the various "caches"
-(e.g. `npm` and `yarn` loaded package cache, or any other similar cache), to
-prevent re-doing the same avoidable requests/operations each time a container is
-spawned.
-
-The latter (`.container-local`) is intended for persistent tool data instead,
-such as shell history, neovim undo history, tool databases etc.
-
-The dockerfile is configured so that the installed tools know they have to use
-those directories for the aforementioned purposes.
-_I made use both of the XDG spec and of tool-specific configuration for this._
-
-Along the mounted project, those are the only directories which are persisted.
+- **Ephemeral**: All other changes (further installed global packages, global
+  system configurations etc.)
 
 ## TODO:
 
 - help flag per commands
-- Add "init bash / zsh /fish" commands to simplify auto-completion
-- ci tests for clean command?
-- on Remove, propose to call docker ourselve to remove the volume
-- flags for clean: --no-prompt, --no-config, --no-image, --no-cache
-- `run` should propose to `build` if not already done
+- Add "init bash / zsh /fish" commands to simplify auto-completion setups
+- no-prompt flags for clean, remove...
 - `update` command?
-- something like `up` / `down` commands make now much more sense with ssh
-- support rootless
-- Add Kakoune and Helix as potential tools
-- less gh-action, more scripts (in-docker for local tests?)
-- issues when calling `create` with `sudo`
+- `kill` command?
+- `up` command?
+- rootless support
+- Add `kakoune` and `helix` as potential in-container editors
+- less gh-action scripts, more shell scripts
+- permissions things when calling the `create` command with `sudo`
 - Kill containers on same image on build?
 - Reference counted container instead of master/slaves
 - Does cache pruning in `clean` actually does anything?
+- ci tests for clean command
