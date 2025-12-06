@@ -84,6 +84,14 @@ func Run(ctx context.Context, args []string, filestore *files.FileStore, console
 		}
 	}
 
+	status, err := filestore.ValidateProjectLock(project.ProjectName)
+	if !status.IsValid() {
+		console.Warn("This project has an invalid lockfile: %s\n", status)
+		console.Warn("The running container may not match your current configuration.\n")
+		console.Warn("Consider running 'build' first.\n\n")
+		// Continue anyway if image exists
+	}
+
 	buildInfo, err := filestore.ReadBuildInfo(project.ProjectName)
 	if err != nil {
 		console.Warn("Could not get the information from a precedent build: %s", err)

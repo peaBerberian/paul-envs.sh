@@ -28,11 +28,10 @@ func Build(ctx context.Context, args []string, filestore *files.FileStore, conso
 		return fmt.Errorf("project '%s' not found\nHint: Use 'paul-envs list' to see available projects", name)
 	}
 
-	// TODO:
-	// projectInfo, err := filestore.ReadProjectInfo(name)
-	// if err != nil {
-	// 	return fmt.Errorf("impossible to parse project info file from project '%s':%w", name, err)
-	// }
+	status, err := filestore.ValidateProjectLock(name)
+	if !status.IsValid() {
+		return fmt.Errorf("cannot build: %s\nPlease re-create this project.", status)
+	}
 
 	console.Info("Preparing dotfiles...")
 	tmpDotfilesDir, err := filestore.CreateProjectDotfilesDir(ctx, name)

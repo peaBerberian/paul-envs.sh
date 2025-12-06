@@ -412,7 +412,6 @@ Along the mounted project, those are the only directories which are persisted.
 
 ## TODO:
 
-- implement lockfile reading
 - update project name
 - => Go can be merged I think
 - help flag per commands

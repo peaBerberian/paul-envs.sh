@@ -460,7 +460,6 @@ func (filestore *FileStore) ReadBuildInfo(projectName string) (*buildState, erro
 	return &bState, nil
 }
 
-// Updated NeedsRebuild function with reason
 func (filestore *FileStore) NeedsRebuild(projectName string, bState *buildState) (bool, RebuildReason, error) {
 	if bState == nil {
 		return false, RebuildNotNeeded, errors.New("cannot determine if rebuild is needed, no build state")
@@ -496,7 +495,6 @@ func (filestore *FileStore) NeedsRebuild(projectName string, bState *buildState)
 	return false, RebuildNotNeeded, nil
 }
 
-// New function to validate project.lock status
 func (filestore *FileStore) ValidateProjectLock(projectName string) (ProjectLockStatus, error) {
 	pInfo, err := filestore.ReadProjectInfo(projectName)
 	if err != nil {
