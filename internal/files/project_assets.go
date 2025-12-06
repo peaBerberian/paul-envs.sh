@@ -90,6 +90,66 @@ type buildState struct {
 	containerEngineVersion string
 }
 
+// RebuildReason indicates why a project needs to be rebuilt
+type RebuildReason int
+
+const (
+	RebuildNotNeeded RebuildReason = iota
+	RebuildDifferentMachine
+	RebuildComposeChanged
+	RebuildEnvChanged
+	RebuildDifferentEngine
+)
+
+func (r RebuildReason) String() string {
+	switch r {
+	case RebuildNotNeeded:
+		return "no rebuild needed"
+	case RebuildDifferentMachine:
+		return "last built on a different machine"
+	case RebuildComposeChanged:
+		return "compose.yaml file has changed since last build"
+	case RebuildEnvChanged:
+		return ".env file has changed since last build"
+	case RebuildDifferentEngine:
+		return "built on a different container engine"
+	default:
+		return "unknown reason"
+	}
+}
+
+// ProjectLockStatus indicates the validity status of a project.lock file
+type ProjectLockStatus int
+
+const (
+	ProjectLockValid ProjectLockStatus = iota
+	ProjectLockMissing
+	ProjectLockInvalidVersion
+	ProjectLockIncompatibleDockerfile
+	ProjectLockCorrupted
+)
+
+func (s ProjectLockStatus) String() string {
+	switch s {
+	case ProjectLockValid:
+		return "valid"
+	case ProjectLockMissing:
+		return "project.lock file not found"
+	case ProjectLockInvalidVersion:
+		return "incompatible project.lock version"
+	case ProjectLockIncompatibleDockerfile:
+		return "incompatible Dockerfile version"
+	case ProjectLockCorrupted:
+		return "corrupted or malformed project.lock"
+	default:
+		return "unknown status"
+	}
+}
+
+func (s ProjectLockStatus) IsValid() bool {
+	return s == ProjectLockValid
+}
+
 // Create the directory and all files needed for the given project name, with
 // the configuration given.
 func (f *FileStore) CreateProjectFiles(
@@ -315,7 +375,7 @@ func (f *FileStore) RefreshBuildInfoFile(projectName string, engineName string, 
 func (filestore *FileStore) ReadBuildInfo(projectName string) (*buildState, error) {
 	file, err := os.Open(filestore.getBuildInfoFilePathFor(projectName))
 	if err != nil {
-		return nil, fmt.Errorf("could not open 'build.buildinfo': %w", err)
+		return nil, fmt.Errorf("could not open 'project.buildinfo': %w", err)
 	}
 	defer file.Close()
 
@@ -330,10 +390,10 @@ func (filestore *FileStore) ReadBuildInfo(projectName string) (*buildState, erro
 		if vStr, ok := strings.CutPrefix(line, "VERSION="); ok {
 			v, err := utils.ParseVersion(vStr)
 			if err != nil {
-				return nil, fmt.Errorf("invalid 'build.buildinfo' version '%s': %w", vStr, err)
+				return nil, fmt.Errorf("invalid 'project.buildinfo' version '%s': %w", vStr, err)
 			}
 			if !v.IsCompatibleWithBase(versions.BuildInfoVersion) {
-				return nil, fmt.Errorf("unknown 'build.buildinfo' version '%s'", vStr)
+				return nil, fmt.Errorf("unknown 'project.buildinfo' version '%s'", vStr)
 			}
 			parsedVersion = &v
 			continue
@@ -361,7 +421,7 @@ func (filestore *FileStore) ReadBuildInfo(projectName string) (*buildState, erro
 		if v, ok := strings.CutPrefix(line, "LAST_BUILT_AT="); ok {
 			parsed, err := time.Parse(time.RFC3339, v)
 			if err != nil {
-				return nil, fmt.Errorf("invalid 'build.buildinfo' LAST_BUILT_AT value '%s': %w", v, err)
+				return nil, fmt.Errorf("invalid 'project.buildinfo' LAST_BUILT_AT value '%s': %w", v, err)
 			}
 
 			parsedBuiltAt = &parsed
@@ -370,68 +430,105 @@ func (filestore *FileStore) ReadBuildInfo(projectName string) (*buildState, erro
 	}
 
 	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("error reading 'build.buildinfo': %w", err)
+		return nil, fmt.Errorf("error reading 'project.buildinfo': %w", err)
 	}
 
 	if parsedBuiltAt == nil {
-		return nil, errors.New("invalid 'build.buildinfo': no LAST_BUILT_AT value")
+		return nil, errors.New("invalid 'project.buildinfo': no LAST_BUILT_AT value")
 	}
 	bState.builtAt = *parsedBuiltAt
 	if parsedVersion == nil {
-		return nil, errors.New("invalid 'build.buildinfo': no VERSION")
+		return nil, errors.New("invalid 'project.buildinfo': no VERSION")
 	}
 	bState.version = *parsedVersion
 
 	if bState.containerEngineVersion == "" {
-		return nil, errors.New("invalid 'build.buildinfo': no CONTAINER_ENGINE_VERSION")
+		return nil, errors.New("invalid 'project.buildinfo': no CONTAINER_ENGINE_VERSION")
 	}
 	if bState.containerEngine == "" {
-		return nil, errors.New("invalid 'build.buildinfo': no CONTAINER_ENGINE")
+		return nil, errors.New("invalid 'project.buildinfo': no CONTAINER_ENGINE")
 	}
 	if bState.builtBy == "" {
-		return nil, errors.New("invalid 'build.buildinfo': no BUILT_BY")
+		return nil, errors.New("invalid 'project.buildinfo': no BUILT_BY")
 	}
 	if bState.buildEnvHash == "" {
-		return nil, errors.New("invalid 'build.buildinfo': no BUILD_ENV")
+		return nil, errors.New("invalid 'project.buildinfo': no BUILD_ENV")
 	}
 	if bState.buildComposeHash == "" {
-		return nil, errors.New("invalid 'build.buildinfo': no BUILD_COMPOSE")
+		return nil, errors.New("invalid 'project.buildinfo': no BUILD_COMPOSE")
 	}
 	return &bState, nil
 }
 
-// ReadBuildInfo reads the "project.buildinfo" file and returns a populated buildState struct.
-// TODO: Return enum of reasons
-func (filestore *FileStore) NeedsRebuild(projectName string, bState *buildState) (bool, error) {
+// Updated NeedsRebuild function with reason
+func (filestore *FileStore) NeedsRebuild(projectName string, bState *buildState) (bool, RebuildReason, error) {
 	if bState == nil {
-		return false, errors.New("cannot now if rebuild is needed, no build state")
+		return false, RebuildNotNeeded, errors.New("cannot determine if rebuild is needed, no build state")
 	}
 	machineId, err := filestore.getMachineID()
 	if err != nil {
-		return false, fmt.Errorf("cannot get current 'machineid': %w", err)
+		return false, RebuildNotNeeded, fmt.Errorf("cannot get current 'machineid': %w", err)
 	}
 	if bState.builtBy != machineId {
-		return true, nil
+		return true, RebuildDifferentMachine, nil
 	}
 
 	composeHash, err := utils.FileHash(filestore.GetProjectComposeFilePath(projectName))
 	if err != nil {
-		return false, fmt.Errorf("cannot hash current compose file: %w", err)
+		return false, RebuildNotNeeded, fmt.Errorf("cannot hash current compose file: %w", err)
 	}
 	if bState.buildComposeHash != composeHash {
-		return true, nil
+		return true, RebuildComposeChanged, nil
 	}
+
 	envHash, err := utils.FileHash(filestore.GetProjectEnvFilePath(projectName))
 	if err != nil {
-		return false, fmt.Errorf("cannot hash current env file: %w", err)
+		return false, RebuildNotNeeded, fmt.Errorf("cannot hash current env file: %w", err)
 	}
 	if bState.buildEnvHash != envHash {
-		return true, nil
+		return true, RebuildEnvChanged, nil
 	}
+
 	if bState.containerEngine != "docker" {
-		return true, nil
+		return true, RebuildDifferentEngine, nil
 	}
-	return false, nil
+
+	return false, RebuildNotNeeded, nil
+}
+
+// New function to validate project.lock status
+func (filestore *FileStore) ValidateProjectLock(projectName string) (ProjectLockStatus, error) {
+	pInfo, err := filestore.ReadProjectInfo(projectName)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return ProjectLockMissing, nil
+		}
+		// If it's a parsing error, it's likely corrupted
+		if strings.Contains(err.Error(), "invalid") {
+			return ProjectLockCorrupted, err
+		}
+		return ProjectLockCorrupted, err
+	}
+
+	// Check if the project.lock version is compatible
+	if !pInfo.version.IsCompatibleWithBase(versions.ProjectLockVersion) {
+		return ProjectLockInvalidVersion, fmt.Errorf(
+			"project.lock version %s is incompatible with current version %s",
+			pInfo.version.ToString(),
+			versions.ProjectLockVersion.ToString(),
+		)
+	}
+
+	// Check if the Dockerfile version is compatible
+	if !pInfo.dockerfileVersion.IsCompatibleWithBase(versions.DockerfileVersion) {
+		return ProjectLockIncompatibleDockerfile, fmt.Errorf(
+			"Dockerfile version %s is incompatible with current version %s",
+			pInfo.dockerfileVersion.ToString(),
+			versions.DockerfileVersion.ToString(),
+		)
+	}
+
+	return ProjectLockValid, nil
 }
 
 // Returns the format of the "project.buildinfo" file which contains information on

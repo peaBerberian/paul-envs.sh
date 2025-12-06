@@ -75,7 +75,7 @@ func Run(ctx context.Context, args []string, filestore *files.FileStore, console
 	}
 	if !hasBeenBuilt {
 		console.WriteLn("The '%s' project has not been built yet", project.ProjectName)
-		choice, err := console.AskYesNo("Do you want to build it?", true)
+		choice, err := console.AskYesNo("Do you want to build it first?", true)
 		if err != nil || !choice {
 			return fmt.Errorf("please run 'paul-envs build %s' first", project.ProjectName)
 		}
@@ -90,13 +90,13 @@ func Run(ctx context.Context, args []string, filestore *files.FileStore, console
 	} else if buildInfo == nil {
 		console.Warn("NIL BUILD INFO")
 	} else {
-		needsRebuild, err := filestore.NeedsRebuild(project.ProjectName, buildInfo)
+		needsRebuild, reason, err := filestore.NeedsRebuild(project.ProjectName, buildInfo)
 		if err != nil {
 			console.Warn("Cannot check previous build metadata: %s", err)
 		}
 		if needsRebuild {
-			console.WriteLn("The '%s' project has changed and needs to be re-built", project.ProjectName)
-			choice, err := console.AskYesNo("Do you want to build it?", true)
+			console.WriteLn("The '%s' project needs to be re-built: %s", project.ProjectName, reason)
+			choice, err := console.AskYesNo("Do you want to build it first?", true)
 			if err != nil || choice {
 				if err = Build(ctx, []string{project.ProjectName}, filestore, console); err != nil {
 					return fmt.Errorf("did not succeed to build project: %w", err)
