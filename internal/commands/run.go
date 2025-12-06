@@ -84,6 +84,28 @@ func Run(ctx context.Context, args []string, filestore *files.FileStore, console
 		}
 	}
 
+	buildInfo, err := filestore.ReadBuildInfo(project.ProjectName)
+	if err != nil {
+		console.Warn("Could not get the information from a precedent build: %s", err)
+	} else if buildInfo == nil {
+		console.Warn("NIL BUILD INFO")
+	} else {
+		needsRebuild, err := filestore.NeedsRebuild(project.ProjectName, buildInfo)
+		if err != nil {
+			console.Warn("Cannot check previous build metadata: %s", err)
+		}
+		if needsRebuild {
+			console.WriteLn("The '%s' project has changed and needs to be re-built", project.ProjectName)
+			choice, err := console.AskYesNo("Do you want to build it?", true)
+			if err != nil || choice {
+				if err = Build(ctx, []string{project.ProjectName}, filestore, console); err != nil {
+					return fmt.Errorf("did not succeed to build project: %w", err)
+				}
+			}
+		}
+
+	}
+
 	containerList, err := containerEngine.ListContainers(ctx)
 	if err != nil {
 		console.Warn("Could not list already launched containers: %s", err)

@@ -3,6 +3,7 @@
 // -  Its `compose.yaml` file
 // -  Its `.env` file
 // -  Its `project.lock` lockfile
+// -  Its `project.buildinfo` build state
 
 package files
 
@@ -10,6 +11,7 @@ import (
 	"bufio"
 	"bytes"
 	"embed"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -267,99 +269,6 @@ func (filestore *FileStore) ReadProjectInfo(projectName string) (projectLockInfo
 	return pInfo, nil
 }
 
-// TODO:
-func (filestore *FileStore) CheckProjectLock(projectName string) error {
-	file, err := os.Open(filestore.getProjectInfoFilePathFor(projectName))
-	if err != nil {
-		return fmt.Errorf("could not open project.lock: %w", err)
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-
-	var fileVersion *utils.Version = nil
-	var dockerfileVersion *utils.Version = nil
-	var buildEnvHash = ""
-	var buildComposeHash = ""
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		if vStr, ok := strings.CutPrefix(line, "VERSION="); ok {
-			v, err := utils.ParseVersion(vStr)
-			if err != nil {
-				return fmt.Errorf("invalid 'project.lock' version '%s': %w", vStr, err)
-			}
-
-			if !v.IsCompatibleWithBase(versions.ProjectLockVersion) {
-				return fmt.Errorf("this project is incompatible with the current version of paul-envs")
-			}
-			fileVersion = &v
-			continue
-		}
-		if vStr, ok := strings.CutPrefix(line, "DOCKERFILE_VERSION="); ok {
-			v, err := utils.ParseVersion(vStr)
-			if err != nil {
-				return fmt.Errorf("invalid 'project.lock' Dockerfile version '%s': %w", vStr, err)
-			}
-
-			if !v.IsCompatibleWithBase(versions.DockerfileVersion) {
-				return fmt.Errorf("this project is incompatible with our Dockerfile")
-			}
-
-			dockerfileVersion = &v
-			continue
-		}
-		if v, ok := strings.CutPrefix(line, "BUILD_ENV="); ok {
-			buildEnvHash = v
-			hash, err := utils.FileHash(filestore.GetProjectEnvFilePath(projectName))
-			if err != nil {
-				// TODO:: Caller should then propose to re-build the project
-				return fmt.Errorf("error hashing project's env file: %w", err)
-			}
-			if hash != buildEnvHash {
-				// TODO:: Caller should then propose to re-build the project
-				return fmt.Errorf(".env file hash does not match its last build")
-			}
-			continue
-		}
-		if v, ok := strings.CutPrefix(line, "BUILD_COMPOSE="); ok {
-			buildComposeHash = v
-			hash, err := utils.FileHash(filestore.GetProjectComposeFilePath(projectName))
-			if err != nil {
-				// TODO:: Caller should then propose to re-build the project
-				return fmt.Errorf("error hashing project's compose file: %w", err)
-			}
-			if hash != buildEnvHash {
-				// TODO:: Caller should then propose to re-build the project
-				return fmt.Errorf("compose.yaml file hash does not match its last build")
-			}
-			continue
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("error reading project.lock: %w", err)
-	}
-
-	if fileVersion == nil {
-		return fmt.Errorf("error reading project.lock: no VERSION key")
-	}
-
-	if dockerfileVersion == nil {
-		return fmt.Errorf("error reading project.lock: no DOCKERFILE_VERSION key")
-	}
-
-	if buildEnvHash == "" {
-		return fmt.Errorf("error reading project.lock: no BUILD_ENV key")
-	}
-
-	if buildComposeHash == "" {
-		return fmt.Errorf("error reading project.lock: no BUILD_COMPOSE key")
-	}
-
-	return nil
-}
-
 // Update the file which stores information on the last performed build, mainly
 // to detect if we should re-build an image.
 //
@@ -400,6 +309,129 @@ func (f *FileStore) RefreshBuildInfoFile(projectName string, engineName string, 
 		return fmt.Errorf("failed to create 'project.buildinfo' due to impossibility to write '%s': %w", buildInfoPath, err)
 	}
 	return nil
+}
+
+// ReadBuildInfo reads the "project.buildinfo" file and returns a populated buildState struct.
+func (filestore *FileStore) ReadBuildInfo(projectName string) (*buildState, error) {
+	file, err := os.Open(filestore.getBuildInfoFilePathFor(projectName))
+	if err != nil {
+		return nil, fmt.Errorf("could not open 'build.buildinfo': %w", err)
+	}
+	defer file.Close()
+
+	var bState buildState
+	scanner := bufio.NewScanner(file)
+
+	var parsedBuiltAt *time.Time = nil
+	var parsedVersion *utils.Version = nil
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		if vStr, ok := strings.CutPrefix(line, "VERSION="); ok {
+			v, err := utils.ParseVersion(vStr)
+			if err != nil {
+				return nil, fmt.Errorf("invalid 'build.buildinfo' version '%s': %w", vStr, err)
+			}
+			if !v.IsCompatibleWithBase(versions.BuildInfoVersion) {
+				return nil, fmt.Errorf("unknown 'build.buildinfo' version '%s'", vStr)
+			}
+			parsedVersion = &v
+			continue
+		}
+		if v, ok := strings.CutPrefix(line, "BUILT_BY="); ok {
+			bState.builtBy = v
+			continue
+		}
+		if v, ok := strings.CutPrefix(line, "BUILD_ENV="); ok {
+			bState.buildEnvHash = v
+			continue
+		}
+		if v, ok := strings.CutPrefix(line, "BUILD_COMPOSE="); ok {
+			bState.buildComposeHash = v
+			continue
+		}
+		if v, ok := strings.CutPrefix(line, "CONTAINER_ENGINE="); ok {
+			bState.containerEngine = v
+			continue
+		}
+		if v, ok := strings.CutPrefix(line, "CONTAINER_ENGINE_VERSION="); ok {
+			bState.containerEngineVersion = v
+			continue
+		}
+		if v, ok := strings.CutPrefix(line, "LAST_BUILT_AT="); ok {
+			parsed, err := time.Parse(time.RFC3339, v)
+			if err != nil {
+				return nil, fmt.Errorf("invalid 'build.buildinfo' LAST_BUILT_AT value '%s': %w", v, err)
+			}
+
+			parsedBuiltAt = &parsed
+			continue
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading 'build.buildinfo': %w", err)
+	}
+
+	if parsedBuiltAt == nil {
+		return nil, errors.New("invalid 'build.buildinfo': no LAST_BUILT_AT value")
+	}
+	bState.builtAt = *parsedBuiltAt
+	if parsedVersion == nil {
+		return nil, errors.New("invalid 'build.buildinfo': no VERSION")
+	}
+	bState.version = *parsedVersion
+
+	if bState.containerEngineVersion == "" {
+		return nil, errors.New("invalid 'build.buildinfo': no CONTAINER_ENGINE_VERSION")
+	}
+	if bState.containerEngine == "" {
+		return nil, errors.New("invalid 'build.buildinfo': no CONTAINER_ENGINE")
+	}
+	if bState.builtBy == "" {
+		return nil, errors.New("invalid 'build.buildinfo': no BUILT_BY")
+	}
+	if bState.buildEnvHash == "" {
+		return nil, errors.New("invalid 'build.buildinfo': no BUILD_ENV")
+	}
+	if bState.buildComposeHash == "" {
+		return nil, errors.New("invalid 'build.buildinfo': no BUILD_COMPOSE")
+	}
+	return &bState, nil
+}
+
+// ReadBuildInfo reads the "project.buildinfo" file and returns a populated buildState struct.
+// TODO: Return enum of reasons
+func (filestore *FileStore) NeedsRebuild(projectName string, bState *buildState) (bool, error) {
+	if bState == nil {
+		return false, errors.New("cannot now if rebuild is needed, no build state")
+	}
+	machineId, err := filestore.getMachineID()
+	if err != nil {
+		return false, fmt.Errorf("cannot get current 'machineid': %w", err)
+	}
+	if bState.builtBy != machineId {
+		return true, nil
+	}
+
+	composeHash, err := utils.FileHash(filestore.GetProjectComposeFilePath(projectName))
+	if err != nil {
+		return false, fmt.Errorf("cannot hash current compose file: %w", err)
+	}
+	if bState.buildComposeHash != composeHash {
+		return true, nil
+	}
+	envHash, err := utils.FileHash(filestore.GetProjectEnvFilePath(projectName))
+	if err != nil {
+		return false, fmt.Errorf("cannot hash current env file: %w", err)
+	}
+	if bState.buildEnvHash != envHash {
+		return true, nil
+	}
+	if bState.containerEngine != "docker" {
+		return true, nil
+	}
+	return false, nil
 }
 
 // Returns the format of the "project.buildinfo" file which contains information on

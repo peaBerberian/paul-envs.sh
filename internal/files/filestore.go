@@ -13,6 +13,7 @@ const (
 	projectComposeFilename = "compose.yaml"
 	projectEnvFilename     = ".env"
 	projectInfoFilename    = "project.lock"
+	buildInfoFilename      = "project.buildinfo"
 )
 
 // Struct allowing to create, read and obtain the path of all files created by
@@ -200,6 +201,11 @@ func (f *FileStore) getProjectDirBase() string {
 // Get path to the 'project.lock' file associated to a project.
 func (f *FileStore) getProjectInfoFilePathFor(projectName string) string {
 	return filepath.Join(f.projectsDir, projectName, projectInfoFilename)
+}
+
+// Get path to the 'project.buildinfo' file associated to a project.
+func (f *FileStore) getBuildInfoFilePathFor(projectName string) string {
+	return filepath.Join(f.projectsDir, projectName, buildInfoFilename)
 }
 
 // Get directory where a specific project's files will be put.
