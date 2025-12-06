@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"os/user"
 	"runtime"
 	"strconv"
 
@@ -107,18 +108,41 @@ type Config struct {
 
 // New creates a config with UID/GID auto-detected.
 func New(username string, shell Shell) Config {
-	uid := "1000"
-	gid := "1000"
-
-	if runtime.GOOS != "windows" {
-		uid = strconv.Itoa(os.Getuid())
-		gid = strconv.Itoa(os.Getgid())
+	if runtime.GOOS == "windows" {
+		return Config{
+			Username: username,
+			Shell:    shell,
+			UID:      "1000",
+			GID:      "1000",
+		}
 	}
-
-	return Config{
-		Username: username,
-		Shell:    shell,
-		UID:      uid,
-		GID:      gid,
+	sudoUserEnv := os.Getenv("SUDO_USER")
+	if os.Geteuid() != 0 || sudoUserEnv == "" {
+		return Config{
+			Username: username,
+			Shell:    shell,
+			UID:      getuid(),
+			GID:      getgid(),
+		}
 	}
+	usr, err := user.Lookup(sudoUserEnv)
+	if err != nil {
+		return Config{
+			Username: username,
+			Shell:    shell,
+			UID:      getuid(),
+			GID:      getgid(),
+		}
+	}
+	uid := usr.Uid
+	gid := usr.Gid
+	return Config{Username: username, Shell: shell, UID: uid, GID: gid}
+}
+
+func getuid() string {
+	return strconv.Itoa(os.Getuid())
+}
+
+func getgid() string {
+	return strconv.Itoa(os.Getgid())
 }
