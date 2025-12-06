@@ -561,7 +561,7 @@ func formatBuildInfo(bInfo buildState) ([]byte, error) {
 // If the file doesn't exist, it creates one.
 func (f *FileStore) getMachineID() (string, error) {
 	machineIdPath := filepath.Join(f.baseDataDir, "machine-id")
-	if err := os.MkdirAll(filepath.Dir(machineIdPath), 0o700); err != nil {
+	if err := f.userFS.MkdirAsUser(filepath.Dir(machineIdPath), 0o700); err != nil {
 		return "", fmt.Errorf("cannot create directory: %w", err)
 	}
 	if data, err := os.ReadFile(machineIdPath); err == nil {
