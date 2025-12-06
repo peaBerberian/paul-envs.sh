@@ -283,7 +283,6 @@ will be removed when the container is exited).
 - rootless support
 - Add `kakoune` and `helix` as potential in-container editors
 - less gh-action scripts, more shell scripts
-- permissions things when calling the `create` command with `sudo`
 - Kill containers on same image on build?
 - Reference counted container instead of master/slaves
 - Does cache pruning in `clean` actually does anything?
