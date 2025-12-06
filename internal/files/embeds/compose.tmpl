@@ -76,6 +76,7 @@ services:
     image: paulenv:{{.ProjectName}}
     pull_policy: never
     stdin_open: true
+    init: true
     tty: true
 
 # Persisted container volumes information - should be left as is
