@@ -44,7 +44,7 @@ func Interactive(ctx context.Context, fs *files.FileStore, c *console.Console) e
 		case "4", "run":
 			cmdErr = Run(ctx, []string{}, fs, c)
 		case "5", "remove", "rm":
-			cmdErr = Remove([]string{}, fs, c)
+			cmdErr = Remove(ctx, []string{}, fs, c)
 		case "6", "version":
 			cmdErr = Version(ctx, c)
 		case "7", "clean":

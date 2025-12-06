@@ -420,8 +420,6 @@ Along the mounted project, those are the only directories which are persisted.
 ## TODO:
 
 - help flag per commands
-- Should remove also remove networks?
-- Should remove also remove volume directly?
 - Add "init bash / zsh /fish" commands to simplify auto-completion
 - ci tests for clean command?
 - on Remove, propose to call docker ourselve to remove the volume
