@@ -4,6 +4,8 @@
 on multiple large projects with rapidly changing dependencies in isolated and
 minimal containers.
 
+<video src="https://github.com/user-attachments/assets/0eb8bbb8-5ad4-4c8d-8d80-f92fbb0072c4"></video>
+
 ## What's this
 
 `paul-envs` is both a wrapper over the `docker compose` tool and a configuration
